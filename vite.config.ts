@@ -8,6 +8,11 @@ import { playwright } from '@vitest/browser-playwright'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages serves project sites from https://<user>.github.io/<repo>/,
+  // so the build needs that repo name as its base path. Netlify (and local
+  // dev/preview) serve from the root, so this only kicks in when the Pages
+  // workflow sets GH_PAGES=true.
+  base: process.env.GH_PAGES === 'true' ? '/automated-schedule-feature/' : '/',
   plugins: [
     tanstackRouter({
       target: 'react',
