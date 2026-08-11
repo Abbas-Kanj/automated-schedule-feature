@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { type Control, type Resolver, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { cn } from '@/lib/utils'
+import { showSubmittedData } from '@/lib/show-submitted-data'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -283,13 +284,14 @@ export function ScheduleForm({
   }
 
   const handleFormSubmit = (values: Schedule) => {
-    // No backend wired up yet — log what would be sent so the payload
-    // shape is easy to inspect during development.
+    // No backend wired up yet — log what would be sent (console + toast) so
+    // the payload shape is easy to inspect during development.
     // eslint-disable-next-line no-console
     console.log(
       'Schedule form submitted — JSON payload:',
       JSON.stringify(values, null, 2)
     )
+    showSubmittedData(values, 'Schedule submitted — JSON payload:')
     onSubmit(values)
   }
 
