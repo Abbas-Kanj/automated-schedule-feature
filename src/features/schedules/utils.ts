@@ -29,7 +29,10 @@ export function calculateHours(times: TimeRange[]): number {
     if (!t.from_time || !t.to_time) return sum
     const from = parse(t.from_time, 'HH:mm', new Date())
     const to = parse(t.to_time, 'HH:mm', new Date())
-    return sum + Math.max(differenceInMinutes(to, from), 0)
+    const diff = differenceInMinutes(to, from)
+    // A range that ends before it starts (e.g. an overnight 22:00 -> 06:00
+    // entry) is treated as crossing midnight rather than a negative duration.
+    return sum + (diff >= 0 ? diff : diff + 24 * 60)
   }, 0)
 
   return Math.round((totalMinutes / 60) * 100) / 100
@@ -78,7 +81,7 @@ export function getScheduleTotalHours(schedule: Schedule): number {
     return schedule.shifts.reduce(
       (shiftSum, shift) =>
         shiftSum +
-        shift.days.reduce((daySum, d) => daySum + calculateHours([d.time]), 0),
+        shift.days.reduce((daySum, d) => daySum + calculateHours(d.times), 0),
       0
     )
   }

@@ -190,7 +190,7 @@ function ShiftDefinitionSummary({ values }: { values: any }) {
                     {d.day}
                   </span>
                   <span className='text-muted-foreground'>
-                    {formatTimes([d.time])}
+                    {formatTimes(d.times)}
                   </span>
                 </div>
               ))}

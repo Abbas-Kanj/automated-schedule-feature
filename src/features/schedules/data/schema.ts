@@ -160,9 +160,54 @@ const regularBaseSchema = z.object({
 
 // --- fixed / flexible: shift definition ---
 
+const regularShiftTimeEntrySchema = z
+  .object({
+    from_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required'),
+    to_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required'),
+    // Lets a range cross midnight (e.g. 22:00 -> 06:00) instead of failing
+    // the "end after start" check below.
+    overnight: z.boolean().optional(),
+  })
+  .refine((val) => val.overnight || val.to_time > val.from_time, {
+    message: 'End time must be after start time (or mark as overnight)',
+    path: ['to_time'],
+  })
+
+// Unwraps an entry onto a single continuous timeline (adding a day once it
+// crosses midnight) so two ranges on the same day can be compared for
+// overlap with plain start/end math.
+export function getShiftTimeEntryRange(entry: {
+  from_time: string
+  to_time: string
+  overnight?: boolean
+}) {
+  const toMinutes = (value: string) => {
+    const [h, m] = value.split(':').map(Number)
+    return h * 60 + m
+  }
+  const start = toMinutes(entry.from_time)
+  let end = toMinutes(entry.to_time)
+  if (entry.overnight || end <= start) end += 24 * 60
+  return { start, end }
+}
+
+export function shiftTimesCollide(
+  times: { from_time: string; to_time: string; overnight?: boolean }[]
+): boolean {
+  const ranges = times.map(getShiftTimeEntryRange)
+  return ranges.some((a, i) =>
+    ranges.some((b, j) => j !== i && a.start < b.end && b.start < a.end)
+  )
+}
+
 const regularShiftDaySchema = z.object({
   day: daySchema,
-  time: timeRangeSchema,
+  times: z
+    .array(regularShiftTimeEntrySchema)
+    .min(1, 'Add at least one time range')
+    .refine((times) => !shiftTimesCollide(times), {
+      message: "Times can't overlap — adjust them so they don't collide",
+    }),
 })
 
 const regularShiftSchema = z.object({
@@ -432,6 +477,7 @@ export type RegularShift = Extract<
   { type: 'fixed' | 'flexible' }
 >['shifts'][number]
 export type RegularShiftDay = RegularShift['days'][number]
+export type RegularShiftTimeEntry = RegularShiftDay['times'][number]
 export type Recurrence = z.infer<typeof recurrenceSchema>
 export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number]
 export type RecurrenceEndType = (typeof RECURRENCE_END_TYPES)[number]
