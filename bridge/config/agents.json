@@ -1,0 +1,47 @@
+{
+  "_notes": "Model identifiers below are examples based on OpenCode's provider/model naming (Aug 2026). After running 'opencode auth login' for each provider you use, run 'opencode models' (or 'opencode models <provider>') to see the exact strings available to YOUR account, then correct the 'model' fields here if they differ. No script changes are needed after editing this file — watchers re-read it on every loop tick.",
+  "pollIntervalSec": 5,
+  "staleAfterMissedBeats": 3,
+  "agents": [
+    {
+      "id": "deepseek-worker",
+      "displayName": "DeepSeek Worker",
+      "model": "deepseek/deepseek-chat",
+      "opencodeAgent": null,
+      "tags": ["cheap", "general", "reasoning"],
+      "description": "Cheap general-purpose coding/reasoning tasks.",
+      "enabled": true,
+      "autoApprove": true
+    },
+    {
+      "id": "qwen-coder",
+      "displayName": "Qwen Coder",
+      "model": "qwen/qwen3-coder",
+      "opencodeAgent": null,
+      "tags": ["cheap", "code", "refactor", "boilerplate"],
+      "description": "Cheap code-focused tasks: refactors, small fixes, boilerplate, test scaffolding.",
+      "enabled": true,
+      "autoApprove": true
+    },
+    {
+      "id": "glm-worker",
+      "displayName": "GLM Worker",
+      "model": "zhipuai/glm-4.6",
+      "opencodeAgent": null,
+      "tags": ["cheap", "general", "docs"],
+      "description": "Cheap general tasks and documentation writing.",
+      "enabled": true,
+      "autoApprove": true
+    },
+    {
+      "id": "kimi-worker",
+      "displayName": "Kimi Worker",
+      "model": "moonshot/kimi-k2",
+      "opencodeAgent": null,
+      "tags": ["cheap", "long-context", "summarize"],
+      "description": "Cheap long-context tasks: large file summaries, big diffs, log triage.",
+      "enabled": true,
+      "autoApprove": true
+    }
+  ]
+}
