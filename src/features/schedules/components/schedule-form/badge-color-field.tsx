@@ -1,0 +1,80 @@
+import { XIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { BADGE_COLOR_OPTIONS } from '../../data/data'
+import { type BadgeColor } from '../../data/schema'
+
+type BadgeColorFieldProps = {
+  value: BadgeColor | undefined
+  onChange: (value: BadgeColor | undefined) => void
+  disabled?: boolean
+}
+
+export function BadgeColorField({
+  value,
+  onChange,
+  disabled,
+}: BadgeColorFieldProps) {
+  const selected = BADGE_COLOR_OPTIONS.find((o) => o.value === value)
+
+  return (
+    <div className='flex items-center gap-2'>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type='button'
+            variant='outline'
+            disabled={disabled}
+            className='justify-start gap-2'
+          >
+            {selected ? (
+              <>
+                <span
+                  className={cn(
+                    'size-3 rounded-full',
+                    selected.swatchClassName
+                  )}
+                />
+                {selected.label}
+              </>
+            ) : (
+              <span className='text-muted-foreground'>Select a color</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className='w-56 p-2'>
+          <div className='grid grid-cols-4 gap-2'>
+            {BADGE_COLOR_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type='button'
+                title={o.label}
+                onClick={() => onChange(o.value)}
+                className={cn(
+                  'size-8 rounded-full ring-offset-2 transition-shadow',
+                  o.swatchClassName,
+                  value === o.value && 'ring-2 ring-ring'
+                )}
+              />
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+      {value && !disabled && (
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon'
+          onClick={() => onChange(undefined)}
+        >
+          <XIcon className='size-4' />
+        </Button>
+      )}
+    </div>
+  )
+}

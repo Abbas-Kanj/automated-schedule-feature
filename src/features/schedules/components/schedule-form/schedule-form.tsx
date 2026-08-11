@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { type Control, useForm, useWatch } from 'react-hook-form'
+import { format } from 'date-fns'
+import { type Control, type Resolver, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -11,31 +13,52 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { type StepperStep, Stepper } from '@/components/ui/stepper'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { MultiSelect } from '@/components/multi-select'
-import { POLICY_TYPE_OPTIONS, SCHEDULE_TYPES } from '../../data/data'
 import {
+  type VerticalTabsStep,
+  VerticalTabs,
+} from '@/components/ui/vertical-tabs'
+import { MultiSelect } from '@/components/multi-select'
+import { SCHEDULE_TYPES } from '../../data/data'
+import {
+  type DailySchedule,
+  type RegularType,
   type Schedule,
   type ScheduleType,
   scheduleSchema,
 } from '../../data/schema'
 import { generateId } from '../../utils'
+import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
-import { RegularShiftFields } from './regular-shift-fields'
+import { RecurrenceFields } from './recurrence-fields'
+import { RegularBasicsFields } from './regular-basics-fields'
+import { RotateFields } from './rotate-fields'
 import { ScheduleSummary } from './schedule-summary'
+import { ShiftDefinitionFields } from './shift-definition-fields'
 import { WeeklyFields } from './weekly-fields'
 import { WeeklyOneFields } from './weekly-one-fields'
 
-function getSteps(parentType: string): StepperStep[] {
-  const steps: StepperStep[] = [
-    { id: 'basics', label: 'Basics' },
-    { id: 'type', label: 'Type' },
-  ]
+function getSteps(
+  parentType: string,
+  regularType?: string,
+  nbOfShifts?: number
+): VerticalTabsStep[] {
+  const steps: VerticalTabsStep[] = [{ id: 'basics', label: 'Basics' }]
+
   if (parentType === 'regular') {
-    steps.push({ id: 'policy', label: 'Policy' })
+    if (regularType === 'rotate') {
+      steps.push({ id: 'rotate-config', label: 'Rotate config' })
+    } else {
+      steps.push({ id: 'shift-definition', label: 'Shift definition' })
+      if (regularType === 'fixed' && nbOfShifts === 1) {
+        steps.push({ id: 'recurrence', label: 'Recurrence' })
+      }
+    }
+  } else {
+    steps.push({ id: 'type', label: 'Type' })
   }
+
   steps.push({ id: 'summary', label: 'Summary' })
   return steps
 }
@@ -52,12 +75,14 @@ function getTypeDefaults(type: ScheduleType) {
         month: now.getMonth() + 1,
         week: { start_date: '', end_date: '' },
         days: [],
+        employees: [],
       }
     case 'weekly_one':
       return {
         parent_type: 'daily' as const,
         type: 'weekly_one' as const,
         days: [],
+        employees: [],
       }
     case 'monthly':
       return {
@@ -65,23 +90,47 @@ function getTypeDefaults(type: ScheduleType) {
         type: 'monthly' as const,
         year: now.getFullYear(),
         months: [],
+        employees: [],
       }
   }
 }
 
-function getRegularDefaults() {
-  return {
+function getRegularTypeDefaults(type: RegularType) {
+  const base = {
     parent_type: 'regular' as const,
-    shift_number: 1,
-    split_number: 1,
-    single_shift: {
-      days: [],
-      time: { from_time: '09:00', to_time: '17:00' },
-      has_break: false,
-    },
-    shifts: undefined,
-    leave_hours: 8,
-    official_holiday_hours: 8,
+    type,
+    is_active: true,
+    start_date: format(now, 'yyyy-MM-dd'),
+  }
+
+  if (type === 'rotate') {
+    return {
+      ...base,
+      cycle_type: 'rotating_shift' as const,
+      cycle_length: { unit: 'weekly' as const, days: 7 },
+      rotate_type: 'right_shift' as const,
+      shift_block: 1,
+      shift_length_hours: 8,
+      blocks: [
+        {
+          id: generateId(),
+          label: 'Shift A',
+          time: { from_time: '09:00', to_time: '17:00' },
+        },
+      ],
+      pattern: Array.from({ length: 7 }, (_, i) => ({
+        position: i + 1,
+        is_off: false,
+        block_id: undefined,
+      })),
+    }
+  }
+
+  return {
+    ...base,
+    nb_of_shifts: 1,
+    shifts: [{ id: generateId(), name: '', short_code: '', days: [] }],
+    temporary_schedule: false,
   }
 }
 
@@ -103,34 +152,50 @@ type ScheduleFormProps = {
   submitLabel?: string
 }
 
-function getStepFields(
-  stepId: string,
-  parentType: string,
-  type?: string,
-  shiftNumber?: number,
-  splitNumber?: number
-): any {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getStepFields(stepId: string, parentType: string, type?: string): any {
   if (stepId === 'basics') {
     return parentType === 'regular'
-      ? ['name', 'description', 'parent_type', 'shift_number', 'split_number']
-      : ['name', 'description', 'parent_type']
+      ? [
+          'name',
+          'description',
+          'parent_type',
+          'type',
+          'badge_color',
+          'icon',
+          'is_active',
+          'policy_type',
+          'start_date',
+        ]
+      : ['name', 'description', 'parent_type', 'employees']
+  }
+  if (stepId === 'shift-definition') {
+    return [
+      'nb_of_shifts',
+      'shifts',
+      'temporary_schedule',
+      'temporary_schedule_label',
+    ]
+  }
+  if (stepId === 'rotate-config') {
+    return [
+      'cycle_type',
+      'cycle_length',
+      'rotate_type',
+      'shift_block',
+      'shift_length_hours',
+      'blocks',
+      'pattern',
+    ]
+  }
+  if (stepId === 'recurrence') {
+    return ['recurrence']
   }
   if (stepId === 'type') {
-    if (parentType === 'regular') {
-      if (shiftNumber === 1 && splitNumber === 1) return ['single_shift']
-      const fields = ['shifts']
-      if ((shiftNumber ?? 0) > 1) {
-        fields.push('shift_cycle', 'shift_rotation', 'repeated_shift')
-      }
-      return fields
-    }
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
     if (type === 'weekly_one') return ['type', 'days']
     if (type === 'monthly') return ['type', 'year', 'months']
     return ['type']
-  }
-  if (stepId === 'policy') {
-    return ['policy_type']
   }
   return []
 }
@@ -142,7 +207,7 @@ export function ScheduleForm({
   submitLabel = 'Save schedule',
 }: ScheduleFormProps) {
   const form = useForm<Schedule>({
-    resolver: zodResolver(scheduleSchema),
+    resolver: zodResolver(scheduleSchema) as Resolver<Schedule>,
     mode: 'onChange',
     defaultValues:
       defaultValues ??
@@ -157,17 +222,23 @@ export function ScheduleForm({
 
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const looseControl = form.control as unknown as Control<any>
-  const shiftNumber = useWatch({ control: looseControl, name: 'shift_number' })
-  const splitNumber = useWatch({ control: looseControl, name: 'split_number' })
+  const regularType = useWatch({ control: looseControl, name: 'type' }) as
+    | RegularType
+    | undefined
+  const nbOfShifts = useWatch({ control: looseControl, name: 'nb_of_shifts' })
 
-  const steps = getSteps(parentType)
+  const steps =
+    parentType === 'regular'
+      ? getSteps(parentType, regularType, nbOfShifts)
+      : getSteps(parentType)
   const currentStepId = steps[step]?.id
   const isLastStep = step === steps.length - 1
 
   const handleNext = async () => {
     const valid = await form.trigger(
-      getStepFields(currentStepId, parentType, type, shiftNumber, splitNumber)
+      getStepFields(currentStepId, parentType, type)
     )
     if (valid) setStep((s) => Math.min(s + 1, steps.length - 1))
   }
@@ -182,8 +253,11 @@ export function ScheduleForm({
       id: current.id,
       name: current.name,
       description: current.description,
-      ...(value === 'daily' ? getTypeDefaults('weekly') : getRegularDefaults()),
+      ...(value === 'daily'
+        ? getTypeDefaults('weekly')
+        : getRegularTypeDefaults('fixed')),
     } as Schedule)
+    setStep(0)
   }
 
   const handleTypeChange = (value: string) => {
@@ -194,7 +268,20 @@ export function ScheduleForm({
       name: current.name,
       description: current.description,
       ...getTypeDefaults(value as ScheduleType),
+      employees: (current as DailySchedule).employees ?? [],
     } as Schedule)
+  }
+
+  const handleRegularTypeChange = (value: RegularType) => {
+    if (value === regularType) return
+    const current = form.getValues()
+    form.reset({
+      id: current.id,
+      name: current.name,
+      description: current.description,
+      ...getRegularTypeDefaults(value),
+    } as Schedule)
+    setStep(0)
   }
 
   return (
@@ -210,86 +297,68 @@ export function ScheduleForm({
         }}
         className='space-y-6'
       >
-        {!disabled && <Stepper steps={steps} currentStep={step} />}
-
-        {(disabled || currentStepId === 'basics') && (
-          <>
-            <FormField
-              control={form.control}
-              name='name'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder='e.g. Front Desk Coverage'
-                      disabled={disabled}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <div className={cn(!disabled && 'flex flex-col gap-8 sm:flex-row')}>
+          {!disabled && (
+            <VerticalTabs
+              steps={steps}
+              currentStep={step}
+              onStepChange={setStep}
             />
-            <FormField
-              control={form.control}
-              name='description'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder='Optional description'
-                      disabled={disabled}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='parent_type'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Type</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      options={PARENT_TYPES}
-                      value={
-                        PARENT_TYPES.find((t) => t.value === field.value) ??
-                        null
-                      }
-                      onChange={(opt: { value: string } | null) =>
-                        handleParentTypeChange(opt?.value ?? '')
-                      }
-                      isDisabled={disabled}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {parentType === 'regular' && (
+          )}
+          <div className='min-w-0 flex-1 space-y-6'>
+            {(disabled || currentStepId === 'basics') && (
               <>
                 <FormField
                   control={form.control}
-                  name='shift_number'
+                  name='name'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Shift number</FormLabel>
+                      <FormLabel>Name</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder='Enter how many shifts'
-                          type='number'
+                          placeholder='e.g. Front Desk Coverage'
                           disabled={disabled}
-                          value={field.value ?? ''}
-                          onChange={(e) =>
-                            field.onChange(e.target.valueAsNumber)
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='description'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder='Optional description'
+                          disabled={disabled}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='parent_type'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type</FormLabel>
+                      <FormControl>
+                        <MultiSelect
+                          options={PARENT_TYPES}
+                          value={
+                            PARENT_TYPES.find((t) => t.value === field.value) ??
+                            null
                           }
-                          min={1}
+                          onChange={(opt: { value: string } | null) =>
+                            handleParentTypeChange(opt?.value ?? '')
+                          }
+                          isDisabled={disabled}
                         />
                       </FormControl>
                       <FormMessage />
@@ -297,167 +366,92 @@ export function ScheduleForm({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name='split_number'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Split number</FormLabel>
-                      <FormControl>
-                        <Input
-                          min={1}
-                          placeholder='Enter how many splits'
-                          type='number'
-                          disabled={disabled}
-                          value={field.value ?? ''}
-                          onChange={(e) =>
-                            field.onChange(e.target.valueAsNumber)
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </>
-            )}
-          </>
-        )}
-
-        {(disabled || currentStepId === 'type') && (
-          <>
-            {parentType === 'daily' && (
-              <>
-                <FormItem>
-                  <FormLabel>Schedule type</FormLabel>
-                  <Tabs value={type} onValueChange={handleTypeChange}>
-                    <TabsList className='grid w-full grid-cols-3'>
-                      {SCHEDULE_TYPES.map((t) => (
-                        <TabsTrigger
-                          key={t.value}
-                          value={t.value}
-                          disabled={disabled}
-                        >
-                          {t.label}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </Tabs>
-                </FormItem>
-
-                {type === 'weekly' && <WeeklyFields disabled={disabled} />}
-                {type === 'weekly_one' && (
-                  <WeeklyOneFields disabled={disabled} />
+                {parentType === 'daily' && (
+                  <EmployeeMultiSelect
+                    control={looseControl}
+                    disabled={disabled}
+                  />
                 )}
-                {type === 'monthly' && <MonthlyFields disabled={disabled} />}
+
+                {parentType === 'regular' && (
+                  <RegularBasicsFields
+                    disabled={disabled}
+                    onTypeChange={handleRegularTypeChange}
+                  />
+                )}
               </>
             )}
 
-            {parentType === 'regular' && (
-              <RegularShiftFields disabled={disabled} />
+            {(disabled || currentStepId === 'type') &&
+              parentType === 'daily' && (
+                <>
+                  <FormItem>
+                    <FormLabel>Schedule type</FormLabel>
+                    <Tabs value={type} onValueChange={handleTypeChange}>
+                      <TabsList className='grid w-full grid-cols-3'>
+                        {SCHEDULE_TYPES.map((t) => (
+                          <TabsTrigger
+                            key={t.value}
+                            value={t.value}
+                            disabled={disabled}
+                          >
+                            {t.label}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </Tabs>
+                  </FormItem>
+
+                  {type === 'weekly' && <WeeklyFields disabled={disabled} />}
+                  {type === 'weekly_one' && (
+                    <WeeklyOneFields disabled={disabled} />
+                  )}
+                  {type === 'monthly' && <MonthlyFields disabled={disabled} />}
+                </>
+              )}
+
+            {(disabled || currentStepId === 'shift-definition') &&
+              parentType === 'regular' &&
+              regularType !== 'rotate' && (
+                <ShiftDefinitionFields disabled={disabled} />
+              )}
+
+            {(disabled || currentStepId === 'rotate-config') &&
+              parentType === 'regular' &&
+              regularType === 'rotate' && <RotateFields disabled={disabled} />}
+
+            {(disabled || currentStepId === 'recurrence') &&
+              parentType === 'regular' &&
+              regularType === 'fixed' &&
+              nbOfShifts === 1 && <RecurrenceFields disabled={disabled} />}
+
+            {!disabled && currentStepId === 'summary' && (
+              <ScheduleSummary control={looseControl} />
             )}
-          </>
-        )}
 
-        {((disabled && parentType === 'regular') ||
-          currentStepId === 'policy') && (
-          <>
-            <FormField
-              control={form.control}
-              name='policy_type'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Policy type</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      options={POLICY_TYPE_OPTIONS}
-                      value={
-                        POLICY_TYPE_OPTIONS.find(
-                          (o) => o.value === field.value
-                        ) ?? null
-                      }
-                      onChange={(opt: { value: string } | null) =>
-                        field.onChange(opt?.value ?? '')
-                      }
-                      isDisabled={disabled}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name='leave_hours'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Leave equivalent hours per day</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={1}
-                      max={12}
-                      disabled={disabled}
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name='official_holiday_hours'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Official holiday equivalent hours per day
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={1}
-                      max={12}
-                      disabled={disabled}
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </>
-        )}
-
-        {!disabled && currentStepId === 'summary' && (
-          <ScheduleSummary control={looseControl} />
-        )}
-
-        {!disabled && (
-          <div className='flex items-center justify-between pt-2'>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={handleBack}
-              disabled={step === 0}
-            >
-              Back
-            </Button>
-            {isLastStep ? (
-              <Button key='submit' type='submit'>
-                {submitLabel}
-              </Button>
-            ) : (
-              <Button key='next' type='button' onClick={handleNext}>
-                Next
-              </Button>
+            {!disabled && (
+              <div className='flex items-center justify-between pt-2'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  onClick={handleBack}
+                  disabled={step === 0}
+                >
+                  Back
+                </Button>
+                {isLastStep ? (
+                  <Button key='submit' type='submit'>
+                    {submitLabel}
+                  </Button>
+                ) : (
+                  <Button key='next' type='button' onClick={handleNext}>
+                    Next
+                  </Button>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
       </form>
     </Form>
   )

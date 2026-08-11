@@ -55,6 +55,25 @@ export const schedulesColumns: ColumnDef<Schedule>[] = [
     ),
   },
   {
+    id: 'employees',
+    header: 'Employees',
+    meta: { className: 'w-1/6', tdClassName: 'max-w-0' },
+    cell: ({ row }) => {
+      const schedule = row.original
+      if (schedule.parent_type === 'regular') {
+        return <span className='text-muted-foreground text-sm'>—</span>
+      }
+      const names = schedule.employees.map((e) => e.label)
+      return (
+        <span className='text-muted-foreground block truncate text-sm'>
+          {names.length > 2
+            ? `${names.slice(0, 2).join(', ')} +${names.length - 2}`
+            : names.join(', ')}
+        </span>
+      )
+    },
+  },
+  {
     id: 'summary',
     header: 'Summary',
     meta: { className: 'w-1/6', tdClassName: 'max-w-0' },
