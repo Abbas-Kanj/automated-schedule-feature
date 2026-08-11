@@ -61,8 +61,11 @@ function getSteps(parentType: string, regularType?: RegularType): VerticalTabsSt
   })
   if (regularType === 'rotate') {
     steps.push({ id: 'pattern', label: 'Pattern' })
+  } else {
+    // Occurrence only applies to fixed/flexible — rotate covers repetition
+    // through its cycle/pattern config instead.
+    steps.push({ id: 'occurrence', label: 'Occurrence' })
   }
-  steps.push({ id: 'occurrence', label: 'Occurrence' })
   steps.push({ id: 'summary', label: 'Summary' })
   return steps
 }
@@ -113,7 +116,6 @@ function getRegularTypeDefaults(type: RegularType) {
     type,
     is_active: true,
     start_date: format(now, 'yyyy-MM-dd'),
-    recurrence: DEFAULT_RECURRENCE,
   }
 
   if (type === 'rotate') {
@@ -141,6 +143,7 @@ function getRegularTypeDefaults(type: RegularType) {
 
   return {
     ...base,
+    recurrence: DEFAULT_RECURRENCE,
     nb_of_shifts: 1,
     shifts: [
       {
@@ -416,7 +419,8 @@ export function ScheduleForm({
               )}
 
             {(disabled || currentStepId === 'occurrence') &&
-              parentType === 'regular' && (
+              parentType === 'regular' &&
+              regularType !== 'rotate' && (
                 <OccurrenceFields disabled={disabled} />
               )}
 

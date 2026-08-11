@@ -272,8 +272,8 @@ const recurrenceSchema = z
     }
   })
 
-// occurrence is a universal step (4) for every regular type, not just
-// fixed + 1 shift, so it lives on the shared base rather than one arm
+// occurrence (step 4) only applies to fixed/flexible schedules — rotate
+// covers repetition through its cycle/pattern config instead
 const regularSharedSchema = regularBaseSchema.extend({
   recurrence: recurrenceSchema,
 })
@@ -342,7 +342,7 @@ const regularFlexibleSchema = z.object({
 const regularRotateSchema = z.object({
   parent_type: z.literal('regular'),
   type: z.literal('rotate'),
-  ...regularSharedSchema.shape,
+  ...regularBaseSchema.shape,
   ...rotateFieldsSchema.shape,
 })
 
