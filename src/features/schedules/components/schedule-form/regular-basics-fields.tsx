@@ -1,4 +1,4 @@
-import { useFormContext } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 import {
   FormControl,
   FormField,
@@ -6,11 +6,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { type RegularType } from '../../data/schema'
-import { BadgeColorField } from './badge-color-field'
 import { DateField } from './date-field'
-import { IconPickerField } from './icon-picker-field'
 import { PolicyPillField } from './policy-pill-field'
 import { ScheduleTypeSelector } from './schedule-type-selector'
 
@@ -25,6 +24,9 @@ export function RegularBasicsFields({
 }: RegularBasicsFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control } = useFormContext<any>()
+  const regularType = useWatch({ control, name: 'type' }) as
+    | RegularType
+    | undefined
 
   return (
     <div className='space-y-4'>
@@ -42,33 +44,21 @@ export function RegularBasicsFields({
 
       <FormField
         control={control}
-        name='badge_color'
+        name={regularType === 'rotate' ? 'shift_block' : 'nb_of_shifts'}
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Badge color</FormLabel>
+            <FormLabel>
+              {regularType === 'rotate'
+                ? 'Number of shift blocks'
+                : 'Number of shifts'}
+            </FormLabel>
             <FormControl>
-              <BadgeColorField
-                value={field.value}
-                onChange={field.onChange}
+              <Input
+                type='number'
+                min={1}
                 disabled={disabled}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={control}
-        name='icon'
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Icon</FormLabel>
-            <FormControl>
-              <IconPickerField
-                value={field.value}
-                onChange={field.onChange}
-                disabled={disabled}
+                value={field.value ?? ''}
+                onChange={(e) => field.onChange(e.target.valueAsNumber)}
               />
             </FormControl>
             <FormMessage />

@@ -10,6 +10,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { SelectDropdown } from '@/components/select-dropdown'
+import { CYCLE_TYPE_OPTIONS } from '../../data/data'
 import { type RotateBlock, type RotatePatternEntry } from '../../data/schema'
 import { DirectionPreview } from './direction-preview'
 
@@ -50,6 +51,25 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
         <CardTitle className='text-sm font-medium'>Create pattern</CardTitle>
       </CardHeader>
       <CardContent className='space-y-3 px-4'>
+        <FormField
+          control={control}
+          name='cycle_type'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Pattern rotate type</FormLabel>
+              <SelectDropdown
+                isControlled
+                defaultValue={field.value}
+                onValueChange={field.onChange}
+                placeholder='Select a pattern type'
+                items={CYCLE_TYPE_OPTIONS}
+                disabled={disabled}
+              />
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {!days ? (
           <p className='text-sm text-muted-foreground'>
             Set the cycle length to build the pattern.

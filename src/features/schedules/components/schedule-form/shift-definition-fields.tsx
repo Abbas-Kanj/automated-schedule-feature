@@ -13,9 +13,19 @@ import { Switch } from '@/components/ui/switch'
 import { type RegularShift } from '../../data/schema'
 import { deriveShortCode, generateId } from '../../utils'
 import { AssignDaysGrid } from './assign-days-grid'
+import { BadgeColorField } from './badge-color-field'
+import { IconPickerField } from './icon-picker-field'
 
 function makeShift(): RegularShift {
-  return { id: generateId(), name: '', short_code: '', days: [] }
+  return {
+    id: generateId(),
+    name: '',
+    short_code: '',
+    badge_color: 'blue',
+    icon: 'clock',
+    shift_length_hours: 8,
+    days: [],
+  }
 }
 
 type ShiftDefinitionFieldsProps = {
@@ -48,29 +58,9 @@ export function ShiftDefinitionFields({
 
   return (
     <div className='space-y-4'>
-      <FormField
-        control={control}
-        name='nb_of_shifts'
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Nb. of shifts</FormLabel>
-            <FormControl>
-              <Input
-                type='number'
-                min={1}
-                disabled={disabled}
-                value={field.value ?? ''}
-                onChange={(e) => field.onChange(e.target.valueAsNumber)}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
       {!nbOfShifts ? (
         <p className='text-sm text-muted-foreground'>
-          Set the number of shifts to continue.
+          Set the number of shifts in the previous step to continue.
         </p>
       ) : (
         shiftFields.map((field, index) => (
@@ -121,7 +111,6 @@ export function ShiftDefinitionFields({
 function ShiftCard({ index, disabled }: { index: number; disabled?: boolean }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, setValue } = useFormContext<any>()
-  const nbOfShifts = Number(useWatch({ control, name: 'nb_of_shifts' })) || 0
   const name = useWatch({ control, name: `shifts.${index}.name` }) as
     | string
     | undefined
@@ -173,29 +162,88 @@ function ShiftCard({ index, disabled }: { index: number; disabled?: boolean }) {
           )}
         />
 
+        <div className='grid gap-3 sm:grid-cols-2'>
+          <FormField
+            control={control}
+            name={`shifts.${index}.badge_color`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Badge color</FormLabel>
+                <FormControl>
+                  <BadgeColorField
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={disabled}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name={`shifts.${index}.icon`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Icon</FormLabel>
+                <FormControl>
+                  <IconPickerField
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={disabled}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={control}
+          name={`shifts.${index}.shift_length_hours`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Shift length (hours)</FormLabel>
+              <FormControl>
+                <Input
+                  type='number'
+                  min={1}
+                  max={24}
+                  disabled={disabled}
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormItem>
           <FormLabel>Assign days</FormLabel>
           <AssignDaysGrid shiftIndex={index} disabled={disabled} />
         </FormItem>
 
-        {nbOfShifts > 1 && (
-          <FormField
-            control={control}
-            name={`shifts.${index}.overnight`}
-            render={({ field }) => (
-              <FormItem className='flex flex-row items-center justify-between rounded-md border p-3'>
-                <FormLabel className='cursor-pointer'>Overnight</FormLabel>
-                <FormControl>
-                  <Switch
-                    checked={!!field.value}
-                    disabled={disabled}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-        )}
+        <FormField
+          control={control}
+          name={`shifts.${index}.overnight`}
+          render={({ field }) => (
+            <FormItem className='flex flex-row items-center justify-between rounded-md border p-3'>
+              <FormLabel className='cursor-pointer'>
+                Check next day
+              </FormLabel>
+              <FormControl>
+                <Switch
+                  checked={!!field.value}
+                  disabled={disabled}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
       </CardContent>
     </Card>
   )

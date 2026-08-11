@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Switch } from '@/components/ui/switch'
 import { RECURRENCE_END_TYPE_OPTIONS } from '../../data/data'
 import { DateField } from './date-field'
 
@@ -97,46 +96,6 @@ export function RecurrenceEndFields({ disabled }: RecurrenceEndFieldsProps) {
           )}
         />
       )}
-
-      <div className='space-y-2 border-t pt-3'>
-        <FormLabel>Exception settings</FormLabel>
-        <FormField
-          control={control}
-          name='recurrence.exceptions.public_holiday'
-          render={({ field }) => (
-            <FormItem className='flex flex-row items-center justify-between rounded-md border p-3'>
-              <FormLabel className='cursor-pointer font-normal'>
-                Public holiday
-              </FormLabel>
-              <FormControl>
-                <Switch
-                  checked={!!field.value}
-                  disabled={disabled}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={control}
-          name='recurrence.exceptions.sick_leave'
-          render={({ field }) => (
-            <FormItem className='flex flex-row items-center justify-between rounded-md border p-3'>
-              <FormLabel className='cursor-pointer font-normal'>
-                Sick leave
-              </FormLabel>
-              <FormControl>
-                <Switch
-                  checked={!!field.value}
-                  disabled={disabled}
-                  onCheckedChange={field.onChange}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-      </div>
     </div>
   )
 }

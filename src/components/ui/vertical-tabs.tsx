@@ -11,6 +11,12 @@ type VerticalTabsProps = {
   currentStep: number
   onStepChange?: (index: number) => void
   className?: string
+  /**
+   * Furthest step index the user has validated their way to. Steps beyond
+   * this are locked — clicking them is a no-op until earlier steps pass
+   * validation, so users can't jump ahead of unfinished ones.
+   */
+  maxStepReached?: number
 }
 
 function VerticalTabs({
@@ -18,6 +24,7 @@ function VerticalTabs({
   currentStep,
   onStepChange,
   className,
+  maxStepReached = currentStep,
 }: VerticalTabsProps) {
   return (
     <nav
@@ -27,18 +34,22 @@ function VerticalTabs({
       {steps.map((step, index) => {
         const isCompleted = index < currentStep
         const isActive = index === currentStep
+        const isLocked = index > maxStepReached
 
         return (
           <button
             key={step.id}
             type='button'
             aria-current={isActive ? 'step' : undefined}
-            onClick={() => onStepChange?.(index)}
+            aria-disabled={isLocked}
+            disabled={isLocked}
+            onClick={() => !isLocked && onStepChange?.(index)}
             className={cn(
               'flex items-center gap-2.5 rounded-md px-3 py-2 text-start text-sm font-medium transition-colors',
               isActive
                 ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+              isLocked && 'cursor-not-allowed opacity-50 hover:bg-transparent'
             )}
           >
             <span

@@ -153,8 +153,6 @@ const scheduleIconSchema = z.enum(SCHEDULE_ICONS)
 const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
 
 const regularBaseSchema = z.object({
-  badge_color: badgeColorSchema.optional(),
-  icon: scheduleIconSchema.optional(),
   is_active: z.boolean().default(true),
   policy_type: policyTypeSchema,
   start_date: dateStringSchema,
@@ -171,6 +169,9 @@ const regularShiftSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Shift name is required'),
   short_code: z.string().min(1, 'Required').max(6),
+  badge_color: badgeColorSchema,
+  icon: scheduleIconSchema,
+  shift_length_hours: z.number().min(1).max(24),
   overnight: z.boolean().optional(),
   days: z
     .array(regularShiftDaySchema)
@@ -187,7 +188,7 @@ const shiftDefinitionFieldsSchema = z.object({
   temporary_schedule_label: z.string().max(60).optional(),
 })
 
-// --- fixed + 1 shift: recurrence rule ---
+// --- occurrence / recurrence rule ---
 
 export const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 const recurrenceFrequencySchema = z.enum(RECURRENCE_FREQUENCIES)
@@ -271,6 +272,12 @@ const recurrenceSchema = z
     }
   })
 
+// occurrence is a universal step (4) for every regular type, not just
+// fixed + 1 shift, so it lives on the shared base rather than one arm
+const regularSharedSchema = regularBaseSchema.extend({
+  recurrence: recurrenceSchema,
+})
+
 // --- rotate: cycle / pattern config ---
 
 export const CYCLE_TYPES = [
@@ -321,22 +328,21 @@ const rotateFieldsSchema = z.object({
 const regularFixedSchema = z.object({
   parent_type: z.literal('regular'),
   type: z.literal('fixed'),
-  ...regularBaseSchema.shape,
+  ...regularSharedSchema.shape,
   ...shiftDefinitionFieldsSchema.shape,
-  recurrence: recurrenceSchema.optional(),
 })
 
 const regularFlexibleSchema = z.object({
   parent_type: z.literal('regular'),
   type: z.literal('flexible'),
-  ...regularBaseSchema.shape,
+  ...regularSharedSchema.shape,
   ...shiftDefinitionFieldsSchema.shape,
 })
 
 const regularRotateSchema = z.object({
   parent_type: z.literal('regular'),
   type: z.literal('rotate'),
-  ...regularBaseSchema.shape,
+  ...regularSharedSchema.shape,
   ...rotateFieldsSchema.shape,
 })
 
@@ -353,14 +359,6 @@ const regularScheduleSchema = z
           code: 'custom',
           message: `Configure all ${val.nb_of_shifts} shift(s)`,
           path: ['shifts'],
-        })
-      }
-
-      if (val.type === 'fixed' && val.nb_of_shifts === 1 && !val.recurrence) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Set the recurrence rule',
-          path: ['recurrence'],
         })
       }
     }

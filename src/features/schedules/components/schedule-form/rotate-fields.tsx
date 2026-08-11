@@ -15,12 +15,10 @@ import { SelectDropdown } from '@/components/select-dropdown'
 import {
   CYCLE_LENGTH_QUICK_PICKS,
   CYCLE_LENGTH_UNIT_OPTIONS,
-  CYCLE_TYPE_OPTIONS,
   ROTATE_TYPE_OPTIONS,
 } from '../../data/data'
 import { type RotateBlock } from '../../data/schema'
 import { calculateHours, generateId } from '../../utils'
-import { PatternBuilder } from './pattern-builder'
 
 function makeBlock(index: number): RotateBlock {
   return {
@@ -60,45 +58,24 @@ export function RotateFields({ disabled }: RotateFieldsProps) {
 
   return (
     <div className='space-y-4'>
-      <div className='grid gap-4 sm:grid-cols-2'>
-        <FormField
-          control={control}
-          name='cycle_type'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Cycle type</FormLabel>
-              <SelectDropdown
-                isControlled
-                defaultValue={field.value}
-                onValueChange={field.onChange}
-                placeholder='Select a cycle type'
-                items={CYCLE_TYPE_OPTIONS}
-                disabled={disabled}
-              />
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={control}
-          name='rotate_type'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Rotate type</FormLabel>
-              <SelectDropdown
-                isControlled
-                defaultValue={field.value}
-                onValueChange={field.onChange}
-                placeholder='Select a rotate type'
-                items={ROTATE_TYPE_OPTIONS}
-                disabled={disabled}
-              />
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+      <FormField
+        control={control}
+        name='rotate_type'
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Rotate type</FormLabel>
+            <SelectDropdown
+              isControlled
+              defaultValue={field.value}
+              onValueChange={field.onChange}
+              placeholder='Select a rotate type'
+              items={ROTATE_TYPE_OPTIONS}
+              disabled={disabled}
+            />
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>
@@ -167,26 +144,6 @@ export function RotateFields({ disabled }: RotateFieldsProps) {
 
       <FormField
         control={control}
-        name='shift_block'
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Shift block</FormLabel>
-            <FormControl>
-              <Input
-                type='number'
-                min={1}
-                disabled={disabled}
-                value={field.value ?? ''}
-                onChange={(e) => field.onChange(e.target.valueAsNumber)}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={control}
         name='shift_length_hours'
         render={({ field }) => (
           <FormItem>
@@ -217,8 +174,6 @@ export function RotateFields({ disabled }: RotateFieldsProps) {
           ))}
         </div>
       )}
-
-      <PatternBuilder disabled={disabled} />
     </div>
   )
 }

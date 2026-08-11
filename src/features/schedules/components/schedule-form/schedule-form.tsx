@@ -19,7 +19,6 @@ import {
   type VerticalTabsStep,
   VerticalTabs,
 } from '@/components/ui/vertical-tabs'
-import { MultiSelect } from '@/components/multi-select'
 import { SCHEDULE_TYPES } from '../../data/data'
 import {
   type DailySchedule,
@@ -31,7 +30,8 @@ import {
 import { generateId } from '../../utils'
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
-import { RecurrenceFields } from './recurrence-fields'
+import { OccurrenceFields } from './occurrence-fields'
+import { PatternBuilder } from './pattern-builder'
 import { RegularBasicsFields } from './regular-basics-fields'
 import { RotateFields } from './rotate-fields'
 import { ScheduleSummary } from './schedule-summary'
@@ -39,26 +39,29 @@ import { ShiftDefinitionFields } from './shift-definition-fields'
 import { WeeklyFields } from './weekly-fields'
 import { WeeklyOneFields } from './weekly-one-fields'
 
-function getSteps(
-  parentType: string,
-  regularType?: string,
-  nbOfShifts?: number
-): VerticalTabsStep[] {
-  const steps: VerticalTabsStep[] = [{ id: 'basics', label: 'Basics' }]
-
-  if (parentType === 'regular') {
-    if (regularType === 'rotate') {
-      steps.push({ id: 'rotate-config', label: 'Rotate config' })
-    } else {
-      steps.push({ id: 'shift-definition', label: 'Shift definition' })
-      if (regularType === 'fixed' && nbOfShifts === 1) {
-        steps.push({ id: 'recurrence', label: 'Recurrence' })
-      }
-    }
-  } else {
-    steps.push({ id: 'type', label: 'Type' })
+// `parent_type: 'daily'` (weekly / weekly_one / monthly) is no longer
+// offered when creating or editing a schedule — the form only builds
+// `regular` schedules (fixed/rotate/flexible) now. The 'daily' branches
+// below are kept only so pre-existing daily schedules (view/edit) still
+// render correctly; there's no UI path left to create a new one.
+function getSteps(parentType: string, regularType?: RegularType): VerticalTabsStep[] {
+  if (parentType === 'daily') {
+    return [
+      { id: 'basics', label: 'Basics' },
+      { id: 'type', label: 'Type' },
+      { id: 'summary', label: 'Summary' },
+    ]
   }
 
+  const steps: VerticalTabsStep[] = [{ id: 'basics', label: 'Basics' }]
+  steps.push({
+    id: 'shift-definition',
+    label: regularType === 'rotate' ? 'Shift blocks' : 'Shifts',
+  })
+  if (regularType === 'rotate') {
+    steps.push({ id: 'pattern', label: 'Pattern' })
+  }
+  steps.push({ id: 'occurrence', label: 'Occurrence' })
   steps.push({ id: 'summary', label: 'Summary' })
   return steps
 }
@@ -95,12 +98,21 @@ function getTypeDefaults(type: ScheduleType) {
   }
 }
 
+const DEFAULT_RECURRENCE = {
+  frequency: 'daily' as const,
+  interval: 1,
+  weekdays: [] as string[],
+  end_type: 'never' as const,
+  exceptions: { public_holiday: false, sick_leave: false },
+}
+
 function getRegularTypeDefaults(type: RegularType) {
   const base = {
     parent_type: 'regular' as const,
     type,
     is_active: true,
     start_date: format(now, 'yyyy-MM-dd'),
+    recurrence: DEFAULT_RECURRENCE,
   }
 
   if (type === 'rotate') {
@@ -129,21 +141,20 @@ function getRegularTypeDefaults(type: RegularType) {
   return {
     ...base,
     nb_of_shifts: 1,
-    shifts: [{ id: generateId(), name: '', short_code: '', days: [] }],
+    shifts: [
+      {
+        id: generateId(),
+        name: '',
+        short_code: '',
+        badge_color: 'blue' as const,
+        icon: 'clock' as const,
+        shift_length_hours: 8,
+        days: [],
+      },
+    ],
     temporary_schedule: false,
   }
 }
-
-const PARENT_TYPES = [
-  {
-    value: 'daily',
-    label: 'Daily',
-  },
-  {
-    value: 'regular',
-    label: 'Regular',
-  },
-]
 
 type ScheduleFormProps = {
   defaultValues?: Schedule
@@ -159,36 +170,29 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
       ? [
           'name',
           'description',
-          'parent_type',
           'type',
-          'badge_color',
-          'icon',
           'is_active',
           'policy_type',
           'start_date',
+          'nb_of_shifts',
+          'shift_block',
         ]
-      : ['name', 'description', 'parent_type', 'employees']
+      : ['name', 'description', 'employees']
   }
   if (stepId === 'shift-definition') {
-    return [
-      'nb_of_shifts',
-      'shifts',
-      'temporary_schedule',
-      'temporary_schedule_label',
-    ]
+    return type === 'rotate'
+      ? ['blocks', 'rotate_type', 'cycle_length', 'shift_length_hours']
+      : [
+          'nb_of_shifts',
+          'shifts',
+          'temporary_schedule',
+          'temporary_schedule_label',
+        ]
   }
-  if (stepId === 'rotate-config') {
-    return [
-      'cycle_type',
-      'cycle_length',
-      'rotate_type',
-      'shift_block',
-      'shift_length_hours',
-      'blocks',
-      'pattern',
-    ]
+  if (stepId === 'pattern') {
+    return ['cycle_type', 'pattern']
   }
-  if (stepId === 'recurrence') {
+  if (stepId === 'occurrence') {
     return ['recurrence']
   }
   if (stepId === 'type') {
@@ -215,10 +219,14 @@ export function ScheduleForm({
         id: generateId(),
         name: '',
         description: '',
+        ...getRegularTypeDefaults('fixed'),
       } as Schedule),
   })
 
   const [step, setStep] = useState(0)
+  // Furthest step the user has validated their way to — steps beyond this
+  // are locked in the vertical tabs until the ones before them pass.
+  const [maxStep, setMaxStep] = useState(0)
 
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
@@ -227,38 +235,27 @@ export function ScheduleForm({
   const regularType = useWatch({ control: looseControl, name: 'type' }) as
     | RegularType
     | undefined
-  const nbOfShifts = useWatch({ control: looseControl, name: 'nb_of_shifts' })
 
-  const steps =
-    parentType === 'regular'
-      ? getSteps(parentType, regularType, nbOfShifts)
-      : getSteps(parentType)
+  const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
   const isLastStep = step === steps.length - 1
+
+  const goToStep = (index: number) => {
+    setStep(Math.min(Math.max(index, 0), steps.length - 1))
+  }
 
   const handleNext = async () => {
     const valid = await form.trigger(
       getStepFields(currentStepId, parentType, type)
     )
-    if (valid) setStep((s) => Math.min(s + 1, steps.length - 1))
+    if (valid) {
+      const next = Math.min(step + 1, steps.length - 1)
+      setStep(next)
+      setMaxStep((m) => Math.max(m, next))
+    }
   }
 
   const handleBack = () => setStep((s) => Math.max(s - 1, 0))
-
-  const handleParentTypeChange = (value: string) => {
-    if (value === parentType) return
-    const current = form.getValues()
-
-    form.reset({
-      id: current.id,
-      name: current.name,
-      description: current.description,
-      ...(value === 'daily'
-        ? getTypeDefaults('weekly')
-        : getRegularTypeDefaults('fixed')),
-    } as Schedule)
-    setStep(0)
-  }
 
   const handleTypeChange = (value: string) => {
     if (value === type) return
@@ -282,6 +279,18 @@ export function ScheduleForm({
       ...getRegularTypeDefaults(value),
     } as Schedule)
     setStep(0)
+    setMaxStep(0)
+  }
+
+  const handleFormSubmit = (values: Schedule) => {
+    // No backend wired up yet — log what would be sent so the payload
+    // shape is easy to inspect during development.
+    // eslint-disable-next-line no-console
+    console.log(
+      'Schedule form submitted — JSON payload:',
+      JSON.stringify(values, null, 2)
+    )
+    onSubmit(values)
   }
 
   return (
@@ -293,7 +302,7 @@ export function ScheduleForm({
             e.preventDefault()
             return
           }
-          return form.handleSubmit(onSubmit)(e)
+          return form.handleSubmit(handleFormSubmit)(e)
         }}
         className='space-y-6'
       >
@@ -302,7 +311,8 @@ export function ScheduleForm({
             <VerticalTabs
               steps={steps}
               currentStep={step}
-              onStepChange={setStep}
+              onStepChange={goToStep}
+              maxStepReached={maxStep}
             />
           )}
           <div className='min-w-0 flex-1 space-y-6'>
@@ -336,29 +346,6 @@ export function ScheduleForm({
                           placeholder='Optional description'
                           disabled={disabled}
                           {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name='parent_type'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type</FormLabel>
-                      <FormControl>
-                        <MultiSelect
-                          options={PARENT_TYPES}
-                          value={
-                            PARENT_TYPES.find((t) => t.value === field.value) ??
-                            null
-                          }
-                          onChange={(opt: { value: string } | null) =>
-                            handleParentTypeChange(opt?.value ?? '')
-                          }
-                          isDisabled={disabled}
                         />
                       </FormControl>
                       <FormMessage />
@@ -416,14 +403,20 @@ export function ScheduleForm({
                 <ShiftDefinitionFields disabled={disabled} />
               )}
 
-            {(disabled || currentStepId === 'rotate-config') &&
+            {(disabled || currentStepId === 'shift-definition') &&
               parentType === 'regular' &&
               regularType === 'rotate' && <RotateFields disabled={disabled} />}
 
-            {(disabled || currentStepId === 'recurrence') &&
+            {(disabled || currentStepId === 'pattern') &&
               parentType === 'regular' &&
-              regularType === 'fixed' &&
-              nbOfShifts === 1 && <RecurrenceFields disabled={disabled} />}
+              regularType === 'rotate' && (
+                <PatternBuilder disabled={disabled} />
+              )}
+
+            {(disabled || currentStepId === 'occurrence') &&
+              parentType === 'regular' && (
+                <OccurrenceFields disabled={disabled} />
+              )}
 
             {!disabled && currentStepId === 'summary' && (
               <ScheduleSummary control={looseControl} />

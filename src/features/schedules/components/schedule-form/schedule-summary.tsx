@@ -117,12 +117,6 @@ function RegularBasicsSummary({ values }: { values: any }) {
   const typeLabel = REGULAR_TYPE_OPTIONS.find(
     (o) => o.value === values.type
   )?.label
-  const badgeLabel = BADGE_COLOR_OPTIONS.find(
-    (o) => o.value === values.badge_color
-  )?.label
-  const iconLabel = SCHEDULE_ICON_OPTIONS.find(
-    (o) => o.value === values.icon
-  )?.label
   const policyLabel = POLICY_TYPE_OPTIONS.find(
     (o) => o.value === values.policy_type
   )?.label
@@ -130,8 +124,10 @@ function RegularBasicsSummary({ values }: { values: any }) {
   return (
     <SummarySection title='Type'>
       <SummaryRow label='Schedule type' value={typeLabel} />
-      <SummaryRow label='Badge color' value={badgeLabel} />
-      <SummaryRow label='Icon' value={iconLabel} />
+      <SummaryRow
+        label='Number of shifts'
+        value={values.type === 'rotate' ? values.shift_block : values.nb_of_shifts}
+      />
       <SummaryRow
         label='Active status'
         value={values.is_active ? 'Active' : 'Inactive'}
@@ -157,35 +153,54 @@ function ShiftDefinitionSummary({ values }: { values: any }) {
       />
 
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      {(values.shifts ?? []).map((shift: any, i: number) => (
-        <div key={shift.id ?? i} className='space-y-1 border-t pt-2'>
-          <p className='text-sm font-medium'>
-            {shift.name || `Shift ${i + 1}`}{' '}
-            <span className='font-normal text-muted-foreground'>
-              {shift.short_code && `(${shift.short_code})`}
-            </span>
-          </p>
-          <div className='space-y-1 ps-2'>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {(shift.days ?? []).map((d: any) => (
-              <div
-                key={d.day}
-                className='flex items-center justify-between text-sm'
-              >
-                <span className='text-muted-foreground capitalize'>
-                  {d.day}
-                </span>
-                <span className='text-muted-foreground'>
-                  {formatTimes([d.time])}
-                </span>
-              </div>
-            ))}
+      {(values.shifts ?? []).map((shift: any, i: number) => {
+        const badgeLabel = BADGE_COLOR_OPTIONS.find(
+          (o) => o.value === shift.badge_color
+        )?.label
+        const iconLabel = SCHEDULE_ICON_OPTIONS.find(
+          (o) => o.value === shift.icon
+        )?.label
+
+        return (
+          <div key={shift.id ?? i} className='space-y-1 border-t pt-2'>
+            <p className='text-sm font-medium'>
+              {shift.name || `Shift ${i + 1}`}{' '}
+              <span className='font-normal text-muted-foreground'>
+                {shift.short_code && `(${shift.short_code})`}
+              </span>
+            </p>
+            <SummaryRow label='Badge color' value={badgeLabel} />
+            <SummaryRow label='Icon' value={iconLabel} />
+            <SummaryRow
+              label='Shift length'
+              value={
+                shift.shift_length_hours
+                  ? `${shift.shift_length_hours}h`
+                  : undefined
+              }
+            />
+            <div className='space-y-1 ps-2'>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {(shift.days ?? []).map((d: any) => (
+                <div
+                  key={d.day}
+                  className='flex items-center justify-between text-sm'
+                >
+                  <span className='text-muted-foreground capitalize'>
+                    {d.day}
+                  </span>
+                  <span className='text-muted-foreground'>
+                    {formatTimes([d.time])}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {shift.overnight && (
+              <p className='text-xs text-muted-foreground'>Check next day</p>
+            )}
           </div>
-          {shift.overnight && (
-            <p className='text-xs text-muted-foreground'>Overnight shift</p>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </SummarySection>
   )
 }
@@ -271,7 +286,7 @@ function RegularSummary({
       )}
 
       {recurrence && (
-        <SummarySection title='Recurrence'>
+        <SummarySection title='Occurrence'>
           <SummaryRow label='Frequency' value={frequencyLabel} />
           <SummaryRow label='Repeat every' value={recurrence.interval} />
           {(recurrence.frequency === 'daily' ||
