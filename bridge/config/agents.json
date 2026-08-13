@@ -1,45 +1,53 @@
 {
-  "_notes": "Model identifiers below are examples based on OpenCode's provider/model naming (Aug 2026). After running 'opencode auth login' for each provider you use, run 'opencode models' (or 'opencode models <provider>') to see the exact strings available to YOUR account, then correct the 'model' fields here if they differ. No script changes are needed after editing this file — watchers re-read it on every loop tick.",
+  "_notes": "Model identifiers use the 'opencode/*' namespace served by the OpenCode Zen gateway credential (auth'd Aug 11, 2026 via 'opencode auth login' -> Add credential -> OpenCode Zen). FREE MODELS ONLY. STANDING RULE (Kanj, Aug 11 2026): every model id in every agent's 'models' array MUST contain 'free' - no exceptions, even for a model independently verified as cost 0/0 (e.g. 'big-pickle' was dropped despite passing the cost check, purely for not matching the naming rule). This is enforced in code, not just by convention - Select-LiveModel in Watch-Agent.ps1 filters out any configured model missing 'free' from its id before it's ever eligible to run. Additionally verified via 'opencode models opencode --verbose' (cost.input==0 && cost.output==0 && status=='active') AND smoke-tested with a real 'opencode run' call (not just catalog presence) on Aug 11, 2026. Each agent lists 'models' in priority order (primary first, then fallbacks) - Watch-Agent.ps1 health-checks the live catalog (https://opencode.ai/zen/v1/models, unauthenticated) before firing and walks the list to the first model still present, since free models are explicitly time-limited per OpenCode Zen's own docs and rotate out without notice. KNOWN GOTCHA: the live Zen catalog endpoint can list a model (e.g. 'north-mini-code-free', 'ling-3.0-flash-free' as of Aug 11 2026) before the CLI's own models.dev-backed provider registry recognizes it - such a model returns UnknownError on actual 'opencode run' even though the live catalog says it exists. Both are deliberately excluded from the active chains below until a re-test confirms the CLI has caught up; don't re-add on catalog presence alone, re-run the real 'opencode run' smoke test first.",
   "pollIntervalSec": 5,
   "staleAfterMissedBeats": 3,
+  "alertThrottleMinutes": 30,
+  "zenModelsEndpoint": "https://opencode.ai/zen/v1/models",
+  "projectSlug": "automated-schedule-feature",
+  "server": {
+    "_notes": "This project attaches to the MACHINE-WIDE shared 'opencode serve' instance (Aug 11 2026: moved out of per-project ownership - was previously started/supervised by this project's own Start-OpenCodeServer.ps1, now that lives at ~\\.claude\\opencode-bridge-server\\ and is shared by every project on this machine, registered once via its own Register-Server.ps1, not per-project). port/hostname here MUST match ~\\.claude\\opencode-bridge-server\\config.json exactly or --attach silently can't reach it. Watch-Agent.ps1 still gracefully falls back to a standalone (cold-boot) 'opencode run' per task if this is unreachable - not fatal, just slower, and raises a throttled bridge_server_down alert when it happens.",
+    "port": 4096,
+    "hostname": "127.0.0.1"
+  },
   "agents": [
     {
       "id": "deepseek-worker",
       "displayName": "DeepSeek Worker",
-      "model": "deepseek/deepseek-chat",
+      "models": ["opencode/deepseek-v4-flash-free", "opencode/nemotron-3-ultra-free"],
       "opencodeAgent": null,
       "tags": ["cheap", "general", "reasoning"],
-      "description": "Cheap general-purpose coding/reasoning tasks.",
+      "description": "Free general-purpose coding/reasoning tasks. Primary: DeepSeek V4 Flash Free (128K output, strong general reasoning, smoke-tested working). Fallback: Nemotron 3 Ultra Free (1M context, smoke-tested working - shared fallback role across all 4 agents now, acceptable for a backup only). Big Pickle was the fallback here but is EXCLUDED despite being genuinely free (cost.input==0/cost.output==0 verified via --verbose) because its id doesn't contain 'free' - standing rule as of Aug 11 2026 is every configured model id must contain 'free', no exceptions, enforced in code by Select-LiveModel, not just by convention.",
       "enabled": true,
       "autoApprove": true
     },
     {
       "id": "qwen-coder",
       "displayName": "Qwen Coder",
-      "model": "qwen/qwen3-coder",
+      "models": ["opencode/mimo-v2.5-free", "opencode/ling-3.0-tiny-free"],
       "opencodeAgent": null,
       "tags": ["cheap", "code", "refactor", "boilerplate"],
-      "description": "Cheap code-focused tasks: refactors, small fixes, boilerplate, test scaffolding.",
+      "description": "Free code-focused tasks: refactors, small fixes, boilerplate, test scaffolding. Primary: MiMo-V2.5 Free (coding-capable general model, smoke-tested working). Fallback: Ling-3.0-tiny Free (small/fast, fine for trivial boilerplate, smoke-tested working). North Mini Code Free would be the ideal primary (purpose-built code model per OpenCode Zen's docs) but returns UnknownError via the CLI as of Aug 11 2026 - see top-level _notes - re-test before promoting it back in.",
       "enabled": true,
       "autoApprove": true
     },
     {
       "id": "glm-worker",
       "displayName": "GLM Worker",
-      "model": "zhipuai/glm-4.6",
+      "models": ["opencode/laguna-s-2.1-free", "opencode/nemotron-3-ultra-free"],
       "opencodeAgent": null,
       "tags": ["cheap", "general", "docs"],
-      "description": "Cheap general tasks and documentation writing.",
+      "description": "Free general tasks and documentation writing. Primary: Laguna S 2.1 Free (256K context, general-purpose, smoke-tested working). Fallback: Nemotron 3 Ultra Free (1M context, strong general reasoning, smoke-tested working - shared fallback role with kimi-worker, acceptable overlap for a backup only).",
       "enabled": true,
       "autoApprove": true
     },
     {
       "id": "kimi-worker",
       "displayName": "Kimi Worker",
-      "model": "moonshot/kimi-k2",
+      "models": ["opencode/longcat-2.0-free", "opencode/nemotron-3-ultra-free"],
       "opencodeAgent": null,
       "tags": ["cheap", "long-context", "summarize"],
-      "description": "Cheap long-context tasks: large file summaries, big diffs, log triage.",
+      "description": "Free long-context tasks: large file summaries, big diffs, log triage. Primary: LongCat-2.0 Free (1M context, purpose-built for long-context per its name, smoke-tested working). Fallback: Nemotron 3 Ultra Free (also 1M context, smoke-tested working, shared fallback role with glm-worker). Ling-3.0-flash Free exists on the live catalog but isn't CLI-resolvable yet as of Aug 11 2026 - see top-level _notes.",
       "enabled": true,
       "autoApprove": true
     }

@@ -16,6 +16,22 @@ dist-ssr
 CLAUDE.md
 .claude
 
+# graphify knowledge-graph output (generated, rebuild with `/graphify .`)
+graphify-out
+
+# OpenCode bridge runtime state — machine/session-local, regenerated per
+# machine by the watcher scripts; keep the folder structure (.keep) but not
+# the actual task/result/log content.
+bridge/.claude-hook-state.json
+bridge/alerts.jsonl
+bridge/notifications.jsonl
+bridge/agents/*/inbox/*
+bridge/agents/*/outbox/*
+bridge/agents/*/pending/*
+!bridge/agents/*/inbox/.keep
+!bridge/agents/*/outbox/.keep
+!bridge/agents/*/pending/.keep
+
 .env
 
 # Editor directories and files
