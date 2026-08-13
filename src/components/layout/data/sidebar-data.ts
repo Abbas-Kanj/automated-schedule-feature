@@ -5,6 +5,7 @@ import {
   Command,
   GalleryVerticalEnd,
   ShoppingCart,
+  Timer,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -56,6 +57,11 @@ export const sidebarData: SidebarData = {
                 { title: 'General schedule', url: '/schedules' },
                 { title: 'Flexible schedule', url: '/schedules' },
               ],
+            },
+            {
+              title: 'Shifts',
+              icon: Timer,
+              url: '/shifts',
             },
           ],
         },
