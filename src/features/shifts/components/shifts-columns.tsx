@@ -2,9 +2,13 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/data-table'
-import { SHIFT_BADGE_COLOR_OPTIONS, SHIFT_ICON_OPTIONS } from '../data/data'
+import {
+  SHIFT_BADGE_COLOR_OPTIONS,
+  SHIFT_ICON_OPTIONS,
+  SHIFT_TYPE_OPTIONS,
+} from '../data/data'
 import { type Shift } from '../data/schema'
-import { calculateShiftHours } from '../utils'
+import { getShiftTimeRange } from '../utils'
 import { DataTableRowActions } from './data-table-row-actions'
 
 export const shiftsColumns: ColumnDef<Shift>[] = [
@@ -13,13 +17,19 @@ export const shiftsColumns: ColumnDef<Shift>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Name' />
     ),
-    meta: { className: 'ps-1 w-1/5', tdClassName: 'ps-4 max-w-0' },
+    meta: { className: 'ps-1 w-1/4', tdClassName: 'ps-4 max-w-0' },
     cell: ({ row }) => {
       const shift = row.original
       const icon = SHIFT_ICON_OPTIONS.find((o) => o.value === shift.icon)
+      const color = SHIFT_BADGE_COLOR_OPTIONS.find(
+        (o) => o.value === shift.badge_color
+      )
       const Icon = icon?.icon
       return (
         <span className='flex items-center gap-2 truncate font-medium'>
+          <span
+            className={cn('size-2 shrink-0 rounded-full', color?.swatchClassName)}
+          />
           {Icon && <Icon className='text-muted-foreground size-4 shrink-0' />}
           <span className='truncate'>{shift.name}</span>
         </span>
@@ -27,62 +37,40 @@ export const shiftsColumns: ColumnDef<Shift>[] = [
     },
   },
   {
-    accessorKey: 'short_code',
+    id: 'start_time',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Code' />
+      <DataTableColumnHeader column={column} title='Start time' />
     ),
+    accessorFn: (row) => getShiftTimeRange(row.days)?.from_time ?? '',
     cell: ({ row }) => {
-      const shift = row.original
-      const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-        (o) => o.value === shift.badge_color
-      )
+      const range = getShiftTimeRange(row.original.days)
       return (
-        <Badge variant='outline' className='gap-1.5'>
-          <span
-            className={cn('size-2 rounded-full', color?.swatchClassName)}
-          />
-          {shift.short_code}
-        </Badge>
+        <span className='text-sm'>{range ? range.from_time : '—'}</span>
       )
     },
   },
   {
-    id: 'time',
-    header: 'Time',
+    id: 'end_time',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='End time' />
+    ),
+    accessorFn: (row) => getShiftTimeRange(row.days)?.to_time ?? '',
     cell: ({ row }) => {
-      const shift = row.original
-      return (
-        <span className='text-sm'>
-          {shift.from_time} – {shift.to_time}
-          {shift.overnight && (
-            <span className='text-muted-foreground'> (+1d)</span>
-          )}
-        </span>
-      )
+      const range = getShiftTimeRange(row.original.days)
+      return <span className='text-sm'>{range ? range.to_time : '—'}</span>
     },
   },
   {
-    id: 'hours',
-    accessorFn: (row) =>
-      calculateShiftHours(row.from_time, row.to_time, row.overnight),
+    accessorKey: 'shift_type',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Hours' />
+      <DataTableColumnHeader column={column} title='Type' />
     ),
-    cell: ({ getValue }) => (
-      <span className='text-sm'>{getValue<number>()}h</span>
-    ),
-  },
-  {
-    accessorKey: 'description',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Description' />
-    ),
-    meta: { className: 'w-1/3', tdClassName: 'max-w-0' },
-    cell: ({ row }) => (
-      <span className='text-muted-foreground block truncate text-sm'>
-        {row.getValue('description') || '—'}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const option = SHIFT_TYPE_OPTIONS.find(
+        (o) => o.value === row.original.shift_type
+      )
+      return <Badge variant='outline'>{option?.label ?? '—'}</Badge>
+    },
   },
   {
     id: 'actions',

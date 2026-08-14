@@ -1,6 +1,7 @@
 import { DotsHorizontalIcon } from '@radix-ui/react-icons'
 import { type Row } from '@tanstack/react-table'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Copy, Pencil, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -10,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { shiftSchema } from '../data/schema'
+import { useShiftsStore } from '../stores/shifts-store'
 import { useShifts } from './shifts-provider'
 
 type DataTableRowActionsProps<TData> = {
@@ -21,6 +23,7 @@ export function DataTableRowActions<TData>({
 }: DataTableRowActionsProps<TData>) {
   const shift = shiftSchema.parse(row.original)
   const { setOpen, setCurrentRow } = useShifts()
+  const cloneShift = useShiftsStore((s) => s.cloneShift)
 
   return (
     <DropdownMenu modal={false}>
@@ -43,6 +46,17 @@ export function DataTableRowActions<TData>({
           Edit
           <DropdownMenuShortcut>
             <Pencil size={16} />
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            cloneShift(shift.id)
+            toast.success(`Shift "${shift.name}" has been cloned.`)
+          }}
+        >
+          Clone
+          <DropdownMenuShortcut>
+            <Copy size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem

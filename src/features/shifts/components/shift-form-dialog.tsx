@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { type Resolver, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -10,33 +11,44 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
-import { Button } from '@/components/ui/button'
+import { Form } from '@/components/ui/form'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type Shift, type ShiftFormValues, shiftFormSchema } from '../data/schema'
 import { useShiftsStore } from '../stores/shifts-store'
-import { deriveShortCode, generateId } from '../utils'
-import { BadgeColorField } from './shift-form/badge-color-field'
-import { IconPickerField } from './shift-form/icon-picker-field'
+import { buildDefaultDays, deriveShortCode, generateId } from '../utils'
+import { AdditionalInfoTab } from './shift-form/additional-info-tab'
+import { GeneralTab } from './shift-form/general-tab'
+import { RepeatTab } from './shift-form/repeat-tab'
 
 const emptyValues: ShiftFormValues = {
   name: '',
   short_code: '',
   badge_color: 'blue',
   icon: 'clock',
-  from_time: '09:00',
-  to_time: '17:00',
-  overnight: false,
+  shift_type: 'fixed',
+  category: 'regular',
+  custom_category: '',
+  timezone_mode: 'local',
+  timezone: undefined,
+  hours_mode: 'same',
+  days: buildDefaultDays({
+    from_time: '09:00',
+    to_time: '17:00',
+    overnight: false,
+  }),
+  break_enabled: false,
+  break_type: undefined,
+  breaks: [],
   description: '',
+  is_active: true,
+  policy_type: undefined,
+  status: 'tentative',
+  time_slot_type: 'regular',
+  repeat_enabled: false,
+  repeat: {},
+  work_type_group: undefined,
+  service_resource: undefined,
+  service_territory: undefined,
 }
 
 type ShiftFormDialogProps = {
@@ -44,6 +56,9 @@ type ShiftFormDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
+
+const TAB_CONTENT_CLASSNAME =
+  'max-h-[60vh] w-[calc(100%+0.75rem)] overflow-y-auto py-1 pe-3'
 
 export function ShiftFormDialog({
   currentRow,
@@ -66,11 +81,22 @@ export function ShiftFormDialog({
   }, [name])
 
   const onSubmit = (values: ShiftFormValues) => {
+    // "Local" mode doesn't carry a chosen zone — the shift just follows
+    // wherever it's viewed from, so we don't persist a stale snapshot.
+    const submitValues: ShiftFormValues = {
+      ...values,
+      timezone: values.timezone_mode === 'local' ? undefined : values.timezone,
+      custom_category:
+        values.category === 'custom' ? values.custom_category : undefined,
+      repeat: values.repeat_enabled ? values.repeat : {},
+      breaks: values.break_enabled ? values.breaks : [],
+    }
+
     if (isEdit) {
-      updateShift(currentRow.id, { id: currentRow.id, ...values })
+      updateShift(currentRow.id, { id: currentRow.id, ...submitValues })
       toast.success(`Shift "${values.name}" has been updated.`)
     } else {
-      addShift({ id: generateId(), ...values })
+      addShift({ id: generateId(), ...submitValues })
       toast.success(`Shift "${values.name}" has been created.`)
     }
     onOpenChange(false)
@@ -84,7 +110,7 @@ export function ShiftFormDialog({
         onOpenChange(state)
       }}
     >
-      <DialogContent className='sm:max-w-lg'>
+      <DialogContent className='sm:max-w-2xl'>
         <DialogHeader className='text-start'>
           <DialogTitle>{isEdit ? 'Edit Shift' : 'Create Shift'}</DialogTitle>
           <DialogDescription>
@@ -93,153 +119,33 @@ export function ShiftFormDialog({
               : 'Define a reusable shift with its name, time range and look.'}
           </DialogDescription>
         </DialogHeader>
-        <div className='h-105 w-[calc(100%+0.75rem)] overflow-y-auto py-1 pe-3'>
-          <Form {...form}>
-            <form
-              id='shift-form'
-              onSubmit={form.handleSubmit(onSubmit)}
-              className='space-y-4 px-0.5'
-            >
-              <FormField
-                control={form.control}
-                name='name'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Shift name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder='e.g. Morning shift'
-                        autoComplete='off'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <Form {...form}>
+          <form
+            id='shift-form'
+            onSubmit={form.handleSubmit(onSubmit)}
+            className='space-y-4'
+          >
+            <Tabs defaultValue='general'>
+              <TabsList variant='line' className='w-full'>
+                <TabsTrigger value='general'>General</TabsTrigger>
+                <TabsTrigger value='repeat'>Repeat shifts</TabsTrigger>
+                <TabsTrigger value='additional'>Additional info</TabsTrigger>
+              </TabsList>
 
-              <FormField
-                control={form.control}
-                name='short_code'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Short code</FormLabel>
-                    <FormControl>
-                      <Input
-                        disabled
-                        readOnly
-                        placeholder='Auto filled from the first letters of the name'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <TabsContent value='general' className={TAB_CONTENT_CLASSNAME}>
+                <GeneralTab />
+              </TabsContent>
 
-              <div className='grid gap-3 sm:grid-cols-2'>
-                <FormField
-                  control={form.control}
-                  name='badge_color'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Badge color</FormLabel>
-                      <FormControl>
-                        <BadgeColorField
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <TabsContent value='repeat' className={TAB_CONTENT_CLASSNAME}>
+                <RepeatTab />
+              </TabsContent>
 
-                <FormField
-                  control={form.control}
-                  name='icon'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Icon</FormLabel>
-                      <FormControl>
-                        <IconPickerField
-                          value={field.value}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className='flex items-start gap-2'>
-                <FormField
-                  control={form.control}
-                  name='from_time'
-                  render={({ field }) => (
-                    <FormItem className='flex-1'>
-                      <FormLabel>From</FormLabel>
-                      <FormControl>
-                        <Input type='time' {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <span className='text-muted-foreground pt-8 text-sm'>to</span>
-                <FormField
-                  control={form.control}
-                  name='to_time'
-                  render={({ field }) => (
-                    <FormItem className='flex-1'>
-                      <FormLabel>To</FormLabel>
-                      <FormControl>
-                        <Input type='time' {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name='overnight'
-                render={({ field }) => (
-                  <FormItem className='flex flex-row items-center justify-between rounded-md border p-3'>
-                    <FormLabel className='cursor-pointer'>
-                      Ends the next day (overnight)
-                    </FormLabel>
-                    <FormControl>
-                      <Switch
-                        checked={!!field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name='description'
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder='Optional notes about this shift'
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </form>
-          </Form>
-        </div>
+              <TabsContent value='additional' className={TAB_CONTENT_CLASSNAME}>
+                <AdditionalInfoTab />
+              </TabsContent>
+            </Tabs>
+          </form>
+        </Form>
         <DialogFooter>
           <Button type='submit' form='shift-form'>
             {isEdit ? 'Save changes' : 'Create shift'}
