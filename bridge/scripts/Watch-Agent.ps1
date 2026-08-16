@@ -412,10 +412,25 @@ function Invoke-OpenCodeTask {
         # 'opencode' on PATH - PATH updates (e.g. right after installing
         # OpenCode) don't reach already-running processes, and Task
         # Scheduler-launched processes have occasionally been seen not to
-        # pick up a just-updated user PATH either. Fall back to PATH lookup
-        # if the well-known location isn't there (e.g. installed elsewhere).
+        # pick up a just-updated user PATH either.
         $exe = Join-Path $env:USERPROFILE ".opencode\bin\opencode.exe"
-        if (-not (Test-Path $exe)) { $exe = "opencode" }
+        if (-not (Test-Path $exe)) {
+            # Native-installer layout absent (npm global install instead,
+            # e.g. under C:\Program Files\nodejs\ or %APPDATA%\npm\) - npm's
+            # own extension-less 'opencode' shim on PATH is a POSIX shell
+            # script with no valid Win32 header, so handing it straight to
+            # Start-Process fails with "%1 is not a valid Win32 application"
+            # (confirmed 2026-08-14, this machine). Resolve the shim's own
+            # directory and look for the real PE binary nested underneath it
+            # instead of trusting the bare name.
+            $shim = Get-Command opencode -ErrorAction SilentlyContinue
+            $exe = $null
+            if ($shim) {
+                $nested = Join-Path (Split-Path $shim.Source -Parent) "node_modules\opencode-ai\bin\opencode.exe"
+                if (Test-Path $nested) { $exe = $nested }
+            }
+            if (-not $exe) { $exe = "opencode.cmd" }  # CMD shim re-execs node correctly, unlike the bare shim
+        }
         $proc = Start-Process -FilePath $exe -ArgumentList $argsList `
             -NoNewWindow -Wait -PassThru `
             -RedirectStandardOutput $stdOutPath -RedirectStandardError $stdErrPath

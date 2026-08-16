@@ -9,8 +9,8 @@ import { Switch } from '@/components/ui/switch'
 import { type ShiftFormValues } from '../../data/schema'
 import { RepeatFields } from './repeat-fields'
 
-// "Repeat shifts" tab of `ShiftFormDialog` — the "Assign to" toggle plus
-// the shared `RepeatFields` (frequency/interval/weekdays/monthly/end).
+// "Repeat" tab of `ShiftFormDialog` — the "Repeat" toggle plus the shared
+// `RepeatFields` (frequency/interval/weekdays/monthly/end).
 export function RepeatTab() {
   const form = useFormContext<ShiftFormValues>()
   const repeatEnabled = useWatch({
@@ -25,7 +25,7 @@ export function RepeatTab() {
         name='repeat_enabled'
         render={({ field }) => (
           <FormItem className='flex w-fit flex-row items-center gap-4 rounded-md border p-3'>
-            <FormLabel className='cursor-pointer'>Assign to</FormLabel>
+            <FormLabel className='cursor-pointer'>Repeat</FormLabel>
             <FormControl>
               <Switch
                 checked={!!field.value}

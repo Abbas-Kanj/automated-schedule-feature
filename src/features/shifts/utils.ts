@@ -16,25 +16,37 @@ export function deriveShortCode(name: string): string {
     .toUpperCase()
 }
 
-export function calculateShiftHours(
-  from_time: string,
-  to_time: string,
-  overnight?: boolean
-): number {
+export function calculateShiftHours(from_time: string, to_time: string): number {
   if (!from_time || !to_time) return 0
   const from = parse(from_time, 'HH:mm', new Date())
   const to = parse(to_time, 'HH:mm', new Date())
   const diff = differenceInMinutes(to, from)
   // A range that ends before it starts (e.g. an overnight 22:00 -> 06:00
   // entry) is treated as crossing midnight rather than a negative duration.
-  const totalMinutes = overnight || diff < 0 ? diff + 24 * 60 : diff
+  // This is purely a "does the clock wrap" check — it doesn't take the
+  // `overnight` flag as an input, since a range that already ends after it
+  // starts (09:00 -> 17:00) isn't spanning an extra day just because its
+  // `overnight` flag happens to be set (see `ShiftTimesTab`'s "Overnight"
+  // category handling, which forces that flag on regardless of the times
+  // actually chosen).
+  const totalMinutes = diff < 0 ? diff + 24 * 60 : diff
 
   return Math.round((totalMinutes / 60) * 100) / 100
 }
 
+// Formats a decimal-hours duration (as returned by `calculateShiftHours`)
+// as a compact "Xh Ym" string for the "Shift times" tab's same-hours
+// duration readout, e.g. 8.5 -> "8h 30m", 8 -> "8h".
+export function formatDurationHours(hours: number): string {
+  const totalMinutes = Math.round(hours * 60)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
+
 // Builds a fresh Mon–Sun set of day entries, all sharing the same single
-// time range and enabled state — the starting point for both the "same
-// hours" and "different hours" dialogs.
+// time range and enabled state — the starting point for the "Shift times"
+// tab's same-hours and different-hours modes.
 export function buildDefaultDays(
   time: Pick<TimeRangeEntry, 'from_time' | 'to_time' | 'overnight'>,
   enabled = true
@@ -42,20 +54,16 @@ export function buildDefaultDays(
   return DAYS_OF_WEEK.map((day) => ({ day, enabled, times: [{ ...time }] }))
 }
 
-const BREAK_DURATION_STEPS_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90, 120]
-
-// Duration choices for a break entry, bounded by its own from/to span —
-// e.g. a 09:00–09:45 window only offers the 5..45 minute steps.
-export function getBreakDurationOptions(
-  from_time: string,
-  to_time: string
-): number[] {
-  if (!from_time || !to_time || !(to_time > from_time)) return []
-  const span = differenceInMinutes(
+// A break entry's own from/to span in minutes — the ceiling its
+// user-entered `duration_minutes` isn't allowed to exceed (see
+// `shiftFieldsSchema`'s `superRefine` and `ShiftTimesTab`'s live check).
+// 0 for an invalid (non-increasing) range rather than a negative number.
+export function getBreakSpanMinutes(from_time: string, to_time: string): number {
+  if (!from_time || !to_time || !(to_time > from_time)) return 0
+  return differenceInMinutes(
     parse(to_time, 'HH:mm', new Date()),
     parse(from_time, 'HH:mm', new Date())
   )
-  return BREAK_DURATION_STEPS_MINUTES.filter((minutes) => minutes <= span)
 }
 
 // A single start/end range to summarize a shift's week for table display:

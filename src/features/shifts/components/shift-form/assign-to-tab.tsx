@@ -1,4 +1,5 @@
-import { useFormContext } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
+import { MultiSelect } from '@/components/multi-select'
 import {
   FormControl,
   FormField,
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import {
   SERVICE_RESOURCE_OPTIONS,
   SERVICE_TERRITORY_OPTIONS,
@@ -20,33 +22,52 @@ import {
 } from '../../data/data'
 import { type ShiftFormValues } from '../../data/schema'
 
-// "Additional info" tab of `ShiftFormDialog` — freeform picks with no
-// downstream validation of their own (see `schema.ts`).
-export function AdditionalInfoTab() {
+// "Assign to" tab of `ShiftFormDialog` (formerly "Additional info") — its
+// own toggle enables/disables the picks below, which have no downstream
+// validation of their own either way (see `schema.ts`).
+export function AssignToTab() {
   const form = useFormContext<ShiftFormValues>()
+  const assignToEnabled = useWatch({
+    control: form.control,
+    name: 'assign_to_enabled',
+  })
 
   return (
     <div className='space-y-4 px-0.5'>
+      <FormField
+        control={form.control}
+        name='assign_to_enabled'
+        render={({ field }) => (
+          <FormItem className='flex w-fit flex-row items-center gap-4 rounded-md border p-3'>
+            <FormLabel className='cursor-pointer'>Assign to</FormLabel>
+            <FormControl>
+              <Switch
+                checked={!!field.value}
+                onCheckedChange={field.onChange}
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
+
       <FormField
         control={form.control}
         name='work_type_group'
         render={({ field }) => (
           <FormItem>
             <FormLabel>Work type group</FormLabel>
-            <Select value={field.value} onValueChange={field.onChange}>
-              <FormControl>
-                <SelectTrigger className='w-full'>
-                  <SelectValue placeholder='Select a work type group' />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {WORK_TYPE_GROUP_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={WORK_TYPE_GROUP_OPTIONS}
+              value={WORK_TYPE_GROUP_OPTIONS.filter((option) =>
+                field.value?.includes(option.value)
+              )}
+              onChange={(selected: typeof WORK_TYPE_GROUP_OPTIONS) =>
+                field.onChange(selected.map((option) => option.value))
+              }
+              isMulti
+              placeholder='Select work type groups'
+              isDisabled={!assignToEnabled}
+            />
             <FormMessage />
           </FormItem>
         )}
@@ -58,7 +79,11 @@ export function AdditionalInfoTab() {
         render={({ field }) => (
           <FormItem>
             <FormLabel>Service resource</FormLabel>
-            <Select value={field.value} onValueChange={field.onChange}>
+            <Select
+              value={field.value}
+              onValueChange={field.onChange}
+              disabled={!assignToEnabled}
+            >
               <FormControl>
                 <SelectTrigger className='w-full'>
                   <SelectValue placeholder='Select a service resource' />
@@ -83,7 +108,11 @@ export function AdditionalInfoTab() {
         render={({ field }) => (
           <FormItem>
             <FormLabel>Service territory</FormLabel>
-            <Select value={field.value} onValueChange={field.onChange}>
+            <Select
+              value={field.value}
+              onValueChange={field.onChange}
+              disabled={!assignToEnabled}
+            >
               <FormControl>
                 <SelectTrigger className='w-full'>
                   <SelectValue placeholder='Select a service territory' />

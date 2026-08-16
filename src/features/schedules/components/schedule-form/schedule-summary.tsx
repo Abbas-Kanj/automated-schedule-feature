@@ -2,18 +2,21 @@ import { type ReactNode } from 'react'
 import { type Control, useWatch } from 'react-hook-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  BADGE_COLOR_OPTIONS,
   CYCLE_LENGTH_UNIT_OPTIONS,
   CYCLE_TYPE_OPTIONS,
   MONTHS,
   POLICY_TYPE_OPTIONS,
   RECURRENCE_END_TYPE_OPTIONS,
-  RECURRENCE_FREQUENCY_OPTIONS,
   REGULAR_TYPE_OPTIONS,
   ROTATE_TYPE_OPTIONS,
-  SCHEDULE_ICON_OPTIONS,
   SCHEDULE_TYPES,
 } from '../../data/data'
+import {
+  SHIFT_BADGE_COLOR_OPTIONS,
+  SHIFT_ICON_OPTIONS,
+} from '@/features/shifts/data/data'
+import { type Shift } from '@/features/shifts/data/schema'
+import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { calculateHours } from '../../utils'
 
 function SummarySection({
@@ -124,15 +127,19 @@ function RegularBasicsSummary({ values }: { values: any }) {
   return (
     <SummarySection title='Type'>
       <SummaryRow label='Schedule type' value={typeLabel} />
-      <SummaryRow
-        label='Number of shifts'
-        value={values.type === 'rotate' ? values.shift_block : values.nb_of_shifts}
-      />
-      <SummaryRow
-        label='Active status'
-        value={values.is_active ? 'Active' : 'Inactive'}
-      />
-      <SummaryRow label='Policy type' value={policyLabel} />
+      {values.type === 'rotate' && (
+        <>
+          <SummaryRow
+            label='Number of shifts'
+            value={values.shift_block}
+          />
+          <SummaryRow
+            label='Active status'
+            value={values.is_active ? 'Active' : 'Inactive'}
+          />
+          <SummaryRow label='Policy type' value={policyLabel} />
+        </>
+      )}
       <SummaryRow label='Start date' value={values.start_date} />
     </SummarySection>
   )
@@ -140,31 +147,37 @@ function RegularBasicsSummary({ values }: { values: any }) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ShiftDefinitionSummary({ values }: { values: any }) {
+  const shifts = useShiftsStore((s) => s.shifts)
+  const resolvedShifts: Shift[] = (
+    (values.shift_ids as string[] | undefined)
+      ?.map((id) => shifts.find((s) => s.id === id))
+      .filter((s): s is Shift => s !== undefined) ?? []
+  )
+
   return (
     <SummarySection title='Shifts'>
-      <SummaryRow label='Nb. of shifts' value={values.nb_of_shifts} />
-      <SummaryRow
-        label='Temporary schedule'
-        value={
-          values.temporary_schedule
-            ? (values.temporary_schedule_label ?? 'Yes')
-            : 'No'
-        }
-      />
-
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      {(values.shifts ?? []).map((shift: any, i: number) => {
-        const badgeLabel = BADGE_COLOR_OPTIONS.find(
+      <SummaryRow label='Nb. of shifts' value={resolvedShifts.length} />
+      {resolvedShifts.length === 0 && (
+        <p className='text-sm text-muted-foreground'>No shifts selected</p>
+      )}
+      {resolvedShifts.map((shift, i) => {
+        const badgeLabel = SHIFT_BADGE_COLOR_OPTIONS.find(
           (o) => o.value === shift.badge_color
         )?.label
-        const iconLabel = SCHEDULE_ICON_OPTIONS.find(
+        const iconLabel = SHIFT_ICON_OPTIONS.find(
           (o) => o.value === shift.icon
         )?.label
+
+        const enabledDays = shift.days.filter((d) => d.enabled)
+        const totalHours = enabledDays.reduce(
+          (sum, d) => sum + calculateHours(d.times),
+          0
+        )
 
         return (
           <div key={shift.id ?? i} className='space-y-1 border-t pt-2'>
             <p className='text-sm font-medium'>
-              {shift.name || `Shift ${i + 1}`}{' '}
+              {shift.name || `Shift ${i + 1}`}
               <span className='font-normal text-muted-foreground'>
                 {shift.short_code && `(${shift.short_code})`}
               </span>
@@ -172,30 +185,27 @@ function ShiftDefinitionSummary({ values }: { values: any }) {
             <SummaryRow label='Badge color' value={badgeLabel} />
             <SummaryRow label='Icon' value={iconLabel} />
             <SummaryRow
-              label='Shift length'
-              value={
-                shift.shift_length_hours
-                  ? `${shift.shift_length_hours}h`
-                  : undefined
-              }
+              label='Weekly hours'
+              value={totalHours ? `${totalHours}h` : undefined}
             />
-            <div className='space-y-1 ps-2'>
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {(shift.days ?? []).map((d: any) => (
-                <div
-                  key={d.day}
-                  className='flex items-center justify-between text-sm'
-                >
-                  <span className='text-muted-foreground capitalize'>
-                    {d.day}
-                  </span>
-                  <span className='text-muted-foreground'>
-                    {formatTimes(d.times)}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {shift.overnight && (
+            {enabledDays.length > 0 && (
+              <div className='space-y-1 ps-2'>
+                {enabledDays.map((d) => (
+                  <div
+                    key={d.day}
+                    className='flex items-center justify-between text-sm'
+                  >
+                    <span className='text-muted-foreground capitalize'>
+                      {d.day}
+                    </span>
+                    <span className='text-muted-foreground'>
+                      {formatTimes(d.times)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {shift.days.some((d) => d.times.some((t) => t.overnight)) && (
               <p className='text-xs text-muted-foreground'>Check next day</p>
             )}
           </div>
@@ -265,15 +275,7 @@ function RegularSummary({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   values: any
 }) {
-  const recurrence = values.recurrence
-  const frequencyLabel = recurrence
-    ? RECURRENCE_FREQUENCY_OPTIONS.find((o) => o.value === recurrence.frequency)
-        ?.label
-    : undefined
-  const endTypeLabel = recurrence
-    ? RECURRENCE_END_TYPE_OPTIONS.find((o) => o.value === recurrence.end_type)
-        ?.label
-    : undefined
+  const endSettings = values.end_settings
 
   return (
     <>
@@ -285,47 +287,24 @@ function RegularSummary({
         <ShiftDefinitionSummary values={values} />
       )}
 
-      {recurrence && (
+      {values.type !== 'rotate' && endSettings && (
         <SummarySection title='Occurrence'>
-          <SummaryRow label='Frequency' value={frequencyLabel} />
-          <SummaryRow label='Repeat every' value={recurrence.interval} />
-          {(recurrence.frequency === 'daily' ||
-            recurrence.frequency === 'weekly') && (
-            <SummaryRow
-              label='Repeat on'
-              value={(recurrence.weekdays ?? [])
-                .map((d: string) => d.charAt(0).toUpperCase() + d.slice(1))
-                .join(', ')}
-            />
-          )}
-          {recurrence.frequency === 'monthly' && (
-            <SummaryRow
-              label='Day of month'
-              value={
-                recurrence.day_of_month_from != null
-                  ? `${recurrence.day_of_month_from}–${recurrence.day_of_month_to}`
-                  : undefined
-              }
-            />
-          )}
-          <SummaryRow label='End' value={endTypeLabel} />
-          {recurrence.end_type === 'after_occurrences' && (
+          <SummaryRow
+            label='End'
+            value={
+              RECURRENCE_END_TYPE_OPTIONS.find((o) => o.value === endSettings.end_type)
+                ?.label ?? endSettings.end_type
+            }
+          />
+          {endSettings.end_type === 'after_occurrences' && (
             <SummaryRow
               label='Occurrences'
-              value={recurrence.end_occurrences}
+              value={endSettings.end_occurrences}
             />
           )}
-          {recurrence.end_type === 'on_date' && (
-            <SummaryRow label='End date' value={recurrence.end_date} />
+          {endSettings.end_type === 'on_date' && (
+            <SummaryRow label='End date' value={endSettings.end_date} />
           )}
-          <SummaryRow
-            label='Public holiday exception'
-            value={recurrence.exceptions?.public_holiday ? 'Yes' : 'No'}
-          />
-          <SummaryRow
-            label='Sick leave exception'
-            value={recurrence.exceptions?.sick_leave ? 'Yes' : 'No'}
-          />
         </SummarySection>
       )}
     </>

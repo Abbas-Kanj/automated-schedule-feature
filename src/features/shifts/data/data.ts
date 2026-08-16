@@ -214,7 +214,7 @@ export const SHIFT_POLICY_DETAILS: Record<ShiftPolicyType, ShiftPolicyDetail> = 
 }
 
 export const REPEAT_FREQUENCY_OPTIONS = [
-  { value: 'daily', label: 'Daily' },
+  { value: 'daily', label: 'Days' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ] satisfies { value: (typeof REPEAT_FREQUENCIES)[number]; label: string }[]
@@ -236,7 +236,7 @@ export const BREAK_TYPE_OPTIONS = [
   { value: 'unpaid', label: 'Unpaid' },
 ] satisfies { value: (typeof BREAK_TYPES)[number]; label: string }[]
 
-// "Additional info" tab dropdowns. There's no backend yet (see CLAUDE.md),
+// "Assign to" tab dropdowns. There's no backend yet (see CLAUDE.md),
 // so these are representative placeholder options rather than live data.
 export const WORK_TYPE_GROUP_OPTIONS = [
   { value: 'installation', label: 'Installation' },

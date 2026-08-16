@@ -5,6 +5,7 @@ import { SCHEDULE_TYPES } from '../data/data'
 import { type Schedule, type ScheduleType } from '../data/schema'
 import { getScheduleSummary, getScheduleTotalHours } from '../utils'
 import { DataTableRowActions } from './data-table-row-actions'
+import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 
 const typeVariant: Record<ScheduleType, 'default' | 'secondary' | 'outline'> = {
   weekly: 'default',
@@ -79,13 +80,14 @@ export const schedulesColumns: ColumnDef<Schedule>[] = [
     meta: { className: 'w-1/6', tdClassName: 'max-w-0' },
     cell: ({ row }) => (
       <span className='text-muted-foreground block truncate text-sm'>
-        {getScheduleSummary(row.original)}
+        {getScheduleSummary(row.original, useShiftsStore.getState().shifts)}
       </span>
     ),
   },
   {
     id: 'hours',
-    accessorFn: (row) => getScheduleTotalHours(row),
+    accessorFn: (row) =>
+      getScheduleTotalHours(row, useShiftsStore.getState().shifts),
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Hours' />
     ),

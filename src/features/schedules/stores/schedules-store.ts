@@ -56,7 +56,12 @@ export const useSchedulesStore = create<SchedulesState>()((set) => ({
       name: `${schedule.name} (copy)`,
     }
     set((state) => {
-      const schedules = [...state.schedules, cloned]
+      const sourceIndex = state.schedules.findIndex((s) => s.id === schedule.id)
+      const schedules = [
+        ...state.schedules.slice(0, sourceIndex + 1),
+        cloned,
+        ...state.schedules.slice(sourceIndex + 1),
+      ]
       persist(schedules)
       return { schedules }
     })
