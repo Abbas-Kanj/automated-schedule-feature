@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
 import { type Shift } from '../data/schema'
 
-export type ShiftsDialogType = 'create' | 'edit' | 'delete'
+export type ShiftsDialogType = 'create' | 'edit' | 'delete' | 'policy'
 
 type ShiftsContextType = {
   open: ShiftsDialogType | null

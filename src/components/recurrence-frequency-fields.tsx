@@ -28,7 +28,10 @@ type RecurrenceWeekdayChipsProps = {
   single?: boolean
 }
 
-function RecurrenceWeekdayChips({
+// Exported for reuse anywhere else a single row of spread-out day chips is
+// needed outside this component's own daily/weekly block — e.g. shifts'
+// monthly "day position" sub-mode (single-select, like `weeklySingleDay`).
+export function RecurrenceWeekdayChips({
   options,
   value,
   onChange,
@@ -88,16 +91,20 @@ type RecurrenceFrequencyFieldsProps = {
   // `RecurrenceWeekdayChips`'s `single` mode).
   weeklySingleDay?: boolean
   disabled?: boolean
-  // Rendered in place of this component's own daily/weekly UI once
-  // frequency === 'monthly' — monthly's shape differs enough between
-  // features (a simple day range vs. day-of-month/date-specific/
+  // Rendered below this component's own "Repeat every" once
+  // frequency === 'monthly' — everything past that point differs enough
+  // between features (a simple day range vs. day-of-month/date-specific/
   // day-position sub-modes) that each feature still owns it.
   monthlyFields?: React.ReactNode
 }
 
 // Shared "Repeat frequency" + "Repeat every" + "Repeat on" block for a
-// daily/weekly/monthly recurrence rule. Used by both `shifts`' RepeatFields
-// and `schedules`' RecurrenceFrequencyFields — see each for its own
+// daily/weekly/monthly recurrence rule. "Repeat every" always shows right
+// under the frequency dropdown regardless of which of the three is picked
+// (day(s)/week(s)/month(s)) — same pattern for all three, so monthly's own
+// `monthlyFields` never needs to render its own copy. "Repeat on" (the
+// weekday picker, single- or multi-select per `weeklySingleDay`) only ever
+// shows for weekly. Used by `shifts`' RepeatFields — see its own
 // monthly-specific fields, passed in via `monthlyFields`.
 export function RecurrenceFrequencyFields({
   control,
@@ -143,14 +150,16 @@ export function RecurrenceFrequencyFields({
         )}
       />
 
-      {(frequency === 'daily' || frequency === 'weekly') && (
+      {(frequency === 'daily' ||
+        frequency === 'weekly' ||
+        frequency === 'monthly') && (
         <FormField
           control={control}
           name={`${name}.interval`}
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Repeat every</FormLabel>
               <div className='flex items-center gap-2'>
+                <FormLabel className='shrink-0'>Repeat every</FormLabel>
                 <FormControl>
                   <Input
                     type='number'
@@ -162,7 +171,11 @@ export function RecurrenceFrequencyFields({
                   />
                 </FormControl>
                 <span className='text-muted-foreground text-sm'>
-                  {frequency === 'daily' ? 'day(s)' : 'week(s)'}
+                  {frequency === 'daily'
+                    ? 'day(s)'
+                    : frequency === 'weekly'
+                      ? 'week(s)'
+                      : 'month(s)'}
                 </span>
               </div>
               <FormMessage />
@@ -171,23 +184,21 @@ export function RecurrenceFrequencyFields({
         />
       )}
 
-      {(frequency === 'daily' || frequency === 'weekly') && (
+      {frequency === 'weekly' && (
         <FormField
           control={control}
           name={`${name}.weekdays`}
           render={({ field }) => (
             <FormItem>
               <FormLabel>
-                {frequency === 'weekly' && weeklySingleDay
-                  ? 'Repeat on which day'
-                  : 'Repeat on'}
+                {weeklySingleDay ? 'Repeat on which day' : 'Repeat on'}
               </FormLabel>
               <RecurrenceWeekdayChips
                 options={weekdayOptions}
                 value={field.value}
                 onChange={field.onChange}
                 disabled={disabled}
-                single={frequency === 'weekly' && weeklySingleDay}
+                single={weeklySingleDay}
               />
               <FormMessage />
             </FormItem>

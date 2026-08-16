@@ -17,6 +17,12 @@ type VerticalTabsProps = {
    * validation, so users can't jump ahead of unfinished ones.
    */
   maxStepReached?: number
+  /**
+   * When true, every step button is locked regardless of maxStepReached —
+   * used while a nested modal (e.g. the "add new shift" dialog) covers the
+   * step content, so the user can't jump between steps out from under it.
+   */
+  navigationDisabled?: boolean
 }
 
 function VerticalTabs({
@@ -25,6 +31,7 @@ function VerticalTabs({
   onStepChange,
   className,
   maxStepReached = currentStep,
+  navigationDisabled = false,
 }: VerticalTabsProps) {
   return (
     <nav
@@ -34,7 +41,7 @@ function VerticalTabs({
       {steps.map((step, index) => {
         const isCompleted = index < currentStep
         const isActive = index === currentStep
-        const isLocked = index > maxStepReached
+        const isLocked = navigationDisabled || index > maxStepReached
 
         return (
           <button

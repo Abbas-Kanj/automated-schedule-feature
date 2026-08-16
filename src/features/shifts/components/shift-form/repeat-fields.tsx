@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 import {
   RecurrenceFrequencyFields,
+  RecurrenceWeekdayChips,
   type RecurrenceOption,
 } from '@/components/recurrence-frequency-fields'
 import {
@@ -25,19 +26,16 @@ import {
   REPEAT_FREQUENCY_OPTIONS,
   REPEAT_MONTHLY_MODE_OPTIONS,
 } from '../../data/data'
-import {
-  DAYS_OF_WEEK,
-  type DayOfWeek,
-  type RepeatFrequency,
-  type RepeatMonthlyMode,
-} from '../../data/schema'
+import { DAYS_OF_WEEK, type RepeatMonthlyMode } from '../../data/schema'
 import { DateField } from './date-field'
 
 type RepeatFieldsProps = {
   disabled?: boolean
 }
 
-const DEFAULT_DAY_POSITION_RULE = { position: 2, weekday: 'tue' } as const
+// Monday by default, like the "Case Monthly" wireframe's example ("the 2nd
+// Monday").
+const DEFAULT_DAY_POSITION_RULE = { position: 2, weekday: 'mon' } as const
 
 // The frequency picker's weekday chips — shared with `schedules`' own
 // recurrence fields via `RecurrenceFrequencyFields` (see
@@ -49,18 +47,12 @@ const WEEKDAY_OPTIONS: RecurrenceOption[] = DAYS_OF_WEEK.map((day) => ({
 
 export function RepeatFields({ disabled }: RepeatFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, setValue } = useFormContext<any>()
-  const frequency = useWatch({ control, name: 'repeat.frequency' }) as
-    | RepeatFrequency
-    | undefined
+  const { control } = useFormContext<any>()
   const monthlyMode = useWatch({ control, name: 'repeat.monthly_mode' }) as
     | RepeatMonthlyMode
     | undefined
   const endType = useWatch({ control, name: 'repeat.end_type' }) as
     | string
-    | undefined
-  const weekdays = useWatch({ control, name: 'repeat.weekdays' }) as
-    | DayOfWeek[]
     | undefined
 
   const { fields: dayPositionRules, append: appendDayPositionRule } =
@@ -74,45 +66,6 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
     }
   }, [monthlyMode, dayPositionRules.length, appendDayPositionRule])
 
-  // Weekly frequency only allows one day — if a multi-day selection was
-  // made while on daily and the user switches to weekly, trim it down to
-  // just the first day instead of leaving several chips looking selected.
-  useEffect(() => {
-    if (frequency === 'weekly' && weekdays && weekdays.length > 1) {
-      setValue('repeat.weekdays', [weekdays[0]])
-    }
-  }, [frequency, weekdays, setValue])
-
-  // Monthly's 3 sub-modes each carry their own "Repeat every ... month(s)"
-  // (see the "Case Monthly" wireframe) rather than sharing the generic one
-  // above — same underlying `repeat.interval` field, just rendered inside
-  // whichever case box is active.
-  const monthlyIntervalField = (
-    <FormField
-      control={control}
-      name='repeat.interval'
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>Repeat every</FormLabel>
-          <div className='flex items-center gap-2'>
-            <FormControl>
-              <Input
-                type='number'
-                min={1}
-                className='w-24'
-                disabled={disabled}
-                value={field.value ?? ''}
-                onChange={(e) => field.onChange(e.target.valueAsNumber)}
-              />
-            </FormControl>
-            <span className='text-muted-foreground text-sm'>month(s)</span>
-          </div>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  )
-
   return (
     <div className='space-y-4'>
       <RecurrenceFrequencyFields
@@ -120,7 +73,6 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
         name='repeat'
         frequencyOptions={REPEAT_FREQUENCY_OPTIONS}
         weekdayOptions={WEEKDAY_OPTIONS}
-        weeklySingleDay
         disabled={disabled}
         monthlyFields={
           <div className='space-y-3 rounded-md border p-3'>
@@ -129,7 +81,7 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
               name='repeat.monthly_mode'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date / Day</FormLabel>
+                  <FormLabel>Repeat</FormLabel>
                   <Select
                     value={field.value}
                     onValueChange={field.onChange}
@@ -154,14 +106,62 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
             />
 
             {monthlyMode === 'day_month' && (
-              <div className='space-y-3'>
-                {monthlyIntervalField}
+              <FormField
+                control={control}
+                name='repeat.day_of_month'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Day of the month</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={28}
+                        disabled={disabled}
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(e.target.valueAsNumber)
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {monthlyMode === 'date_specific' && (
+              <div className='flex items-end gap-2'>
                 <FormField
                   control={control}
-                  name='repeat.day_of_month'
+                  name='repeat.date_specific_1'
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Day of the month</FormLabel>
+                    <FormItem className='flex-1'>
+                      <FormLabel>Date specific</FormLabel>
+                      <FormControl>
+                        <Input
+                          type='number'
+                          min={1}
+                          max={28}
+                          disabled={disabled}
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(e.target.valueAsNumber)
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <span className='text-muted-foreground pb-2 text-sm'>
+                  and
+                </span>
+                <FormField
+                  control={control}
+                  name='repeat.date_specific_2'
+                  render={({ field }) => (
+                    <FormItem className='flex-1'>
                       <FormControl>
                         <Input
                           type='number'
@@ -181,21 +181,21 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
               </div>
             )}
 
-            {monthlyMode === 'date_specific' && (
-              <div className='space-y-3'>
-                {monthlyIntervalField}
-                <div className='flex items-end gap-2'>
+            {monthlyMode === 'day_position' &&
+              dayPositionRules.map((rule, index) => (
+                <div key={rule.id} className='space-y-3'>
                   <FormField
                     control={control}
-                    name='repeat.date_specific_1'
+                    name={`repeat.day_position_rules.${index}.position`}
                     render={({ field }) => (
-                      <FormItem className='flex-1'>
-                        <FormLabel>Date specific</FormLabel>
+                      <FormItem>
+                        <FormLabel>Day #</FormLabel>
                         <FormControl>
                           <Input
                             type='number'
                             min={1}
                             max={28}
+                            className='w-24'
                             disabled={disabled}
                             value={field.value ?? ''}
                             onChange={(e) =>
@@ -207,88 +207,31 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
                       </FormItem>
                     )}
                   />
-                  <span className='text-muted-foreground pb-2 text-sm'>
-                    and
-                  </span>
                   <FormField
                     control={control}
-                    name='repeat.date_specific_2'
+                    name={`repeat.day_position_rules.${index}.weekday`}
                     render={({ field }) => (
-                      <FormItem className='flex-1'>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            min={1}
-                            max={28}
-                            disabled={disabled}
-                            value={field.value ?? ''}
-                            onChange={(e) =>
-                              field.onChange(e.target.valueAsNumber)
-                            }
-                          />
-                        </FormControl>
+                      <FormItem>
+                        <FormLabel>Repeat on which day</FormLabel>
+                        <RecurrenceWeekdayChips
+                          options={WEEKDAY_OPTIONS}
+                          value={field.value ? [field.value] : []}
+                          onChange={(days) => field.onChange(days[0])}
+                          disabled={disabled}
+                          single
+                        />
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-              </div>
-            )}
-
+              ))}
             {monthlyMode === 'day_position' && (
-              <div className='space-y-2'>
-                {monthlyIntervalField}
-                <FormLabel>Repeat on what day</FormLabel>
-                {dayPositionRules.map((rule, index) => (
-                  <div key={rule.id} className='flex items-center gap-2'>
-                    <FormField
-                      control={control}
-                      name={`repeat.day_position_rules.${index}.position`}
-                      render={({ field }) => (
-                        <Input
-                          type='number'
-                          min={1}
-                          max={28}
-                          className='flex-1'
-                          placeholder='Day #'
-                          disabled={disabled}
-                          value={field.value ?? ''}
-                          onChange={(e) =>
-                            field.onChange(e.target.valueAsNumber)
-                          }
-                        />
-                      )}
-                    />
-                    <FormField
-                      control={control}
-                      name={`repeat.day_position_rules.${index}.weekday`}
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
-                          disabled={disabled}
-                        >
-                          <SelectTrigger className='flex-1'>
-                            <SelectValue placeholder='Day' />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DAYS_OF_WEEK.map((day) => (
-                              <SelectItem key={day} value={day}>
-                                {DAY_LABELS[day]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </div>
-                ))}
-                <FormField
-                  control={control}
-                  name='repeat.day_position_rules'
-                  render={() => <FormMessage />}
-                />
-              </div>
+              <FormField
+                control={control}
+                name='repeat.day_position_rules'
+                render={() => <FormMessage />}
+              />
             )}
           </div>
         }
@@ -328,18 +271,25 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
                     name='repeat.end_occurrences'
                     render={({ field: occurrencesField }) => (
                       <FormItem className='space-y-0'>
-                        <FormControl>
-                          <Input
-                            type='number'
-                            min={1}
-                            className='h-8 w-24'
-                            disabled={disabled}
-                            value={occurrencesField.value ?? ''}
-                            onChange={(e) =>
-                              occurrencesField.onChange(e.target.valueAsNumber)
-                            }
-                          />
-                        </FormControl>
+                        <div className='flex items-center gap-2'>
+                          <FormControl>
+                            <Input
+                              type='number'
+                              min={1}
+                              className='h-8 w-24'
+                              disabled={disabled}
+                              value={occurrencesField.value ?? ''}
+                              onChange={(e) =>
+                                occurrencesField.onChange(
+                                  e.target.valueAsNumber
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <span className='text-muted-foreground text-sm'>
+                            occurrence(s)
+                          </span>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}

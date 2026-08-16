@@ -5,6 +5,7 @@ import { DataTableColumnHeader } from '@/components/data-table'
 import {
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_OPTIONS,
+  SHIFT_POLICY_TYPE_OPTIONS,
   SHIFT_TYPE_OPTIONS,
 } from '../data/data'
 import { type Shift } from '../data/schema'
@@ -68,6 +69,18 @@ export const shiftsColumns: ColumnDef<Shift>[] = [
     cell: ({ row }) => {
       const option = SHIFT_TYPE_OPTIONS.find(
         (o) => o.value === row.original.shift_type
+      )
+      return <Badge variant='outline'>{option?.label ?? '—'}</Badge>
+    },
+  },
+  {
+    accessorKey: 'policy_type',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Policy' />
+    ),
+    cell: ({ row }) => {
+      const option = SHIFT_POLICY_TYPE_OPTIONS.find(
+        (o) => o.value === row.original.policy_type
       )
       return <Badge variant='outline'>{option?.label ?? '—'}</Badge>
     },

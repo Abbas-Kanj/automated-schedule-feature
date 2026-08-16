@@ -1,4 +1,4 @@
-import { XIcon } from 'lucide-react'
+import { ImageIcon, XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,34 +38,41 @@ export function IconPickerField({
           <Button
             type='button'
             variant='outline'
+            size='icon'
             disabled={disabled}
-            className='justify-start gap-2'
+            title={selected ? selected.label : 'Select an icon'}
+            aria-label={selected ? `Icon: ${selected.label}` : 'Select an icon'}
           >
             {selected && SelectedIcon ? (
-              <>
-                <SelectedIcon className='size-4' />
-                {selected.label}
-              </>
+              <SelectedIcon className='size-4' />
             ) : (
-              <span className='text-muted-foreground'>Select an icon</span>
+              <ImageIcon className='size-4 text-muted-foreground' />
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className='w-56 p-0'>
+        <PopoverContent className='w-64 p-0'>
           <Command>
             <CommandInput placeholder='Search icons...' />
             <CommandList>
               <CommandEmpty>No icon found.</CommandEmpty>
-              <CommandGroup>
+              {/* cmdk renders a group's items inside a nested
+                  `[cmdk-group-items]` div, not the element `className`
+                  lands on — target that descendant directly, or a
+                  grid/flex layout here is a no-op and icons stay a
+                  single-column list. */}
+              <CommandGroup className='**:[[cmdk-group-items]]:flex **:[[cmdk-group-items]]:flex-wrap **:[[cmdk-group-items]]:gap-1'>
                 {SHIFT_ICON_OPTIONS.map((o) => (
                   <CommandItem
                     key={o.value}
                     value={o.label}
+                    title={o.label}
                     onSelect={() => onChange(o.value)}
-                    className={cn(value === o.value && 'bg-accent')}
+                    className={cn(
+                      'w-[18%] flex-none justify-center py-2',
+                      value === o.value && 'bg-accent'
+                    )}
                   >
                     <o.icon className='size-4' />
-                    {o.label}
                   </CommandItem>
                 ))}
               </CommandGroup>

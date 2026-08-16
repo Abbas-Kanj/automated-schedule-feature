@@ -67,7 +67,12 @@ export const useShiftsStore = create<ShiftsState>()((set) => ({
         name,
         short_code: deriveShortCode(name),
       }
-      const shifts = [...state.shifts, clone]
+      const sourceIndex = state.shifts.indexOf(source)
+      const shifts = [
+        ...state.shifts.slice(0, sourceIndex + 1),
+        clone,
+        ...state.shifts.slice(sourceIndex + 1),
+      ]
       persist(shifts)
       return { shifts }
     }),

@@ -128,8 +128,6 @@ export const BADGE_COLORS = [
   'pink',
   'rose',
 ] as const
-const badgeColorSchema = z.enum(BADGE_COLORS)
-
 export const SCHEDULE_ICONS = [
   'briefcase',
   'clock',
@@ -148,8 +146,6 @@ export const SCHEDULE_ICONS = [
   'home',
   'truck',
 ] as const
-const scheduleIconSchema = z.enum(SCHEDULE_ICONS)
-
 const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
 
 const regularBaseSchema = z.object({
@@ -158,85 +154,23 @@ const regularBaseSchema = z.object({
   start_date: dateStringSchema,
 })
 
-// --- fixed / flexible: shift definition ---
-
-const regularShiftTimeEntrySchema = z
-  .object({
-    from_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required'),
-    to_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required'),
-    // Lets a range cross midnight (e.g. 22:00 -> 06:00) instead of failing
-    // the "end after start" check below.
-    overnight: z.boolean().optional(),
-  })
-  .refine((val) => val.overnight || val.to_time > val.from_time, {
-    message: 'End time must be after start time (or mark as overnight)',
-    path: ['to_time'],
-  })
-
-// Unwraps an entry onto a single continuous timeline (adding a day once it
-// crosses midnight) so two ranges on the same day can be compared for
-// overlap with plain start/end math.
-export function getShiftTimeEntryRange(entry: {
-  from_time: string
-  to_time: string
-  overnight?: boolean
-}) {
-  const toMinutes = (value: string) => {
-    const [h, m] = value.split(':').map(Number)
-    return h * 60 + m
-  }
-  const start = toMinutes(entry.from_time)
-  let end = toMinutes(entry.to_time)
-  if (entry.overnight || end <= start) end += 24 * 60
-  return { start, end }
-}
-
-export function shiftTimesCollide(
-  times: { from_time: string; to_time: string; overnight?: boolean }[]
-): boolean {
-  const ranges = times.map(getShiftTimeEntryRange)
-  return ranges.some((a, i) =>
-    ranges.some((b, j) => j !== i && a.start < b.end && b.start < a.end)
-  )
-}
-
-const regularShiftDaySchema = z.object({
-  day: daySchema,
-  times: z
-    .array(regularShiftTimeEntrySchema)
-    .min(1, 'Add at least one time range')
-    .refine((times) => !shiftTimesCollide(times), {
-      message: "Times can't overlap — adjust them so they don't collide",
-    }),
-})
-
-const regularShiftSchema = z.object({
-  id: z.string(),
-  name: z.string().min(1, 'Shift name is required'),
-  short_code: z.string().min(1, 'Required').max(6),
-  badge_color: badgeColorSchema,
-  icon: scheduleIconSchema,
-  shift_length_hours: z.number().min(1).max(24),
-  overnight: z.boolean().optional(),
-  days: z
-    .array(regularShiftDaySchema)
-    .min(1, 'Assign at least one day')
-    .refine((days) => new Set(days.map((d) => d.day)).size === days.length, {
-      message: 'Each day can only be selected once',
-    }),
-})
-
+// --- fixed / flexible: shift selection ---
+//
+// `shift_ids` references records in the standalone `shifts` feature's own
+// store (`useShiftsStore`, see `src/features/shifts`) rather than duplicating
+// a shift's name/badge/icon/days/hours inline here. A schedule fully
+// inherits whatever the referenced Shift itself defines — there's no
+// per-schedule override of a shift's days or times. To run a shift on
+// different days, edit the Shift itself (or pick/create a different one).
 const shiftDefinitionFieldsSchema = z.object({
-  nb_of_shifts: z.number().min(1),
-  shifts: z.array(regularShiftSchema),
+  shift_ids: z
+    .array(z.string().min(1))
+    .min(1, 'Select or create at least one shift'),
   temporary_schedule: z.boolean().default(false),
   temporary_schedule_label: z.string().max(60).optional(),
 })
 
-// --- occurrence / recurrence rule ---
-
-export const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
-const recurrenceFrequencySchema = z.enum(RECURRENCE_FREQUENCIES)
+// --- fixed / flexible: start date + end settings ---
 
 export const RECURRENCE_END_TYPES = [
   'never',
@@ -245,61 +179,17 @@ export const RECURRENCE_END_TYPES = [
 ] as const
 const recurrenceEndTypeSchema = z.enum(RECURRENCE_END_TYPES)
 
-const recurrenceSchema = z
+// Just "when does this whole arrangement stop" — never ends / ends after N
+// occurrences / ends on a specific date. There's no frequency/weekday
+// picker here (that used to live alongside this) since which days a
+// schedule runs on now comes entirely from its selected shifts' own days.
+const endSettingsSchema = z
   .object({
-    frequency: recurrenceFrequencySchema,
-    interval: z.number().min(1),
-    weekdays: z.array(daySchema).optional(),
-    day_of_month_from: z.number().min(1).max(28).optional(),
-    day_of_month_to: z.number().min(1).max(28).optional(),
     end_type: recurrenceEndTypeSchema,
     end_occurrences: z.number().min(1).optional(),
     end_date: dateStringSchema.optional(),
-    exceptions: z.object({
-      public_holiday: z.boolean().default(false),
-      sick_leave: z.boolean().default(false),
-    }),
   })
   .superRefine((val, ctx) => {
-    if (
-      (val.frequency === 'daily' || val.frequency === 'weekly') &&
-      !val.weekdays?.length
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Select at least one day',
-        path: ['weekdays'],
-      })
-    }
-
-    if (val.frequency === 'monthly') {
-      if (val.day_of_month_from == null) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Set the start day of month',
-          path: ['day_of_month_from'],
-        })
-      }
-      if (val.day_of_month_to == null) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Set the end day of month',
-          path: ['day_of_month_to'],
-        })
-      }
-      if (
-        val.day_of_month_from != null &&
-        val.day_of_month_to != null &&
-        val.day_of_month_to < val.day_of_month_from
-      ) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'End day must be on or after start day',
-          path: ['day_of_month_to'],
-        })
-      }
-    }
-
     if (val.end_type === 'after_occurrences' && val.end_occurrences == null) {
       ctx.addIssue({
         code: 'custom',
@@ -317,10 +207,11 @@ const recurrenceSchema = z
     }
   })
 
-// occurrence (step 4) only applies to fixed/flexible schedules — rotate
-// covers repetition through its cycle/pattern config instead
-const regularSharedSchema = regularBaseSchema.extend({
-  recurrence: recurrenceSchema,
+// step 3 (fixed/flexible only) — rotate covers its own start date +
+// repetition through its cycle/pattern config instead
+const regularSharedSchema = z.object({
+  start_date: dateStringSchema,
+  end_settings: endSettingsSchema,
 })
 
 // --- rotate: cycle / pattern config ---
@@ -399,11 +290,11 @@ const regularScheduleSchema = z
   ])
   .superRefine((val, ctx) => {
     if (val.type === 'fixed' || val.type === 'flexible') {
-      if (val.shifts.length !== val.nb_of_shifts) {
+      if (new Set(val.shift_ids).size !== val.shift_ids.length) {
         ctx.addIssue({
           code: 'custom',
-          message: `Configure all ${val.nb_of_shifts} shift(s)`,
-          path: ['shifts'],
+          message: 'Each shift can only be selected once',
+          path: ['shift_ids'],
         })
       }
     }
@@ -450,6 +341,9 @@ const commonScheduleSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
   description: z.string(),
+  // Predefined-template picker on step 1 — wiring templates to actually
+  // pre-fill a schedule is a follow-up; for now this just records the pick.
+  template_id: z.string().optional(),
 })
 
 export const scheduleSchema = z
@@ -472,14 +366,7 @@ export type PolicyType = z.infer<typeof policyTypeSchema>
 export type RegularType = (typeof REGULAR_TYPES)[number]
 export type BadgeColor = (typeof BADGE_COLORS)[number]
 export type ScheduleIcon = (typeof SCHEDULE_ICONS)[number]
-export type RegularShift = Extract<
-  RegularSchedule,
-  { type: 'fixed' | 'flexible' }
->['shifts'][number]
-export type RegularShiftDay = RegularShift['days'][number]
-export type RegularShiftTimeEntry = RegularShiftDay['times'][number]
-export type Recurrence = z.infer<typeof recurrenceSchema>
-export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number]
+export type EndSettings = z.infer<typeof endSettingsSchema>
 export type RecurrenceEndType = (typeof RECURRENCE_END_TYPES)[number]
 export type CycleType = (typeof CYCLE_TYPES)[number]
 export type CycleLengthUnit = (typeof CYCLE_LENGTH_UNITS)[number]

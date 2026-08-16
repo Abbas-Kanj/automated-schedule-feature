@@ -27,7 +27,9 @@ export function Schedules() {
       <Main className='flex flex-1 flex-col gap-4 sm:gap-6'>
         <div className='flex flex-wrap items-end justify-between gap-2'>
           <div>
-            <h2 className='text-2xl font-bold tracking-tight'>Schedules</h2>
+            <h2 className='text-2xl font-bold tracking-tight'>
+              Schedule management
+            </h2>
           </div>
           <Button className='space-x-1' asChild>
             <Link to='/schedules/new'>

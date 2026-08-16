@@ -11,14 +11,16 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { RECURRENCE_END_TYPE_OPTIONS } from '../../data/data'
 import { DateField } from './date-field'
 
-type RecurrenceEndFieldsProps = {
+type ScheduleEndSettingsFieldsProps = {
   disabled?: boolean
 }
 
-export function RecurrenceEndFields({ disabled }: RecurrenceEndFieldsProps) {
+export function ScheduleEndSettingsFields({
+  disabled,
+}: ScheduleEndSettingsFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control } = useFormContext<any>()
-  const endType = useWatch({ control, name: 'recurrence.end_type' }) as
+  const endType = useWatch({ control, name: 'end_settings.end_type' }) as
     | string
     | undefined
 
@@ -26,7 +28,25 @@ export function RecurrenceEndFields({ disabled }: RecurrenceEndFieldsProps) {
     <div className='space-y-4'>
       <FormField
         control={control}
-        name='recurrence.end_type'
+        name='start_date'
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Start date</FormLabel>
+            <FormControl>
+              <DateField
+                value={field.value}
+                onChange={field.onChange}
+                disabled={disabled}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name='end_settings.end_type'
         render={({ field }) => (
           <FormItem className='space-y-2'>
             <FormLabel>End settings</FormLabel>
@@ -58,7 +78,7 @@ export function RecurrenceEndFields({ disabled }: RecurrenceEndFieldsProps) {
       {endType === 'after_occurrences' && (
         <FormField
           control={control}
-          name='recurrence.end_occurrences'
+          name='end_settings.end_occurrences'
           render={({ field }) => (
             <FormItem>
               <FormLabel>Occurrences</FormLabel>
@@ -80,7 +100,7 @@ export function RecurrenceEndFields({ disabled }: RecurrenceEndFieldsProps) {
       {endType === 'on_date' && (
         <FormField
           control={control}
-          name='recurrence.end_date'
+          name='end_settings.end_date'
           render={({ field }) => (
             <FormItem>
               <FormLabel>End date</FormLabel>

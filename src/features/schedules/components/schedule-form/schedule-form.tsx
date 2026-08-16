@@ -31,12 +31,13 @@ import {
 import { generateId } from '../../utils'
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
-import { OccurrenceFields } from './occurrence-fields'
 import { PatternBuilder } from './pattern-builder'
 import { RegularBasicsFields } from './regular-basics-fields'
 import { RotateFields } from './rotate-fields'
+import { ScheduleBasicsFields } from './schedule-basics-fields'
+import { ScheduleEndSettingsFields } from './schedule-end-settings-fields'
 import { ScheduleSummary } from './schedule-summary'
-import { ShiftDefinitionFields } from './shift-definition-fields'
+import { ShiftPickerField } from './shift-picker-field'
 import { WeeklyFields } from './weekly-fields'
 import { WeeklyOneFields } from './weekly-one-fields'
 
@@ -54,20 +55,25 @@ function getSteps(parentType: string, regularType?: RegularType): VerticalTabsSt
     ]
   }
 
-  const steps: VerticalTabsStep[] = [{ id: 'basics', label: 'Basics' }]
-  steps.push({
-    id: 'shift-definition',
-    label: regularType === 'rotate' ? 'Shift blocks' : 'Shifts',
-  })
+  // rotate keeps its own unchanged flow: basics -> shift blocks -> pattern
+  // -> summary. fixed/flexible get the new 3-step flow: basics -> shifts
+  // (search/select/create from the standalone `shifts` feature) -> start
+  // date + end settings -> summary.
   if (regularType === 'rotate') {
-    steps.push({ id: 'pattern', label: 'Pattern' })
-  } else {
-    // Occurrence only applies to fixed/flexible — rotate covers repetition
-    // through its cycle/pattern config instead.
-    steps.push({ id: 'occurrence', label: 'Occurrence' })
+    return [
+      { id: 'basics', label: 'Basics' },
+      { id: 'shift-definition', label: 'Shift blocks' },
+      { id: 'pattern', label: 'Pattern' },
+      { id: 'summary', label: 'Summary' },
+    ]
   }
-  steps.push({ id: 'summary', label: 'Summary' })
-  return steps
+
+  return [
+    { id: 'basics', label: 'Basics' },
+    { id: 'shifts', label: 'Shifts' },
+    { id: 'end-settings', label: 'Start & End' },
+    { id: 'summary', label: 'Summary' },
+  ]
 }
 
 const now = new Date()
@@ -102,25 +108,19 @@ function getTypeDefaults(type: ScheduleType) {
   }
 }
 
-const DEFAULT_RECURRENCE = {
-  frequency: 'daily' as const,
-  interval: 1,
-  weekdays: [] as string[],
+const DEFAULT_END_SETTINGS = {
   end_type: 'never' as const,
-  exceptions: { public_holiday: false, sick_leave: false },
 }
 
 function getRegularTypeDefaults(type: RegularType) {
-  const base = {
-    parent_type: 'regular' as const,
-    type,
-    is_active: true,
-    start_date: format(now, 'yyyy-MM-dd'),
-  }
+  const startDate = format(now, 'yyyy-MM-dd')
 
   if (type === 'rotate') {
     return {
-      ...base,
+      parent_type: 'regular' as const,
+      type,
+      is_active: true,
+      start_date: startDate,
       cycle_type: 'rotating_shift' as const,
       cycle_length: { unit: 'weekly' as const, days: 7 },
       rotate_type: 'right_shift' as const,
@@ -142,20 +142,11 @@ function getRegularTypeDefaults(type: RegularType) {
   }
 
   return {
-    ...base,
-    recurrence: DEFAULT_RECURRENCE,
-    nb_of_shifts: 1,
-    shifts: [
-      {
-        id: generateId(),
-        name: '',
-        short_code: '',
-        badge_color: 'blue' as const,
-        icon: 'clock' as const,
-        shift_length_hours: 8,
-        days: [],
-      },
-    ],
+    parent_type: 'regular' as const,
+    type,
+    start_date: startDate,
+    end_settings: DEFAULT_END_SETTINGS,
+    shift_ids: [] as string[],
     temporary_schedule: false,
   }
 }
@@ -170,7 +161,8 @@ type ScheduleFormProps = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getStepFields(stepId: string, parentType: string, type?: string): any {
   if (stepId === 'basics') {
-    return parentType === 'regular'
+    if (parentType !== 'regular') return ['name', 'description', 'employees']
+    return type === 'rotate'
       ? [
           'name',
           'description',
@@ -178,26 +170,23 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
           'is_active',
           'policy_type',
           'start_date',
-          'nb_of_shifts',
           'shift_block',
         ]
-      : ['name', 'description', 'employees']
+      : ['name', 'description', 'type']
+  }
+  if (stepId === 'shifts') {
+    return ['shift_ids']
+  }
+  if (stepId === 'end-settings') {
+    return ['start_date', 'end_settings']
   }
   if (stepId === 'shift-definition') {
-    return type === 'rotate'
-      ? ['blocks', 'rotate_type', 'cycle_length', 'shift_length_hours']
-      : [
-          'nb_of_shifts',
-          'shifts',
-          'temporary_schedule',
-          'temporary_schedule_label',
-        ]
+    // Only reachable for rotate now — fixed/flexible's shift picking lives
+    // under the 'shifts' step above instead.
+    return ['blocks', 'rotate_type', 'cycle_length', 'shift_length_hours']
   }
   if (stepId === 'pattern') {
     return ['cycle_type', 'pattern']
-  }
-  if (stepId === 'occurrence') {
-    return ['recurrence']
   }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
@@ -231,6 +220,10 @@ export function ScheduleForm({
   // Furthest step the user has validated their way to — steps beyond this
   // are locked in the vertical tabs until the ones before them pass.
   const [maxStep, setMaxStep] = useState(0)
+  // True while the "add new shift" modal (opened from the Shifts step) is
+  // open — locks all step navigation so the user can't jump away from
+  // underneath it. See `ShiftPickerField`'s `onDialogOpenChange`.
+  const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
 
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
@@ -284,6 +277,7 @@ export function ScheduleForm({
     } as Schedule)
     setStep(0)
     setMaxStep(0)
+    setIsShiftDialogOpen(false)
   }
 
   const handleFormSubmit = (values: Schedule) => {
@@ -318,6 +312,7 @@ export function ScheduleForm({
               currentStep={step}
               onStepChange={goToStep}
               maxStepReached={maxStep}
+              navigationDisabled={isShiftDialogOpen}
             />
           )}
           <div className='min-w-0 flex-1 space-y-6'>
@@ -365,8 +360,15 @@ export function ScheduleForm({
                   />
                 )}
 
-                {parentType === 'regular' && (
+                {parentType === 'regular' && regularType === 'rotate' && (
                   <RegularBasicsFields
+                    disabled={disabled}
+                    onTypeChange={handleRegularTypeChange}
+                  />
+                )}
+
+                {parentType === 'regular' && regularType !== 'rotate' && (
+                  <ScheduleBasicsFields
                     disabled={disabled}
                     onTypeChange={handleRegularTypeChange}
                   />
@@ -402,10 +404,13 @@ export function ScheduleForm({
                 </>
               )}
 
-            {(disabled || currentStepId === 'shift-definition') &&
+            {(disabled || currentStepId === 'shifts') &&
               parentType === 'regular' &&
               regularType !== 'rotate' && (
-                <ShiftDefinitionFields disabled={disabled} />
+                <ShiftPickerField
+                  disabled={disabled}
+                  onDialogOpenChange={setIsShiftDialogOpen}
+                />
               )}
 
             {(disabled || currentStepId === 'shift-definition') &&
@@ -418,10 +423,10 @@ export function ScheduleForm({
                 <PatternBuilder disabled={disabled} />
               )}
 
-            {(disabled || currentStepId === 'occurrence') &&
+            {(disabled || currentStepId === 'end-settings') &&
               parentType === 'regular' &&
               regularType !== 'rotate' && (
-                <OccurrenceFields disabled={disabled} />
+                <ScheduleEndSettingsFields disabled={disabled} />
               )}
 
             {!disabled && currentStepId === 'summary' && (
@@ -434,16 +439,25 @@ export function ScheduleForm({
                   type='button'
                   variant='outline'
                   onClick={handleBack}
-                  disabled={step === 0}
+                  disabled={step === 0 || isShiftDialogOpen}
                 >
                   Back
                 </Button>
                 {isLastStep ? (
-                  <Button key='submit' type='submit'>
+                  <Button
+                    key='submit'
+                    type='submit'
+                    disabled={isShiftDialogOpen}
+                  >
                     {submitLabel}
                   </Button>
                 ) : (
-                  <Button key='next' type='button' onClick={handleNext}>
+                  <Button
+                    key='next'
+                    type='button'
+                    onClick={handleNext}
+                    disabled={isShiftDialogOpen}
+                  >
                     Next
                   </Button>
                 )}

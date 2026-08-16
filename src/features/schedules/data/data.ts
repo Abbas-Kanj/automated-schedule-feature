@@ -26,7 +26,6 @@ import {
   type CYCLE_TYPES,
   type PolicyType,
   type RECURRENCE_END_TYPES,
-  type RECURRENCE_FREQUENCIES,
   type REGULAR_TYPES,
   type ROTATE_DIRECTIONS,
 } from './schema'
@@ -235,12 +234,6 @@ export const ROTATE_TYPE_OPTIONS = [
   { value: 'normal_rotation', label: 'Normal rotation' },
   { value: 'no_rotation', label: 'No rotation' },
 ] satisfies { value: (typeof ROTATE_DIRECTIONS)[number]; label: string }[]
-
-export const RECURRENCE_FREQUENCY_OPTIONS = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-] satisfies { value: (typeof RECURRENCE_FREQUENCIES)[number]; label: string }[]
 
 export const RECURRENCE_END_TYPE_OPTIONS = [
   { value: 'never', label: 'Never ends' },

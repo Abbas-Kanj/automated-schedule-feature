@@ -8,6 +8,7 @@ import {
 } from 'date-fns'
 import { CYCLE_TYPE_OPTIONS } from './data/data'
 import { type DayOfWeek, type Schedule, type TimeRange } from './data/schema'
+import { type Shift } from '@/features/shifts/data/schema'
 
 export function generateId() {
   return crypto.randomUUID()
@@ -67,7 +68,7 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
-export function getScheduleTotalHours(schedule: Schedule): number {
+export function getScheduleTotalHours(schedule: Schedule, shifts: Shift[]): number {
   if (schedule.parent_type === 'regular') {
     if (schedule.type === 'rotate') {
       const activeHours = schedule.pattern.reduce((sum, p) => {
@@ -78,10 +79,16 @@ export function getScheduleTotalHours(schedule: Schedule): number {
       return Math.round((activeHours / schedule.cycle_length.days) * 100) / 100
     }
 
-    return schedule.shifts.reduce(
+    const resolvedShifts = schedule.shift_ids
+      .map((id) => shifts.find((s) => s.id === id))
+      .filter((s): s is Shift => s !== undefined)
+
+    return resolvedShifts.reduce(
       (shiftSum, shift) =>
         shiftSum +
-        shift.days.reduce((daySum, d) => daySum + calculateHours(d.times), 0),
+        shift.days
+          .filter((d) => d.enabled)
+          .reduce((daySum, d) => daySum + calculateHours(d.times), 0),
       0
     )
   }
@@ -97,7 +104,7 @@ export function getScheduleTotalHours(schedule: Schedule): number {
   )
 }
 
-export function getScheduleSummary(schedule: Schedule): string {
+export function getScheduleSummary(schedule: Schedule, shifts: Shift[]): string {
   if (schedule.parent_type === 'regular') {
     if (schedule.type === 'rotate') {
       const cycleLabel = CYCLE_TYPE_OPTIONS.find(
@@ -106,11 +113,16 @@ export function getScheduleSummary(schedule: Schedule): string {
       return `${cycleLabel} · ${schedule.cycle_length.days}-day cycle`
     }
 
-    const dayCount = schedule.shifts.reduce(
-      (sum, shift) => sum + shift.days.length,
+    const resolvedShifts = schedule.shift_ids
+      .map((id) => shifts.find((s) => s.id === id))
+      .filter((s): s is Shift => s !== undefined)
+
+    const shiftCount = resolvedShifts.length
+    const dayCount = resolvedShifts.reduce(
+      (sum, shift) => sum + shift.days.filter((d) => d.enabled).length,
       0
     )
-    return `${schedule.nb_of_shifts} shift${schedule.nb_of_shifts > 1 ? 's' : ''} · ${dayCount} day${dayCount === 1 ? '' : 's'}`
+    return `${shiftCount} shift${shiftCount > 1 ? 's' : ''} · ${dayCount} day${dayCount === 1 ? '' : 's'}`
   }
 
   if (schedule.type === 'weekly') {

@@ -7,6 +7,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -25,25 +26,17 @@ import { type ShiftFormValues } from '../../data/schema'
 import { BadgeColorField } from './badge-color-field'
 import { CategoryField } from './category-field'
 import { IconPickerField } from './icon-picker-field'
-import { PolicyPillField } from './policy-pill-field'
-import { ShiftHoursField } from './shift-hours-field'
 import { ShiftTypeField } from './shift-type-field'
 import { TimezoneField } from './timezone-field'
 
 // "General" tab of `ShiftFormDialog` — name/look, type/category, status,
-// time zone, hours, policy and active toggle. Split out so the dialog
-// itself only wires up the form and its tabs.
+// time zone and active toggle. Hours live on their own "Shift times" tab
+// (see `shift-times-tab.tsx`) and policy on its own "Shift policy" tab
+// (see `shift-policy-tab.tsx`). Split out so the dialog itself only wires
+// up the form and its tabs.
 export function GeneralTab() {
   const form = useFormContext<ShiftFormValues>()
 
-  const hoursMode = useWatch({ control: form.control, name: 'hours_mode' })
-  const days = useWatch({ control: form.control, name: 'days' })
-  const breakEnabled = useWatch({
-    control: form.control,
-    name: 'break_enabled',
-  })
-  const breakType = useWatch({ control: form.control, name: 'break_type' })
-  const breaks = useWatch({ control: form.control, name: 'breaks' })
   const timezoneMode = useWatch({
     control: form.control,
     name: 'timezone_mode',
@@ -54,46 +47,47 @@ export function GeneralTab() {
     control: form.control,
     name: 'custom_category',
   })
-  const policyType = useWatch({ control: form.control, name: 'policy_type' })
 
   return (
     <div className='space-y-4 px-0.5'>
-      <FormField
-        control={form.control}
-        name='name'
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Shift name</FormLabel>
-            <FormControl>
-              <Input
-                placeholder='e.g. Morning shift'
-                autoComplete='off'
-                {...field}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      <div className='grid gap-3 sm:grid-cols-2'>
+        <FormField
+          control={form.control}
+          name='name'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Shift name</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder='e.g. Morning shift'
+                  autoComplete='off'
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-      <FormField
-        control={form.control}
-        name='short_code'
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Short code</FormLabel>
-            <FormControl>
-              <Input
-                disabled
-                readOnly
-                placeholder='Auto filled from the first letters of the name'
-                {...field}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+        <FormField
+          control={form.control}
+          name='short_code'
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Short code</FormLabel>
+              <FormControl>
+                <Input
+                  disabled
+                  readOnly
+                  placeholder='Auto filled from the first letters of the name'
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
 
       <FormField
         control={form.control}
@@ -204,6 +198,18 @@ export function GeneralTab() {
         )}
       />
 
+      {/* Not a real form field — just an indicator that the "Overnight"
+          category forces every time range on the "Shift times" tab to
+          cross midnight (see `ShiftTimesTab`'s `isOvernightCategory`). */}
+      {category === 'overnight' && (
+        <div className='flex flex-row items-center justify-between rounded-md border p-3'>
+          <Label className='text-muted-foreground font-normal'>
+            Check next day
+          </Label>
+          <Switch checked disabled />
+        </div>
+      )}
+
       <div className='grid gap-3 sm:grid-cols-2'>
         <FormField
           control={form.control}
@@ -297,75 +303,10 @@ export function GeneralTab() {
 
       <FormField
         control={form.control}
-        name='days'
-        render={() => (
-          <FormItem>
-            <FormLabel>Shift time</FormLabel>
-            <FormControl>
-              <ShiftHoursField
-                mode={hoursMode}
-                days={days ?? []}
-                breakEnabled={!!breakEnabled}
-                breakType={breakType}
-                breaks={breaks ?? []}
-                onSave={(value) => {
-                  form.setValue('hours_mode', value.mode, {
-                    shouldDirty: true,
-                  })
-                  form.setValue('days', value.days, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  })
-                  form.setValue('break_enabled', value.breakEnabled, {
-                    shouldDirty: true,
-                  })
-                  form.setValue('break_type', value.breakType, {
-                    shouldDirty: true,
-                  })
-                  form.setValue('breaks', value.breaks, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  })
-                }}
-                error={
-                  typeof form.formState.errors.days?.message === 'string'
-                    ? form.formState.errors.days.message
-                    : undefined
-                }
-              />
-            </FormControl>
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name='policy_type'
-        render={() => (
-          <FormItem>
-            <FormLabel>Shift policy</FormLabel>
-            <FormControl>
-              <PolicyPillField
-                value={policyType}
-                onChange={(value) =>
-                  form.setValue('policy_type', value, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  })
-                }
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
         name='is_active'
         render={({ field }) => (
           <FormItem className='flex flex-row items-center justify-between rounded-md border p-3'>
-            <FormLabel className='cursor-pointer'>Active status</FormLabel>
+            <FormLabel className='cursor-pointer'>Is Active</FormLabel>
             <FormControl>
               <Switch
                 checked={!!field.value}

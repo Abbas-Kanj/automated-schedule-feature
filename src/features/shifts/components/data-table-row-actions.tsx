@@ -1,6 +1,6 @@
 import { DotsHorizontalIcon } from '@radix-ui/react-icons'
 import { type Row } from '@tanstack/react-table'
-import { Copy, Pencil, Trash2 } from 'lucide-react'
+import { Copy, Pencil, Shield, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,7 +36,7 @@ export function DataTableRowActions<TData>({
           <span className='sr-only'>Open menu</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' className='w-32'>
+      <DropdownMenuContent align='end' className='w-40'>
         <DropdownMenuItem
           onClick={() => {
             setCurrentRow(shift)
@@ -57,6 +57,17 @@ export function DataTableRowActions<TData>({
           Clone
           <DropdownMenuShortcut>
             <Copy size={16} />
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            setCurrentRow(shift)
+            setOpen('policy')
+          }}
+        >
+          Change policy
+          <DropdownMenuShortcut>
+            <Shield size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem
