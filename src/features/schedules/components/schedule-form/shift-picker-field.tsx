@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { CheckIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -12,11 +13,14 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ShiftFormDialog } from '@/features/shifts/components/shift-form-dialog'
 import {
   DAY_LABELS,
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_COMPONENTS,
+  SHIFT_POLICY_TYPE_OPTIONS,
+  SHIFT_TYPE_OPTIONS,
 } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
@@ -24,11 +28,16 @@ import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 type ShiftPickerFieldProps = {
   disabled?: boolean
   onDialogOpenChange?: (open: boolean) => void
+  // Rotate needs >=2 shifts to actually rotate between; fixed/flexible are
+  // fine with just one. Purely a UI hint — the real gate is the schema's
+  // own superRefine on `shift_ids` (see `data/schema.ts`).
+  minSelection?: number
 }
 
 export function ShiftPickerField({
   disabled,
   onDialogOpenChange,
+  minSelection = 1,
 }: ShiftPickerFieldProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, setValue } = useFormContext<any>()
@@ -39,12 +48,15 @@ export function ShiftPickerField({
     | undefined
 
   const [query, setQuery] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   // Snapshot of the shifts store's ids at the moment "Add new shift" is
   // clicked — used to detect which shift the create dialog just added.
   const idsBeforeCreateRef = useRef<string[]>([])
 
   const normalizedQuery = query.trim().toLowerCase()
+  // Empty query shows every shift — the dropdown opens on click, not just
+  // once you start typing, so there needs to be something to show.
   const filteredShifts = normalizedQuery
     ? shifts.filter((s) => s.name.toLowerCase().includes(normalizedQuery))
     : shifts
@@ -53,13 +65,14 @@ export function ShiftPickerField({
     .map((id) => shifts.find((s) => s.id === id))
     .filter((shift): shift is Shift => shift !== undefined)
 
-  const toggleShift = (id: string, onChange: (value: string[]) => void) => {
+  const selectShift = (id: string, onChange: (value: string[]) => void) => {
     if (disabled) return
     const current = selectedIds ?? []
-    const next = current.includes(id)
-      ? current.filter((s) => s !== id)
-      : [...current, id]
-    onChange(next)
+    if (!current.includes(id)) onChange([...current, id])
+    // Selecting finishes that search — clear it so the list resets to
+    // showing everything for the next pick, but leave the dropdown open so
+    // multiple shifts can be picked in one go.
+    setQuery('')
   }
 
   const removeShift = (id: string, onChange: (value: string[]) => void) => {
@@ -102,19 +115,112 @@ export function ShiftPickerField({
         render={({ field }) => (
           <FormItem className='space-y-4'>
             <FormLabel>Shifts</FormLabel>
+            {minSelection > 1 && (
+              <p className='-mt-2 text-sm text-muted-foreground'>
+                Select at least {minSelection} shifts to build a rotation.
+              </p>
+            )}
             <FormControl>
               <div className='space-y-4'>
                 <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
-                  <div className='relative flex-1'>
-                    <SearchIcon className='pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground' />
-                    <Input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder='Search shifts by name...'
-                      disabled={disabled}
-                      className='ps-9'
-                    />
-                  </div>
+                  <Popover
+                    open={isOpen}
+                    onOpenChange={(open) => {
+                      // Fires for Radix-initiated opens/closes (Escape,
+                      // outside click). Our own trigger click below handles
+                      // opening explicitly, so this mainly catches closes.
+                      setIsOpen(open)
+                      if (!open) setQuery('')
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <div
+                        className='relative flex-1'
+                        onClick={(e) => {
+                          // PopoverTrigger toggles open/closed on every
+                          // click by default. Once open, clicking back into
+                          // the input (e.g. to reposition the cursor while
+                          // typing) shouldn't close the dropdown — only
+                          // swallow the toggle when it would close it.
+                          if (disabled || isOpen) e.preventDefault()
+                        }}
+                      >
+                        <SearchIcon className='pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground' />
+                        <Input
+                          type='text'
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder='Search shifts by name...'
+                          disabled={disabled}
+                          className='ps-9'
+                          autoComplete='off'
+                        />
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className='w-(--radix-popover-trigger-width) p-1'
+                      align='start'
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                      {filteredShifts.length ? (
+                        <div className='max-h-64 space-y-0.5 overflow-y-auto'>
+                          {filteredShifts.map((shift) => {
+                            const isSelected = (field.value ?? []).includes(
+                              shift.id
+                            )
+                            const Icon = SHIFT_ICON_COMPONENTS[shift.icon]
+                            const color = SHIFT_BADGE_COLOR_OPTIONS.find(
+                              (o) => o.value === shift.badge_color
+                            )
+                            return (
+                              <button
+                                key={shift.id}
+                                type='button'
+                                onClick={() =>
+                                  selectShift(shift.id, field.onChange)
+                                }
+                                disabled={disabled}
+                                className={cn(
+                                  'flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left transition-colors',
+                                  disabled
+                                    ? 'cursor-not-allowed opacity-60'
+                                    : 'cursor-pointer hover:bg-accent',
+                                  isSelected && 'bg-primary/5'
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    'size-2.5 shrink-0 rounded-full',
+                                    color?.swatchClassName
+                                  )}
+                                />
+                                {Icon && (
+                                  <Icon className='size-4 shrink-0 text-muted-foreground' />
+                                )}
+                                <span className='min-w-0 flex-1'>
+                                  <span className='block truncate text-sm font-medium'>
+                                    {shift.name}
+                                  </span>
+                                  <span className='block truncate text-xs text-muted-foreground'>
+                                    {shift.short_code}
+                                  </span>
+                                </span>
+                                {isSelected && (
+                                  <CheckIcon className='size-4 shrink-0 text-primary' />
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className='px-3 py-2 text-sm text-muted-foreground'>
+                          {normalizedQuery
+                            ? 'No shifts match your search.'
+                            : 'No shifts yet — add one to get started.'}
+                        </p>
+                      )}
+                    </PopoverContent>
+                  </Popover>
                   <Button
                     type='button'
                     variant='outline'
@@ -125,58 +231,6 @@ export function ShiftPickerField({
                     Add new shift
                   </Button>
                 </div>
-
-                {filteredShifts.length ? (
-                  <div className='grid gap-2 sm:grid-cols-2'>
-                    {filteredShifts.map((shift) => {
-                      const isSelected = (field.value ?? []).includes(shift.id)
-                      const Icon = SHIFT_ICON_COMPONENTS[shift.icon]
-                      const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-                        (o) => o.value === shift.badge_color
-                      )
-                      return (
-                        <Card
-                          key={shift.id}
-                          onClick={() => toggleShift(shift.id, field.onChange)}
-                          className={cn(
-                            'gap-0 py-3 transition-colors',
-                            disabled
-                              ? 'cursor-not-allowed opacity-60'
-                              : 'cursor-pointer hover:border-primary/60',
-                            isSelected && 'border-primary bg-primary/5'
-                          )}
-                        >
-                          <CardContent className='flex items-center gap-3 px-4'>
-                            <span
-                              className={cn(
-                                'size-3 shrink-0 rounded-full',
-                                color?.swatchClassName
-                              )}
-                            />
-                            {Icon && (
-                              <Icon className='size-5 shrink-0 text-muted-foreground' />
-                            )}
-                            <span className='min-w-0 flex-1'>
-                              <span className='block truncate text-sm font-medium'>
-                                {shift.name}
-                              </span>
-                              <span className='block truncate text-xs text-muted-foreground'>
-                                {shift.short_code}
-                              </span>
-                            </span>
-                            {isSelected && (
-                              <CheckIcon className='size-4 shrink-0 text-primary' />
-                            )}
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className='text-sm text-muted-foreground'>
-                    No shifts match your search.
-                  </p>
-                )}
 
                 {selectedShifts.length > 0 && (
                   <div className='space-y-2'>
@@ -189,11 +243,19 @@ export function ShiftPickerField({
                       const color = SHIFT_BADGE_COLOR_OPTIONS.find(
                         (o) => o.value === shift.badge_color
                       )
+                      const shiftTypeLabel = SHIFT_TYPE_OPTIONS.find(
+                        (o) => o.value === shift.shift_type
+                      )?.label
+                      const policyLabel = shift.policy_type
+                        ? SHIFT_POLICY_TYPE_OPTIONS.find(
+                            (o) => o.value === shift.policy_type
+                          )?.label
+                        : undefined
                       return (
                         <Card key={shift.id} className='gap-0 py-3'>
                           <CardContent className='flex items-start gap-3 px-4'>
                             <div className='min-w-0 flex-1 space-y-1'>
-                              <div className='flex items-center gap-2'>
+                              <div className='flex flex-wrap items-center gap-2'>
                                 <span
                                   className={cn(
                                     'size-2 shrink-0 rounded-full',
@@ -209,6 +271,14 @@ export function ShiftPickerField({
                                 <span className='shrink-0 text-xs text-muted-foreground'>
                                   {shift.short_code}
                                 </span>
+                                {shiftTypeLabel && (
+                                  <Badge variant='secondary'>
+                                    {shiftTypeLabel}
+                                  </Badge>
+                                )}
+                                {policyLabel && (
+                                  <Badge variant='outline'>{policyLabel}</Badge>
+                                )}
                               </div>
                               {enabledDays.length ? (
                                 <div className='flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground'>

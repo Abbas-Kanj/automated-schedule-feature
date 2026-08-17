@@ -250,8 +250,29 @@ export function ShiftTimesTab() {
                 onValueChange={(value) => switchMode(value as ShiftHoursMode)}
                 className='gap-2'
               >
+                {/*
+                  Radix's RadioGroupItem renders a hidden native radio input
+                  for native-form compatibility, and whenever its checked
+                  state changes for ANY reason — including `switchMode`
+                  flipping `mode` here — it dispatches a synthetic
+                  (untrusted) bubbling `click` on that hidden input. That
+                  event bubbles into these labels and would otherwise
+                  re-trigger this same onClick, calling `switchMode` again
+                  on the *other* option, flipping `mode` back, which
+                  dispatches another synthetic click, and so on —
+                  cascading into an infinite update loop that crashes the
+                  page. The `isTrusted` guard filters out Radix's own
+                  re-dispatch; real user clicks are always trusted. See
+                  `radix-radio-group-bubble-input-reopens-dialog` (global
+                  skill) — this is the same landmine, just a crash instead
+                  of a reopened dialog since there's no dialog here.
+                */}
                 <Label
-                  onClick={() => mode !== 'same' && switchMode('same')}
+                  onClick={(event) => {
+                    if (event.nativeEvent.isTrusted && mode !== 'same') {
+                      switchMode('same')
+                    }
+                  }}
                   className={cn(
                     'flex cursor-pointer items-center gap-2 rounded-md border p-3 font-normal',
                     mode === 'same' && 'border-primary bg-primary/5'
@@ -261,7 +282,11 @@ export function ShiftTimesTab() {
                   Same hours every day
                 </Label>
                 <Label
-                  onClick={() => mode !== 'different' && switchMode('different')}
+                  onClick={(event) => {
+                    if (event.nativeEvent.isTrusted && mode !== 'different') {
+                      switchMode('different')
+                    }
+                  }}
                   className={cn(
                     'flex cursor-pointer items-center gap-2 rounded-md border p-3 font-normal',
                     mode === 'different' && 'border-primary bg-primary/5'

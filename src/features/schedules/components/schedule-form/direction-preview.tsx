@@ -1,22 +1,22 @@
 import { useFormContext, useWatch } from 'react-hook-form'
-import { type RotateBlock, type RotatePatternEntry } from '../../data/schema'
+import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
+import { type RotatePatternEntry } from '../../data/schema'
 
 export function DirectionPreview() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control } = useFormContext<any>()
+  const shifts = useShiftsStore((s) => s.shifts)
   const pattern =
     (useWatch({ control, name: 'pattern' }) as
       | RotatePatternEntry[]
       | undefined) ?? []
-  const blocks =
-    (useWatch({ control, name: 'blocks' }) as RotateBlock[] | undefined) ?? []
 
   const sorted = [...pattern].sort((a, b) => a.position - b.position)
   const runs: { label: string; count: number }[] = []
   for (const entry of sorted) {
     const label = entry.is_off
       ? 'Day off'
-      : (blocks.find((b) => b.id === entry.block_id)?.label ?? 'Unassigned')
+      : (shifts.find((s) => s.id === entry.shift_id)?.name ?? 'Unassigned')
     const last = runs[runs.length - 1]
     if (last && last.label === label) {
       last.count += 1

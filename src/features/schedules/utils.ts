@@ -71,10 +71,19 @@ function capitalize(value: string) {
 export function getScheduleTotalHours(schedule: Schedule, shifts: Shift[]): number {
   if (schedule.parent_type === 'regular') {
     if (schedule.type === 'rotate') {
+      // Each pattern day now points at one of the schedule's own selected
+      // shifts (`shift_id`) rather than a hand-authored block — total hours
+      // come from that shift's own enabled-day hours instead.
       const activeHours = schedule.pattern.reduce((sum, p) => {
-        if (p.is_off || !p.block_id) return sum
-        const block = schedule.blocks.find((b) => b.id === p.block_id)
-        return sum + (block ? calculateHours([block.time]) : 0)
+        if (p.is_off || !p.shift_id) return sum
+        const shift = shifts.find((s) => s.id === p.shift_id)
+        if (!shift) return sum
+        return (
+          sum +
+          shift.days
+            .filter((d) => d.enabled)
+            .reduce((daySum, d) => daySum + calculateHours(d.times), 0)
+        )
       }, 0)
       return Math.round((activeHours / schedule.cycle_length.days) * 100) / 100
     }

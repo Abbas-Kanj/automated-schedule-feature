@@ -5,10 +5,8 @@ import {
   CYCLE_LENGTH_UNIT_OPTIONS,
   CYCLE_TYPE_OPTIONS,
   MONTHS,
-  POLICY_TYPE_OPTIONS,
   RECURRENCE_END_TYPE_OPTIONS,
   REGULAR_TYPE_OPTIONS,
-  ROTATE_TYPE_OPTIONS,
   SCHEDULE_TYPES,
 } from '../../data/data'
 import {
@@ -120,26 +118,10 @@ function RegularBasicsSummary({ values }: { values: any }) {
   const typeLabel = REGULAR_TYPE_OPTIONS.find(
     (o) => o.value === values.type
   )?.label
-  const policyLabel = POLICY_TYPE_OPTIONS.find(
-    (o) => o.value === values.policy_type
-  )?.label
 
   return (
     <SummarySection title='Type'>
       <SummaryRow label='Schedule type' value={typeLabel} />
-      {values.type === 'rotate' && (
-        <>
-          <SummaryRow
-            label='Number of shifts'
-            value={values.shift_block}
-          />
-          <SummaryRow
-            label='Active status'
-            value={values.is_active ? 'Active' : 'Inactive'}
-          />
-          <SummaryRow label='Policy type' value={policyLabel} />
-        </>
-      )}
       <SummaryRow label='Start date' value={values.start_date} />
     </SummarySection>
   )
@@ -217,15 +199,17 @@ function ShiftDefinitionSummary({ values }: { values: any }) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function RotateSummary({ values }: { values: any }) {
+  const shifts = useShiftsStore((s) => s.shifts)
   const cycleTypeLabel = CYCLE_TYPE_OPTIONS.find(
     (o) => o.value === values.cycle_type
   )?.label
   const cycleUnitLabel = CYCLE_LENGTH_UNIT_OPTIONS.find(
     (o) => o.value === values.cycle_length?.unit
   )?.label
-  const rotateTypeLabel = ROTATE_TYPE_OPTIONS.find(
-    (o) => o.value === values.rotate_type
-  )?.label
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pattern = (values.pattern ?? []) as any[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shiftCounts = (values.custom_shift_counts ?? []) as any[]
 
   return (
     <SummarySection title='Rotate config'>
@@ -238,8 +222,6 @@ function RotateSummary({ values }: { values: any }) {
             : undefined
         }
       />
-      <SummaryRow label='Rotate type' value={rotateTypeLabel} />
-      <SummaryRow label='Shift block' value={values.shift_block} />
       <SummaryRow
         label='Shift length'
         value={
@@ -249,17 +231,34 @@ function RotateSummary({ values }: { values: any }) {
         }
       />
 
-      {(values.blocks?.length ?? 0) > 0 && (
+      {values.cycle_type === 'custom_shifts' &&
+        shiftCounts.some((c) => c.count > 0) && (
+          <div className='space-y-1 border-t pt-2'>
+            {shiftCounts
+              .filter((c) => c.count > 0)
+              .map((c) => (
+                <SummaryRow
+                  key={c.shift_id}
+                  label={shifts.find((s) => s.id === c.shift_id)?.name ?? 'Shift'}
+                  value={`${c.count} day(s)`}
+                />
+              ))}
+          </div>
+        )}
+
+      {pattern.length > 0 && (
         <div className='space-y-1 border-t pt-2'>
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {values.blocks.map((b: any) => (
+          {pattern.map((p) => (
             <div
-              key={b.id}
+              key={p.position}
               className='flex items-center justify-between text-sm'
             >
-              <span>{b.label}</span>
+              <span>Day {p.position}</span>
               <span className='text-muted-foreground'>
-                {formatTimes([b.time])}
+                {p.is_off
+                  ? 'Day off'
+                  : (shifts.find((s) => s.id === p.shift_id)?.name ??
+                    'Unassigned')}
               </span>
             </div>
           ))}
@@ -281,11 +280,8 @@ function RegularSummary({
     <>
       <RegularBasicsSummary values={values} />
 
-      {values.type === 'rotate' ? (
-        <RotateSummary values={values} />
-      ) : (
-        <ShiftDefinitionSummary values={values} />
-      )}
+      <ShiftDefinitionSummary values={values} />
+      {values.type === 'rotate' && <RotateSummary values={values} />}
 
       {values.type !== 'rotate' && endSettings && (
         <SummarySection title='Occurrence'>

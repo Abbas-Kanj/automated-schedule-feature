@@ -12,10 +12,6 @@ export const DAYS_OF_WEEK = [
 
 const daySchema = z.enum(DAYS_OF_WEEK)
 
-export const POLICY_TYPES = ['standard', 'flexible', 'strict'] as const
-
-const policyTypeSchema = z.enum(POLICY_TYPES)
-
 const timeRangeSchema = z
   .object({
     from_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required'),
@@ -148,12 +144,6 @@ export const SCHEDULE_ICONS = [
 ] as const
 const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
 
-const regularBaseSchema = z.object({
-  is_active: z.boolean().default(true),
-  policy_type: policyTypeSchema,
-  start_date: dateStringSchema,
-})
-
 // --- fixed / flexible: shift selection ---
 //
 // `shift_ids` references records in the standalone `shifts` feature's own
@@ -216,12 +206,12 @@ const regularSharedSchema = z.object({
 
 // --- rotate: cycle / pattern config ---
 
-export const CYCLE_TYPES = [
-  'rotating_shift',
-  'day_on_day_off',
-  'continental_pattern',
-  'split_shift',
-] as const
+// "Pattern shifts" builds the cycle day-by-day (a shift or day-off picked
+// per position, see `rotatePatternEntrySchema`). "Custom shifts" starts
+// from how many times each selected shift repeats (`customShiftCountSchema`)
+// and uses that to seed the same per-day pattern, which stays editable
+// afterward — both modes end up driving the same `pattern` array.
+export const CYCLE_TYPES = ['pattern_shifts', 'custom_shifts'] as const
 const cycleTypeSchema = z.enum(CYCLE_TYPES)
 
 export const CYCLE_LENGTH_UNITS = ['weekly', 'monthly', 'custom_days'] as const
@@ -230,33 +220,31 @@ const cycleLengthSchema = z.object({
   days: z.number().min(1),
 })
 
-export const ROTATE_DIRECTIONS = [
-  'right_shift',
-  'normal_rotation',
-  'no_rotation',
-] as const
-const rotateTypeSchema = z.enum(ROTATE_DIRECTIONS)
-
-const rotateBlockSchema = z.object({
-  id: z.string(),
-  label: z.string().min(1, 'Label is required'),
-  time: timeRangeSchema,
-})
-
+// A pattern day now points at one of the schedule's own selected shifts
+// (`shift_id`, resolved against `shift_ids`/the `shifts` store) instead of a
+// hand-authored "block" — rotate's step 1/2 match fixed/flexible's exactly
+// (see `shiftDefinitionFieldsSchema`), so there's no separate block concept
+// left to reference.
 const rotatePatternEntrySchema = z.object({
   position: z.number().min(1),
-  block_id: z.string().optional(),
+  shift_id: z.string().optional(),
   is_off: z.boolean(),
+})
+
+// "Custom shifts" mode: one count per selected shift ("how many days in the
+// cycle it covers"), kept in `shift_ids` order — see the "Apply to days"
+// action in `pattern-builder.tsx` that seeds `pattern` from these counts.
+const customShiftCountSchema = z.object({
+  shift_id: z.string(),
+  count: z.number().min(0),
 })
 
 const rotateFieldsSchema = z.object({
   cycle_type: cycleTypeSchema,
   cycle_length: cycleLengthSchema,
-  rotate_type: rotateTypeSchema,
-  shift_block: z.number().min(1),
   shift_length_hours: z.number().min(1).max(24),
-  blocks: z.array(rotateBlockSchema),
   pattern: z.array(rotatePatternEntrySchema).min(1),
+  custom_shift_counts: z.array(customShiftCountSchema).default([]),
 })
 
 // --- assemble the three `regular` arms ---
@@ -275,10 +263,15 @@ const regularFlexibleSchema = z.object({
   ...shiftDefinitionFieldsSchema.shape,
 })
 
+// rotate's step 1/2 are the same `ScheduleBasicsFields`/`ShiftPickerField`
+// fixed and flexible use — it only diverges from them at step 3 (its own
+// cycle/pattern config, in place of fixed/flexible's `end_settings`), so it
+// shares `shiftDefinitionFieldsSchema` too rather than a rotate-only shape.
 const regularRotateSchema = z.object({
   parent_type: z.literal('regular'),
   type: z.literal('rotate'),
-  ...regularBaseSchema.shape,
+  start_date: dateStringSchema,
+  ...shiftDefinitionFieldsSchema.shape,
   ...rotateFieldsSchema.shape,
 })
 
@@ -289,25 +282,25 @@ const regularScheduleSchema = z
     regularRotateSchema,
   ])
   .superRefine((val, ctx) => {
-    if (val.type === 'fixed' || val.type === 'flexible') {
-      if (new Set(val.shift_ids).size !== val.shift_ids.length) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Each shift can only be selected once',
-          path: ['shift_ids'],
-        })
-      }
+    if (new Set(val.shift_ids).size !== val.shift_ids.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Each shift can only be selected once',
+        path: ['shift_ids'],
+      })
+    }
+
+    // A rotation needs at least 2 distinct shifts to alternate between —
+    // fixed/flexible are fine with just one (see `shiftDefinitionFieldsSchema`).
+    if (val.type === 'rotate' && val.shift_ids.length < 2) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Select at least 2 shifts to build a rotation',
+        path: ['shift_ids'],
+      })
     }
 
     if (val.type === 'rotate') {
-      if (val.blocks.length !== val.shift_block) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `Configure all ${val.shift_block} shift block(s)`,
-          path: ['blocks'],
-        })
-      }
-
       if (val.pattern.length !== val.cycle_length.days) {
         ctx.addIssue({
           code: 'custom',
@@ -326,14 +319,28 @@ const regularScheduleSchema = z
       }
 
       val.pattern.forEach((p, i) => {
-        if (!p.is_off && !p.block_id) {
+        if (!p.is_off && !p.shift_id) {
           ctx.addIssue({
             code: 'custom',
             message: 'Select a shift or mark as day off',
-            path: ['pattern', i, 'block_id'],
+            path: ['pattern', i, 'shift_id'],
           })
         }
       })
+
+      if (val.cycle_type === 'custom_shifts') {
+        const totalCount = val.custom_shift_counts.reduce(
+          (sum, c) => sum + c.count,
+          0
+        )
+        if (totalCount > val.cycle_length.days) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Shift counts add up to more than the ${val.cycle_length.days}-day cycle`,
+            path: ['custom_shift_counts'],
+          })
+        }
+      }
     }
   })
 
@@ -362,7 +369,6 @@ export type RegularScheduleType = RegularSchedule['type']
 export type DayOfWeek = (typeof DAYS_OF_WEEK)[number]
 export type TimeRange = z.infer<typeof timeRangeSchema>
 export type DaySchedule = z.infer<typeof dayScheduleSchema>
-export type PolicyType = z.infer<typeof policyTypeSchema>
 export type RegularType = (typeof REGULAR_TYPES)[number]
 export type BadgeColor = (typeof BADGE_COLORS)[number]
 export type ScheduleIcon = (typeof SCHEDULE_ICONS)[number]
@@ -370,12 +376,11 @@ export type EndSettings = z.infer<typeof endSettingsSchema>
 export type RecurrenceEndType = (typeof RECURRENCE_END_TYPES)[number]
 export type CycleType = (typeof CYCLE_TYPES)[number]
 export type CycleLengthUnit = (typeof CYCLE_LENGTH_UNITS)[number]
-export type RotateType = (typeof ROTATE_DIRECTIONS)[number]
-export type RotateBlock = Extract<
-  RegularSchedule,
-  { type: 'rotate' }
->['blocks'][number]
 export type RotatePatternEntry = Extract<
   RegularSchedule,
   { type: 'rotate' }
 >['pattern'][number]
+export type CustomShiftCount = Extract<
+  RegularSchedule,
+  { type: 'rotate' }
+>['custom_shift_counts'][number]
