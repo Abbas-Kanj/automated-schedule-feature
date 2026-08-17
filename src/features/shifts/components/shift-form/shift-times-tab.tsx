@@ -674,6 +674,7 @@ export function ShiftTimesTab() {
                             <IconPickerField
                               value={b.icon}
                               onChange={(value) => updateBreak(i, { icon: value })}
+                              showClear={false}
                             />
                           </div>
                           <div className='flex-1 space-y-1'>

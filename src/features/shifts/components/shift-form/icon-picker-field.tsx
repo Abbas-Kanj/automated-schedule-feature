@@ -21,12 +21,18 @@ type IconPickerFieldProps = {
   value: ShiftIcon | undefined
   onChange: (value: ShiftIcon | undefined) => void
   disabled?: boolean
+  // Break rows always carry an icon (defaults to 'coffee' — see
+  // `DEFAULT_BREAK` in `shift-times-tab.tsx`) and have no real "no icon"
+  // state worth clearing to, so that usage hides this button; the General
+  // tab's own shift icon field keeps it since a shift's icon is optional.
+  showClear?: boolean
 }
 
 export function IconPickerField({
   value,
   onChange,
   disabled,
+  showClear = true,
 }: IconPickerFieldProps) {
   const selected = SHIFT_ICON_OPTIONS.find((o) => o.value === value)
   const SelectedIcon = selected?.icon
@@ -80,7 +86,7 @@ export function IconPickerField({
           </Command>
         </PopoverContent>
       </Popover>
-      {value && !disabled && (
+      {value && !disabled && showClear && (
         <Button
           type='button'
           variant='ghost'
