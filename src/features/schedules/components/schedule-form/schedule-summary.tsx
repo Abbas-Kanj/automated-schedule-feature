@@ -222,15 +222,6 @@ function RotateSummary({ values }: { values: any }) {
             : undefined
         }
       />
-      <SummaryRow
-        label='Shift length'
-        value={
-          values.shift_length_hours
-            ? `${values.shift_length_hours}h/day`
-            : undefined
-        }
-      />
-
       {values.cycle_type === 'custom_shifts' &&
         shiftCounts.some((c) => c.count > 0) && (
           <div className='space-y-1 border-t pt-2'>

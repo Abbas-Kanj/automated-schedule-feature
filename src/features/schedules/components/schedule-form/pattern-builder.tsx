@@ -21,6 +21,7 @@ import { SelectDropdown } from '@/components/select-dropdown'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import {
   CYCLE_LENGTH_QUICK_PICKS,
+  CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS,
   CYCLE_LENGTH_UNIT_OPTIONS,
   CYCLE_TYPE_OPTIONS,
 } from '../../data/data'
@@ -121,7 +122,27 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                 <SelectDropdown
                   isControlled
                   defaultValue={field.value}
-                  onValueChange={field.onChange}
+                  onValueChange={(unit) => {
+                    field.onChange(unit)
+                    // Switching units resets to a clean 1-unit default
+                    // (1 week / 1 month) instead of carrying over a day
+                    // count that made sense under the old unit.
+                    const multiplier =
+                      CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS[
+                        unit as keyof typeof CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS
+                      ]
+                    if (multiplier) {
+                      setValue('cycle_length.days', multiplier, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    } else if (!cycleLength?.days) {
+                      setValue('cycle_length.days', 7, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                  }}
                   placeholder='Select a unit'
                   items={CYCLE_LENGTH_UNIT_OPTIONS}
                   disabled={disabled}
@@ -131,68 +152,85 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
             )}
           />
 
-          <FormField
-            control={control}
-            name='cycle_length.days'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cycle length (days)</FormLabel>
-                <FormControl>
-                  <Input
-                    type='number'
-                    min={1}
-                    disabled={disabled}
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                  />
-                </FormControl>
-                {!disabled && (
-                  <div className='flex flex-wrap gap-1.5 pt-1'>
-                    {CYCLE_LENGTH_QUICK_PICKS.map((quickPickDays) => (
-                      <Button
-                        key={quickPickDays}
-                        type='button'
-                        variant='outline'
-                        size='sm'
-                        className={cn(
-                          'h-7',
-                          cycleLength?.days === quickPickDays &&
-                            'border-primary'
-                        )}
-                        onClick={() => field.onChange(quickPickDays)}
-                      >
-                        {quickPickDays}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {cycleLength?.unit === 'custom_days' ? (
+            <FormField
+              control={control}
+              name='cycle_length.days'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cycle length (days)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={1}
+                      disabled={disabled}
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                    />
+                  </FormControl>
+                  {!disabled && (
+                    <div className='flex flex-wrap gap-1.5 pt-1'>
+                      {CYCLE_LENGTH_QUICK_PICKS.map((quickPickDays) => (
+                        <Button
+                          key={quickPickDays}
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          className={cn(
+                            'h-7',
+                            cycleLength?.days === quickPickDays &&
+                              'border-primary'
+                          )}
+                          onClick={() => field.onChange(quickPickDays)}
+                        >
+                          {quickPickDays}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ) : (
+            <FormField
+              control={control}
+              name='cycle_length.days'
+              render={({ field }) => {
+                const isMonthly = cycleLength?.unit === 'monthly'
+                const multiplier = isMonthly ? 30 : 7
+                const count = field.value
+                  ? Math.round(field.value / multiplier)
+                  : ''
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      Cycle length ({isMonthly ? 'month(s)' : 'week(s)'})
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        disabled={disabled}
+                        value={count}
+                        onChange={(e) => {
+                          const nextCount = e.target.valueAsNumber
+                          field.onChange(
+                            Number.isNaN(nextCount)
+                              ? undefined
+                              : nextCount * multiplier
+                          )
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
+            />
+          )}
         </CardContent>
       </Card>
-
-      <FormField
-        control={control}
-        name='shift_length_hours'
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Shift length (hours per day)</FormLabel>
-            <FormControl>
-              <Input
-                type='number'
-                min={1}
-                max={24}
-                disabled={disabled}
-                value={field.value ?? ''}
-                onChange={(e) => field.onChange(e.target.valueAsNumber)}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
 
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>
@@ -371,51 +409,91 @@ type PatternDayGridProps = {
   disabled?: boolean
 }
 
+// A monthly cycle's day count is always a multiple of this (see the
+// month-count input in the Cycle length card, which stores `count * 30`) —
+// used to split the cycle into one box per month.
+const DAYS_PER_MONTH_BOX = 30
+
 function PatternDayGrid({
   fields,
   shiftOptions,
   cycleLengthUnit,
   disabled,
 }: PatternDayGridProps) {
-  const [modalOpen, setModalOpen] = useState(false)
+  const [openMonthIndex, setOpenMonthIndex] = useState<number | null>(null)
   const isMonthly = cycleLengthUnit === 'monthly'
 
-  const grid = (
-    <div className='grid grid-cols-3 gap-2 sm:grid-cols-7'>
-      {fields.map((field, index) => (
-        <PatternDayCard
-          key={field.id}
-          index={index}
-          shiftOptions={shiftOptions}
-          disabled={disabled}
-        />
-      ))}
-    </div>
-  )
-
-  // Monthly cycles can run 28-31+ days — too many cards to show inline, so
-  // they're tucked behind a summary that opens the same grid in a modal.
   // Weekly/custom-days cycles are short enough (max 7 per row) to show
   // directly.
-  if (!isMonthly) return grid
+  if (!isMonthly) {
+    return (
+      <div className='grid grid-cols-3 gap-2 sm:grid-cols-7'>
+        {fields.map((field, index) => (
+          <PatternDayCard
+            key={field.id}
+            index={index}
+            shiftOptions={shiftOptions}
+            disabled={disabled}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  // Monthly cycles can span several months — too many day cards to show
+  // inline, so they're split into one box per month; clicking a box opens
+  // just that month's days in a modal.
+  const months = Array.from(
+    { length: Math.ceil(fields.length / DAYS_PER_MONTH_BOX) },
+    (_, i) => {
+      const start = i * DAYS_PER_MONTH_BOX
+      const end = Math.min(start + DAYS_PER_MONTH_BOX, fields.length)
+      return { index: i, start, end }
+    }
+  )
+  const openMonth =
+    openMonthIndex != null ? months[openMonthIndex] : undefined
 
   return (
     <>
-      <button
-        type='button'
-        onClick={() => setModalOpen(true)}
-        disabled={disabled}
-        className='flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60'
+      <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
+        {months.map((month) => (
+          <button
+            key={month.index}
+            type='button'
+            onClick={() => setOpenMonthIndex(month.index)}
+            disabled={disabled}
+            className='flex flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-4 text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60'
+          >
+            <span className='font-medium'>Month {month.index + 1}</span>
+            <span className='text-xs text-muted-foreground'>
+              Days {month.start + 1}–{month.end}
+            </span>
+          </button>
+        ))}
+      </div>
+      <Dialog
+        open={openMonth != null}
+        onOpenChange={(open) => !open && setOpenMonthIndex(null)}
       >
-        <span>Configure {fields.length} day(s)</span>
-        <span className='text-muted-foreground'>Tap to open</span>
-      </button>
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className='max-w-3xl'>
           <DialogHeader>
-            <DialogTitle>Configure days</DialogTitle>
+            <DialogTitle>
+              Month {openMonth ? openMonth.index + 1 : ''}
+            </DialogTitle>
           </DialogHeader>
-          <div className='max-h-[65vh] overflow-y-auto pe-1'>{grid}</div>
+          {openMonth && (
+            <div className='grid max-h-[65vh] grid-cols-3 gap-2 overflow-y-auto pe-1 sm:grid-cols-7'>
+              {fields.slice(openMonth.start, openMonth.end).map((field, i) => (
+                <PatternDayCard
+                  key={field.id}
+                  index={openMonth.start + i}
+                  shiftOptions={shiftOptions}
+                  disabled={disabled}
+                />
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

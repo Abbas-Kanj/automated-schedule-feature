@@ -164,6 +164,18 @@ export const CYCLE_LENGTH_UNIT_OPTIONS = [
 
 export const CYCLE_LENGTH_QUICK_PICKS = [7, 14, 6, 28, 35]
 
+// Weekly/monthly cycle lengths are entered as a week/month count in the UI
+// (e.g. "2 week(s)", "1 month") and converted to the stored day count using
+// these flat approximations — a "month" here is always 30 days, not the
+// calendar month's actual length. Custom-days cycles skip this and store
+// the day count directly (the quick-pick UI from before).
+export const CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS: Partial<
+  Record<(typeof CYCLE_LENGTH_UNITS)[number], number>
+> = {
+  weekly: 7,
+  monthly: 30,
+}
+
 export const RECURRENCE_END_TYPE_OPTIONS = [
   { value: 'never', label: 'Never ends' },
   { value: 'after_occurrences', label: 'End after' },

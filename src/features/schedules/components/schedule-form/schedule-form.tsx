@@ -116,7 +116,6 @@ function getRegularTypeDefaults(type: RegularType) {
       temporary_schedule: false,
       cycle_type: 'pattern_shifts' as const,
       cycle_length: { unit: 'weekly' as const, days: 7 },
-      shift_length_hours: 8,
       pattern: Array.from({ length: 7 }, (_, i) => ({
         position: i + 1,
         is_off: true,
@@ -163,7 +162,6 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
       'start_date',
       'cycle_type',
       'cycle_length',
-      'shift_length_hours',
       'pattern',
       'custom_shift_counts',
     ]

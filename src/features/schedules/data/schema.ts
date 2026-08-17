@@ -242,7 +242,6 @@ const customShiftCountSchema = z.object({
 const rotateFieldsSchema = z.object({
   cycle_type: cycleTypeSchema,
   cycle_length: cycleLengthSchema,
-  shift_length_hours: z.number().min(1).max(24),
   pattern: z.array(rotatePatternEntrySchema).min(1),
   custom_shift_counts: z.array(customShiftCountSchema).default([]),
 })
