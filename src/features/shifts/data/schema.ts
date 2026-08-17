@@ -319,21 +319,20 @@ const shiftFieldsSchema = z
           })
           return
         }
-        if (val.break_type === 'paid') {
-          const span = toMinutes(b.to_time) - toMinutes(b.from_time)
-          if (!b.duration_minutes) {
-            ctx.addIssue({
-              code: 'custom',
-              message: 'Enter a break duration',
-              path: ['breaks', index, 'duration_minutes'],
-            })
-          } else if (b.duration_minutes > span) {
-            ctx.addIssue({
-              code: 'custom',
-              message: "Duration can't be longer than the from–to range",
-              path: ['breaks', index, 'duration_minutes'],
-            })
-          }
+        // Duration defaults on creation (see `DEFAULT_BREAK` in
+        // `shift-times-tab.tsx`) and is edited via an "H:MM" input rather
+        // than typed in from scratch, so it's not required the way the
+        // break type is — only bounded once one is entered.
+        if (
+          val.break_type === 'paid' &&
+          b.duration_minutes &&
+          b.duration_minutes > toMinutes(b.to_time) - toMinutes(b.from_time)
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message: "Duration can't be longer than the from–to range",
+            path: ['breaks', index, 'duration_minutes'],
+          })
         }
       })
     }

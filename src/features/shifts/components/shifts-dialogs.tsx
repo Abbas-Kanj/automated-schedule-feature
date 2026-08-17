@@ -11,12 +11,6 @@ export function ShiftsDialogs() {
 
   return (
     <>
-      <ShiftFormDialog
-        key='shift-create'
-        open={open === 'create'}
-        onOpenChange={() => setOpen('create')}
-      />
-
       {currentRow && (
         <>
           <ShiftFormDialog

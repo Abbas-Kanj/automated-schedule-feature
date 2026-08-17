@@ -265,36 +265,38 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
                 <FormLabel className='cursor-pointer font-normal'>
                   End after
                 </FormLabel>
-                {endType === 'after_occurrences' && (
-                  <FormField
-                    control={control}
-                    name='repeat.end_occurrences'
-                    render={({ field: occurrencesField }) => (
-                      <FormItem className='space-y-0'>
-                        <div className='flex items-center gap-2'>
-                          <FormControl>
-                            <Input
-                              type='number'
-                              min={1}
-                              className='h-8 w-24'
-                              disabled={disabled}
-                              value={occurrencesField.value ?? ''}
-                              onChange={(e) =>
-                                occurrencesField.onChange(
-                                  e.target.valueAsNumber
-                                )
-                              }
-                            />
-                          </FormControl>
-                          <span className='text-muted-foreground text-sm'>
-                            occurrence(s)
-                          </span>
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                {/* Always rendered (just disabled until "End after" is the
+                    selected option) rather than mounted/unmounted with it —
+                    so the field, and its default value, are visible instead
+                    of appearing out of nowhere the moment it's selected. */}
+                <FormField
+                  control={control}
+                  name='repeat.end_occurrences'
+                  render={({ field: occurrencesField }) => (
+                    <FormItem className='space-y-0'>
+                      <div className='flex items-center gap-2'>
+                        <FormControl>
+                          <Input
+                            type='number'
+                            min={1}
+                            className='h-8 w-24'
+                            disabled={disabled || endType !== 'after_occurrences'}
+                            value={occurrencesField.value ?? ''}
+                            onChange={(e) =>
+                              occurrencesField.onChange(
+                                e.target.valueAsNumber
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <span className='text-muted-foreground text-sm'>
+                          occurrence(s)
+                        </span>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </FormItem>
 
               <FormItem className='flex flex-wrap items-center gap-2 space-y-0'>
@@ -304,24 +306,24 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
                 <FormLabel className='cursor-pointer font-normal'>
                   End on
                 </FormLabel>
-                {endType === 'on_date' && (
-                  <FormField
-                    control={control}
-                    name='repeat.end_date'
-                    render={({ field: dateField }) => (
-                      <FormItem className='space-y-0'>
-                        <FormControl>
-                          <DateField
-                            value={dateField.value}
-                            onChange={dateField.onChange}
-                            disabled={disabled}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                {/* Same always-rendered/disabled treatment as "End after"
+                    above. */}
+                <FormField
+                  control={control}
+                  name='repeat.end_date'
+                  render={({ field: dateField }) => (
+                    <FormItem className='space-y-0'>
+                      <FormControl>
+                        <DateField
+                          value={dateField.value}
+                          onChange={dateField.onChange}
+                          disabled={disabled || endType !== 'on_date'}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </FormItem>
             </RadioGroup>
             <FormMessage />

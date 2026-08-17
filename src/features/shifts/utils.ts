@@ -1,5 +1,10 @@
 import { differenceInMinutes, parse } from 'date-fns'
-import { DAYS_OF_WEEK, type DayTimeEntry, type TimeRangeEntry } from './data/schema'
+import {
+  DAYS_OF_WEEK,
+  type DayTimeEntry,
+  type ShiftFormValues,
+  type TimeRangeEntry,
+} from './data/schema'
 
 export function generateId() {
   return crypto.randomUUID()
@@ -64,6 +69,55 @@ export function getBreakSpanMinutes(from_time: string, to_time: string): number 
     parse(to_time, 'HH:mm', new Date()),
     parse(from_time, 'HH:mm', new Date())
   )
+}
+
+// Formats a duration in minutes as "H:MM" — the break-time duration
+// input's display format (see `ShiftTimesTab`'s break rows), so users
+// enter e.g. "1:30" instead of 90 raw minutes.
+export function formatDurationHM(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${h}:${String(m).padStart(2, '0')}`
+}
+
+// Inverse of `formatDurationHM` — returns undefined for anything that
+// isn't a complete, valid "H:MM" string (partial typing, e.g. "1:"), so
+// callers can leave the field's own text alone until it parses.
+export function parseDurationHM(text: string): number | undefined {
+  const match = /^(\d{1,3}):([0-5]?\d)$/.exec(text.trim())
+  if (!match) return undefined
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  return hours * 60 + minutes
+}
+
+// Normalizes a submitted form's values before it's written to the store —
+// clears out fields whose owning toggle is off rather than persisting
+// stale/hidden data. Shared by the "Create shift" page and the "Edit
+// shift" dialog (see `pages/create/shift-create-page.tsx` /
+// `shift-form-dialog.tsx`).
+export function normalizeShiftFormValues(
+  values: ShiftFormValues
+): ShiftFormValues {
+  return {
+    ...values,
+    // "Local" mode doesn't carry a chosen zone — the shift just follows
+    // wherever it's viewed from, so we don't persist a stale snapshot.
+    timezone: values.timezone_mode === 'local' ? undefined : values.timezone,
+    custom_category:
+      values.category === 'custom' ? values.custom_category : undefined,
+    repeat: values.repeat_enabled ? values.repeat : {},
+    breaks: values.break_enabled ? values.breaks : [],
+    work_type_group: values.assign_to_enabled
+      ? values.work_type_group
+      : undefined,
+    service_resource: values.assign_to_enabled
+      ? values.service_resource
+      : undefined,
+    service_territory: values.assign_to_enabled
+      ? values.service_territory
+      : undefined,
+  }
 }
 
 // A single start/end range to summarize a shift's week for table display:

@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfigDrawer } from '@/components/config-drawer'
@@ -7,15 +8,18 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ShiftsDialogs } from './components/shifts-dialogs'
-import { ShiftsProvider, useShifts } from './components/shifts-provider'
+import { ShiftsProvider } from './components/shifts-provider'
 import { ShiftsTable } from './components/shifts-table'
 import { useShiftsStore } from './stores/shifts-store'
 
+// Navigates to the "Create shift" page instead of opening a dialog — see
+// `pages/create/shift-create-page.tsx`.
 function ShiftsPrimaryButtons() {
-  const { setOpen } = useShifts()
   return (
-    <Button className='space-x-1' onClick={() => setOpen('create')}>
-      <span>Create Shift</span> <Plus size={18} />
+    <Button className='space-x-1' asChild>
+      <Link to='/shifts/new'>
+        <span>Create Shift</span> <Plus size={18} />
+      </Link>
     </Button>
   )
 }

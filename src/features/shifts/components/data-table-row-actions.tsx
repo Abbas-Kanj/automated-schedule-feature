@@ -1,6 +1,6 @@
 import { DotsHorizontalIcon } from '@radix-ui/react-icons'
 import { type Row } from '@tanstack/react-table'
-import { Copy, Pencil, Shield, Trash2 } from 'lucide-react'
+import { Copy, Pencil, Shield, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -65,9 +65,17 @@ export function DataTableRowActions<TData>({
             setOpen('policy')
           }}
         >
-          Change policy
+          Modify Policy
           <DropdownMenuShortcut>
             <Shield size={16} />
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+        {/* Not wired up yet — no assignment flow exists — kept visible so
+            the action is discoverable ahead of that. */}
+        <DropdownMenuItem disabled>
+          Assign users
+          <DropdownMenuShortcut>
+            <UserPlus size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem

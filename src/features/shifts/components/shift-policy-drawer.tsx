@@ -26,21 +26,31 @@ export function ShiftPolicyDrawer({
   onOpenChange,
 }: ShiftPolicyDrawerProps) {
   const updateShift = useShiftsStore((s) => s.updateShift)
+  // `shift` is a snapshot taken when the row's menu was clicked
+  // (`currentRow` in `shifts-provider.tsx`) — it never re-renders once the
+  // store updates, so the Select below kept showing the old policy right
+  // after picking a new one even though the table (which reads straight
+  // from the store) updated correctly. Re-read the live row from the store
+  // by id and prefer that; fall back to the snapshot only for the brief
+  // window between delete and this drawer unmounting.
+  const liveShift =
+    useShiftsStore((s) => s.shifts.find((row) => row.id === shift?.id)) ??
+    shift
 
-  if (!shift) return null
+  if (!liveShift) return null
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side='right' className='sm:max-w-md'>
         <SheetHeader>
-          <SheetTitle>{shift.name}</SheetTitle>
+          <SheetTitle>{liveShift.name}</SheetTitle>
           <SheetDescription>Change this shift's policy.</SheetDescription>
         </SheetHeader>
         <div className='overflow-y-auto px-4 pb-4'>
           <PolicySelectField
-            value={shift.policy_type}
+            value={liveShift.policy_type}
             onChange={(value) =>
-              updateShift(shift.id, { ...shift, policy_type: value })
+              updateShift(liveShift.id, { ...liveShift, policy_type: value })
             }
           />
         </div>

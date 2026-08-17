@@ -1,5 +1,5 @@
-import { Copy, Plus, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { Copy, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Switch } from '@/components/ui/switch'
-import { BREAK_TYPE_OPTIONS, DAY_LABELS } from '../../data/data'
+import {
+  BREAK_TYPE_OPTIONS,
+  DAY_LABELS,
+  SHIFT_ICON_COMPONENTS,
+} from '../../data/data'
 import {
   type BreakEntry,
   type BreakType,
@@ -21,8 +25,10 @@ import {
 } from '../../data/schema'
 import {
   calculateShiftHours,
+  formatDurationHM,
   formatDurationHours,
   getBreakSpanMinutes,
+  parseDurationHM,
 } from '../../utils'
 import { IconPickerField } from './icon-picker-field'
 
@@ -32,12 +38,57 @@ const DEFAULT_TIME: TimeRangeEntry = {
   overnight: false,
 }
 
+// Duration defaults to this range's own span (30 min) rather than being
+// left blank — it's no longer required input (see the schema's dropped
+// "Enter a break duration" check), just editable.
 const DEFAULT_BREAK: BreakEntry = {
   from_time: '12:00',
   to_time: '12:30',
-  duration_minutes: undefined,
+  duration_minutes: 30,
   name: '',
   icon: 'coffee',
+}
+
+// A break-duration input formatted as "H:MM" (e.g. "1:30") instead of raw
+// minutes. Keeps its own text buffer so a partial, not-yet-parseable edit
+// (e.g. "1:") isn't clobbered by the formatted value on every keystroke —
+// only a fully-parsed value is pushed up to the form, and the field snaps
+// back to the canonical formatting on blur. Re-syncing that buffer when
+// `value` changes out from under it (e.g. the from/to range narrowing and
+// clearing it — see `updateBreak`) is done during render rather than in an
+// effect, per React's own guidance for "reset state when a prop changes".
+function BreakDurationInput({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number | undefined
+  onChange: (value: number | undefined) => void
+  disabled?: boolean
+}) {
+  const [prevValue, setPrevValue] = useState(value)
+  const [text, setText] = useState(
+    value != null ? formatDurationHM(value) : ''
+  )
+  if (value !== prevValue) {
+    setPrevValue(value)
+    setText(value != null ? formatDurationHM(value) : '')
+  }
+
+  return (
+    <Input
+      placeholder='e.g. 1:30'
+      className='h-8'
+      disabled={disabled}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value)
+        const parsed = parseDurationHM(e.target.value)
+        if (parsed !== undefined) onChange(parsed)
+      }}
+      onBlur={() => setText(value != null ? formatDurationHM(value) : '')}
+    />
+  )
 }
 
 // "Shift times" tab of `ShiftFormDialog` — hours mode, per-day time ranges
@@ -52,6 +103,18 @@ export function ShiftTimesTab() {
   const breakType = useWatch({ control: form.control, name: 'break_type' })
   const breaks = useWatch({ control: form.control, name: 'breaks' }) ?? []
   const category = useWatch({ control: form.control, name: 'category' })
+  // The "Select at least one day" error is real the instant every day is
+  // off, but showing it before the user has even tried to submit reads as
+  // the form scolding them for a blank slate — only surface it once a
+  // submit's actually been attempted, same as the rest of the app's
+  // validation.
+  const isSubmitted = form.formState.isSubmitted
+  // Which break row (if any) is expanded for editing — see `BreakRow`
+  // below. Newly-added breaks open straight into this; existing ones only
+  // open when their pencil icon is clicked.
+  const [editingBreakIndex, setEditingBreakIndex] = useState<number | null>(
+    null
+  )
 
   // The "Overnight" category implies every time range on this shift
   // crosses midnight — see the "Check next day" indicator on the General
@@ -188,13 +251,30 @@ export function ShiftTimesTab() {
 
   const toggleBreakEnabled = (checked: boolean) => {
     form.setValue('break_enabled', checked, { shouldDirty: true })
-    if (checked && breaks.length === 0) setBreaks([{ ...DEFAULT_BREAK }])
+    // "Paid" is the common case — pre-select it instead of making that a
+    // required choice every time.
+    if (checked && !breakType) {
+      form.setValue('break_type', 'paid', { shouldDirty: true })
+    }
+    if (checked && breaks.length === 0) {
+      setBreaks([{ ...DEFAULT_BREAK }])
+      setEditingBreakIndex(0)
+    }
   }
 
-  const addBreak = () => setBreaks([...breaks, { ...DEFAULT_BREAK }])
+  const addBreak = () => {
+    setBreaks([...breaks, { ...DEFAULT_BREAK }])
+    setEditingBreakIndex(breaks.length)
+  }
 
-  const removeBreak = (index: number) =>
+  const removeBreak = (index: number) => {
     setBreaks(breaks.filter((_, i) => i !== index))
+    setEditingBreakIndex((current) => {
+      if (current === null) return current
+      if (current === index) return null
+      return current > index ? current - 1 : current
+    })
+  }
 
   const updateBreak = (index: number, patch: Partial<BreakEntry>) =>
     setBreaks(
@@ -229,8 +309,10 @@ export function ShiftTimesTab() {
   const getBreakEntryError = (b: BreakEntry): string | null => {
     if (!(b.to_time > b.from_time)) return 'End time must be after start time.'
     if (breakType !== 'paid') return null
-    if (!b.duration_minutes) return 'Enter a break duration.'
-    if (b.duration_minutes > getBreakSpanMinutes(b.from_time, b.to_time)) {
+    if (
+      b.duration_minutes &&
+      b.duration_minutes > getBreakSpanMinutes(b.from_time, b.to_time)
+    ) {
       return "Duration can't be longer than the from–to range."
     }
     return null
@@ -274,12 +356,60 @@ export function ShiftTimesTab() {
                     }
                   }}
                   className={cn(
-                    'flex cursor-pointer items-center gap-2 rounded-md border p-3 font-normal',
+                    'flex flex-col gap-3 rounded-md border p-3 font-normal',
                     mode === 'same' && 'border-primary bg-primary/5'
                   )}
                 >
-                  <RadioGroupItem value='same' />
-                  Same hours every day
+                  <span className='flex cursor-pointer items-center gap-2'>
+                    <RadioGroupItem value='same' />
+                    Same hours every day
+                  </span>
+                  {/* Nested directly under this option instead of a
+                      separate block below the whole radio group, so it
+                      reads as this option's own expanded settings. */}
+                  {mode === 'same' && (
+                    <div className='space-y-3'>
+                      <div className='flex items-start gap-2'>
+                        <div className='flex-1 space-y-1'>
+                          <Label>From</Label>
+                          <Input
+                            type='time'
+                            value={master.from_time}
+                            onChange={(e) =>
+                              updateMaster({ from_time: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className='flex-1 space-y-1'>
+                          <Label>To</Label>
+                          <Input
+                            type='time'
+                            value={master.to_time}
+                            onChange={(e) =>
+                              updateMaster({ to_time: e.target.value })
+                            }
+                          />
+                        </div>
+                        <div className='flex-1 space-y-1'>
+                          <Label>Duration</Label>
+                          <Input
+                            disabled
+                            readOnly
+                            value={
+                              masterValid
+                                ? formatDurationHours(masterDuration)
+                                : '—'
+                            }
+                          />
+                        </div>
+                      </div>
+                      {!masterValid && (
+                        <p className='text-destructive text-sm'>
+                          End time must be after start time.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </Label>
                 <Label
                   onClick={(event) => {
@@ -301,43 +431,8 @@ export function ShiftTimesTab() {
         )}
       />
 
-      {mode === 'same' && (
-        <div className='space-y-3 rounded-md border p-3'>
-          <div className='flex items-start gap-2'>
-            <div className='flex-1 space-y-1'>
-              <Label>From</Label>
-              <Input
-                type='time'
-                value={master.from_time}
-                onChange={(e) => updateMaster({ from_time: e.target.value })}
-              />
-            </div>
-            <div className='flex-1 space-y-1'>
-              <Label>To</Label>
-              <Input
-                type='time'
-                value={master.to_time}
-                onChange={(e) => updateMaster({ to_time: e.target.value })}
-              />
-            </div>
-            <div className='flex-1 space-y-1'>
-              <Label>Duration</Label>
-              <Input
-                disabled
-                readOnly
-                value={masterValid ? formatDurationHours(masterDuration) : '—'}
-              />
-            </div>
-          </div>
-          {!masterValid && (
-            <p className='text-destructive text-sm'>
-              End time must be after start time.
-            </p>
-          )}
-        </div>
-      )}
-
       <div className='space-y-1.5'>
+        <Label>Week days</Label>
         {days.map((d) => {
           const dayCollides =
             mode === 'different' && d.enabled && dayTimesCollide(d.times)
@@ -453,7 +548,7 @@ export function ShiftTimesTab() {
         })}
       </div>
 
-      {!anyEnabled && (
+      {!anyEnabled && isSubmitted && (
         <p className='text-destructive text-sm'>Select at least one day.</p>
       )}
       {anyEnabled && !allValid && (
@@ -510,9 +605,77 @@ export function ShiftTimesTab() {
                   {breaks.map((b, i) => {
                     const span = getBreakSpanMinutes(b.from_time, b.to_time)
                     const error = getBreakEntryError(b)
+                    const BreakIcon = b.icon
+                      ? SHIFT_ICON_COMPONENTS[b.icon]
+                      : undefined
+                    const isEditing = editingBreakIndex === i
+
+                    if (!isEditing) {
+                      // Saved/collapsed row: icon leads, then name, then a
+                      // compact time summary, with edit/trash actions at
+                      // the end.
+                      return (
+                        <div
+                          key={i}
+                          className='flex items-center gap-2 rounded-md border p-2'
+                        >
+                          <span className='bg-muted flex size-8 shrink-0 items-center justify-center rounded-md'>
+                            {BreakIcon ? (
+                              <BreakIcon className='size-4' />
+                            ) : null}
+                          </span>
+                          <div className='min-w-0 flex-1'>
+                            <p className='truncate text-sm font-medium'>
+                              {b.name?.trim() || 'Break'}
+                            </p>
+                            <p className='text-muted-foreground text-xs'>
+                              {b.from_time}–{b.to_time} ·{' '}
+                              {formatDurationHM(
+                                breakType === 'paid'
+                                  ? (b.duration_minutes ?? span)
+                                  : span
+                              )}
+                            </p>
+                            {error && (
+                              <p className='text-destructive text-xs'>
+                                {error}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='size-7'
+                            onClick={() => setEditingBreakIndex(i)}
+                            aria-label='Edit break'
+                          >
+                            <Pencil className='size-4' />
+                          </Button>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='icon'
+                            className='size-7'
+                            onClick={() => removeBreak(i)}
+                            aria-label='Remove break'
+                          >
+                            <Trash2 className='size-4' />
+                          </Button>
+                        </div>
+                      )
+                    }
+
                     return (
                       <div key={i} className='space-y-1.5 rounded-md border p-2'>
                         <div className='flex items-start gap-2'>
+                          <div className='space-y-1'>
+                            <Label className='text-xs'>Icon</Label>
+                            <IconPickerField
+                              value={b.icon}
+                              onChange={(value) => updateBreak(i, { icon: value })}
+                            />
+                          </div>
                           <div className='flex-1 space-y-1'>
                             <Label className='text-xs'>Name</Label>
                             <Input
@@ -522,13 +685,6 @@ export function ShiftTimesTab() {
                               onChange={(e) =>
                                 updateBreak(i, { name: e.target.value })
                               }
-                            />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label className='text-xs'>Icon</Label>
-                            <IconPickerField
-                              value={b.icon}
-                              onChange={(value) => updateBreak(i, { icon: value })}
                             />
                           </div>
                         </div>
@@ -556,42 +712,28 @@ export function ShiftTimesTab() {
                             />
                           </div>
                           <div className='flex-1 space-y-1'>
-                            <Label className='text-xs'>Duration (min)</Label>
-                            <Input
-                              type='number'
-                              min={1}
-                              max={span || undefined}
-                              className='h-8'
-                              placeholder='Minutes'
+                            <Label className='text-xs'>Duration</Label>
+                            <BreakDurationInput
                               disabled={breakType === 'unpaid'}
-                              value={b.duration_minutes ?? ''}
-                              onChange={(e) =>
-                                updateBreak(i, {
-                                  duration_minutes: Number.isNaN(
-                                    e.target.valueAsNumber
-                                  )
-                                    ? undefined
-                                    : e.target.valueAsNumber,
-                                })
+                              value={b.duration_minutes}
+                              onChange={(value) =>
+                                updateBreak(i, { duration_minutes: value })
                               }
                             />
                           </div>
-                          {breaks.length > 1 && (
-                            <Button
-                              type='button'
-                              variant='ghost'
-                              size='icon'
-                              className='mt-5'
-                              onClick={() => removeBreak(i)}
-                              aria-label='Remove break'
-                            >
-                              <X className='size-4' />
-                            </Button>
-                          )}
                         </div>
                         {error && (
                           <p className='text-destructive text-sm'>{error}</p>
                         )}
+                        <Button
+                          type='button'
+                          size='sm'
+                          className='w-full'
+                          disabled={!!error}
+                          onClick={() => setEditingBreakIndex(null)}
+                        >
+                          Save
+                        </Button>
                       </div>
                     )
                   })}
