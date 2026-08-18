@@ -365,6 +365,54 @@ export function ShiftTimesTab() {
                   <RadioGroupItem value='same' />
                   Same hours every day
                 </Label>
+
+                {/* A separate block directly below the "Same hours" option
+                    instead of nested inside its own card — keeps both radio
+                    options themselves plain, un-expanded controls. */}
+                {mode === 'same' && (
+                  <div className='space-y-1.5 rounded-md border p-3'>
+                    <div className='flex items-start gap-2'>
+                      <div className='flex-1 space-y-1'>
+                        <Label>From</Label>
+                        <Input
+                          type='time'
+                          value={master.from_time}
+                          onChange={(e) =>
+                            updateMaster({ from_time: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className='flex-1 space-y-1'>
+                        <Label>To</Label>
+                        <Input
+                          type='time'
+                          value={master.to_time}
+                          onChange={(e) =>
+                            updateMaster({ to_time: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className='flex-1 space-y-1'>
+                        <Label>Duration</Label>
+                        <Input
+                          disabled
+                          readOnly
+                          value={
+                            masterValid
+                              ? formatDurationHours(masterDuration)
+                              : '—'
+                          }
+                        />
+                      </div>
+                    </div>
+                    {!masterValid && (
+                      <p className='text-destructive text-sm'>
+                        End time must be after start time.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <Label
                   onClick={(event) => {
                     if (event.nativeEvent.isTrusted && mode !== 'different') {
@@ -384,45 +432,6 @@ export function ShiftTimesTab() {
           </FormItem>
         )}
       />
-
-      {/* A separate block below the whole radio group instead of nested
-          inside the "Same hours" option's own card — keeps the two radio
-          options themselves plain, un-expanded controls. */}
-      {mode === 'same' && (
-        <div className='space-y-3 rounded-md border p-3'>
-          <div className='flex items-start gap-2'>
-            <div className='flex-1 space-y-1'>
-              <Label>From</Label>
-              <Input
-                type='time'
-                value={master.from_time}
-                onChange={(e) => updateMaster({ from_time: e.target.value })}
-              />
-            </div>
-            <div className='flex-1 space-y-1'>
-              <Label>To</Label>
-              <Input
-                type='time'
-                value={master.to_time}
-                onChange={(e) => updateMaster({ to_time: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className='max-w-40 space-y-1'>
-            <Label>Duration</Label>
-            <Input
-              disabled
-              readOnly
-              value={masterValid ? formatDurationHours(masterDuration) : '—'}
-            />
-          </div>
-          {!masterValid && (
-            <p className='text-destructive text-sm'>
-              End time must be after start time.
-            </p>
-          )}
-        </div>
-      )}
 
       <div className='space-y-1.5'>
         <Label>Week days</Label>
