@@ -358,60 +358,12 @@ export function ShiftTimesTab() {
                     }
                   }}
                   className={cn(
-                    'flex flex-col gap-3 rounded-md border p-3 font-normal',
+                    'flex cursor-pointer items-center gap-2 rounded-md border p-3 font-normal',
                     mode === 'same' && 'border-primary bg-primary/5'
                   )}
                 >
-                  <span className='flex cursor-pointer items-center gap-2'>
-                    <RadioGroupItem value='same' />
-                    Same hours every day
-                  </span>
-                  {/* Nested directly under this option instead of a
-                      separate block below the whole radio group, so it
-                      reads as this option's own expanded settings. */}
-                  {mode === 'same' && (
-                    <div className='space-y-3'>
-                      <div className='flex items-start gap-2'>
-                        <div className='flex-1 space-y-1'>
-                          <Label>From</Label>
-                          <Input
-                            type='time'
-                            value={master.from_time}
-                            onChange={(e) =>
-                              updateMaster({ from_time: e.target.value })
-                            }
-                          />
-                        </div>
-                        <div className='flex-1 space-y-1'>
-                          <Label>To</Label>
-                          <Input
-                            type='time'
-                            value={master.to_time}
-                            onChange={(e) =>
-                              updateMaster({ to_time: e.target.value })
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className='max-w-40 space-y-1'>
-                        <Label>Duration</Label>
-                        <Input
-                          disabled
-                          readOnly
-                          value={
-                            masterValid
-                              ? formatDurationHours(masterDuration)
-                              : '—'
-                          }
-                        />
-                      </div>
-                      {!masterValid && (
-                        <p className='text-destructive text-sm'>
-                          End time must be after start time.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <RadioGroupItem value='same' />
+                  Same hours every day
                 </Label>
                 <Label
                   onClick={(event) => {
@@ -432,6 +384,45 @@ export function ShiftTimesTab() {
           </FormItem>
         )}
       />
+
+      {/* A separate block below the whole radio group instead of nested
+          inside the "Same hours" option's own card — keeps the two radio
+          options themselves plain, un-expanded controls. */}
+      {mode === 'same' && (
+        <div className='space-y-3 rounded-md border p-3'>
+          <div className='flex items-start gap-2'>
+            <div className='flex-1 space-y-1'>
+              <Label>From</Label>
+              <Input
+                type='time'
+                value={master.from_time}
+                onChange={(e) => updateMaster({ from_time: e.target.value })}
+              />
+            </div>
+            <div className='flex-1 space-y-1'>
+              <Label>To</Label>
+              <Input
+                type='time'
+                value={master.to_time}
+                onChange={(e) => updateMaster({ to_time: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className='max-w-40 space-y-1'>
+            <Label>Duration</Label>
+            <Input
+              disabled
+              readOnly
+              value={masterValid ? formatDurationHours(masterDuration) : '—'}
+            />
+          </div>
+          {!masterValid && (
+            <p className='text-destructive text-sm'>
+              End time must be after start time.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className='space-y-1.5'>
         <Label>Week days</Label>
