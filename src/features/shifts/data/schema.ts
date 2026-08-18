@@ -184,7 +184,9 @@ const repeatConfigSchema = z.object({
   end_occurrences: z.number().min(1).optional(),
 })
 
-// One row of the break-time list. `duration_minutes` is user-entered (not
+// One row of the break-time list. `break_type` is per-break — each break
+// created on a shift can be paid or unpaid independently of the others
+// (there's no shift-wide setting). `duration_minutes` is user-entered (not
 // picked from a preset list) and bounded by this entry's own
 // from_time–to_time span (see the `duration_minutes` check below) — only
 // meaningful for paid breaks, an unpaid break just treats its whole
@@ -192,6 +194,7 @@ const repeatConfigSchema = z.object({
 // downstream validation of their own. `icon` reuses the shift-level icon
 // enum rather than a parallel one.
 const breakEntrySchema = z.object({
+  break_type: breakTypeSchema.optional(),
   from_time: timeStringSchema,
   to_time: timeStringSchema,
   duration_minutes: z.number().min(1).optional(),
@@ -220,9 +223,9 @@ const shiftFieldsSchema = z
     hours_mode: shiftHoursModeSchema,
     days: z.array(dayTimeEntrySchema).length(7, 'All 7 days are required'),
     // Break-time toggle, a field on the "Shift times" tab — off by
-    // default, `breaks` is only validated once it's on.
+    // default, `breaks` is only validated once it's on. Paid/unpaid is set
+    // per break entry (see `breakEntrySchema.break_type`), not shift-wide.
     break_enabled: z.boolean().default(false),
-    break_type: breakTypeSchema.optional(),
     breaks: z.array(breakEntrySchema).default([]),
     description: z.string().max(200).optional(),
     is_active: z.boolean().default(true),
@@ -296,13 +299,6 @@ const shiftFieldsSchema = z
       }
     })
     if (val.break_enabled) {
-      if (!val.break_type) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Select a break type',
-          path: ['break_type'],
-        })
-      }
       if (!val.breaks.length) {
         ctx.addIssue({
           code: 'custom',
@@ -311,6 +307,13 @@ const shiftFieldsSchema = z
         })
       }
       val.breaks.forEach((b, index) => {
+        if (!b.break_type) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Select a break type',
+            path: ['breaks', index, 'break_type'],
+          })
+        }
         if (!(b.to_time > b.from_time)) {
           ctx.addIssue({
             code: 'custom',
@@ -324,7 +327,7 @@ const shiftFieldsSchema = z
         // than typed in from scratch, so it's not required the way the
         // break type is — only bounded once one is entered.
         if (
-          val.break_type === 'paid' &&
+          b.break_type === 'paid' &&
           b.duration_minutes &&
           b.duration_minutes > toMinutes(b.to_time) - toMinutes(b.from_time)
         ) {

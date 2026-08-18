@@ -40,8 +40,10 @@ const DEFAULT_TIME: TimeRangeEntry = {
 
 // Duration defaults to this range's own span (30 min) rather than being
 // left blank — it's no longer required input (see the schema's dropped
-// "Enter a break duration" check), just editable.
+// "Enter a break duration" check), just editable. `break_type` defaults to
+// 'paid' — the common case — same as the old shift-wide toggle did.
 const DEFAULT_BREAK: BreakEntry = {
+  break_type: 'paid',
   from_time: '12:00',
   to_time: '12:30',
   duration_minutes: 30,
@@ -100,7 +102,6 @@ export function ShiftTimesTab() {
 
   const mode = useWatch({ control: form.control, name: 'hours_mode' })
   const days = useWatch({ control: form.control, name: 'days' }) ?? []
-  const breakType = useWatch({ control: form.control, name: 'break_type' })
   const breaks = useWatch({ control: form.control, name: 'breaks' }) ?? []
   const category = useWatch({ control: form.control, name: 'category' })
   // The "Select at least one day" error is real the instant every day is
@@ -234,14 +235,18 @@ export function ShiftTimesTab() {
       )
     )
 
-  // Copies this day's time ranges onto every other day — reuse a fully
-  // set-up day instead of re-entering the same ranges one by one.
-  const copyDayToAll = (day: DayOfWeek) => {
-    const source = days.find((d) => d.day === day)
-    if (!source) return
+  // Copies this day's time ranges onto every day *after* it in the week
+  // (`days` is always mon->sun — see `buildDefaultDays`) — reuse a fully
+  // set-up day instead of re-entering the same ranges one by one, without
+  // touching days earlier in the week that may already be set up
+  // differently on purpose.
+  const copyDayForward = (day: DayOfWeek) => {
+    const sourceIndex = days.findIndex((d) => d.day === day)
+    if (sourceIndex === -1) return
+    const source = days[sourceIndex]
     setDays(
-      days.map((d) =>
-        d.day === day ? d : { ...d, times: source.times.map((t) => ({ ...t })) }
+      days.map((d, i) =>
+        i > sourceIndex ? { ...d, times: source.times.map((t) => ({ ...t })) } : d
       )
     )
   }
@@ -251,11 +256,6 @@ export function ShiftTimesTab() {
 
   const toggleBreakEnabled = (checked: boolean) => {
     form.setValue('break_enabled', checked, { shouldDirty: true })
-    // "Paid" is the common case — pre-select it instead of making that a
-    // required choice every time.
-    if (checked && !breakType) {
-      form.setValue('break_type', 'paid', { shouldDirty: true })
-    }
     if (checked && breaks.length === 0) {
       setBreaks([{ ...DEFAULT_BREAK }])
       setEditingBreakIndex(0)
@@ -305,10 +305,12 @@ export function ShiftTimesTab() {
   const masterDuration = calculateShiftHours(master.from_time, master.to_time)
 
   // Mirrors the schema's `superRefine` break checks, for live feedback
-  // without waiting on a submit/validate cycle.
+  // without waiting on a submit/validate cycle. `break_type` is per-break
+  // (see `breakEntrySchema`), not a shift-wide setting.
   const getBreakEntryError = (b: BreakEntry): string | null => {
+    if (!b.break_type) return 'Select a break type.'
     if (!(b.to_time > b.from_time)) return 'End time must be after start time.'
-    if (breakType !== 'paid') return null
+    if (b.break_type !== 'paid') return null
     if (
       b.duration_minutes &&
       b.duration_minutes > getBreakSpanMinutes(b.from_time, b.to_time)
@@ -390,18 +392,18 @@ export function ShiftTimesTab() {
                             }
                           />
                         </div>
-                        <div className='flex-1 space-y-1'>
-                          <Label>Duration</Label>
-                          <Input
-                            disabled
-                            readOnly
-                            value={
-                              masterValid
-                                ? formatDurationHours(masterDuration)
-                                : '—'
-                            }
-                          />
-                        </div>
+                      </div>
+                      <div className='max-w-40 space-y-1'>
+                        <Label>Duration</Label>
+                        <Input
+                          disabled
+                          readOnly
+                          value={
+                            masterValid
+                              ? formatDurationHours(masterDuration)
+                              : '—'
+                          }
+                        />
                       </div>
                       {!masterValid && (
                         <p className='text-destructive text-sm'>
@@ -513,8 +515,9 @@ export function ShiftTimesTab() {
                                 variant='ghost'
                                 size='icon'
                                 className='size-7'
-                                onClick={() => copyDayToAll(d.day)}
-                                aria-label='Copy to all days'
+                                onClick={() => copyDayForward(d.day)}
+                                aria-label='Copy to the rest of the week'
+                                title='Copy to the rest of the week'
                               >
                                 <Copy className='size-3.5' />
                               </Button>
@@ -575,32 +578,6 @@ export function ShiftTimesTab() {
 
             {field.value && (
               <>
-                <RadioGroup
-                  value={breakType}
-                  onValueChange={(v) =>
-                    form.setValue('break_type', v as BreakType, {
-                      shouldValidate: true,
-                      shouldDirty: true,
-                    })
-                  }
-                  className='flex gap-4'
-                >
-                  {BREAK_TYPE_OPTIONS.map((option) => (
-                    <Label
-                      key={option.value}
-                      className='flex cursor-pointer items-center gap-1.5 font-normal'
-                    >
-                      <RadioGroupItem value={option.value} />
-                      {option.label}
-                    </Label>
-                  ))}
-                </RadioGroup>
-                {!breakType && (
-                  <p className='text-destructive text-sm'>
-                    Select a break type.
-                  </p>
-                )}
-
                 <div className='space-y-2'>
                   {breaks.map((b, i) => {
                     const span = getBreakSpanMinutes(b.from_time, b.to_time)
@@ -631,9 +608,20 @@ export function ShiftTimesTab() {
                             <p className='text-muted-foreground text-xs'>
                               {b.from_time}–{b.to_time} ·{' '}
                               {formatDurationHM(
-                                breakType === 'paid'
+                                b.break_type === 'paid'
                                   ? (b.duration_minutes ?? span)
                                   : span
+                              )}
+                              {b.break_type && (
+                                <>
+                                  {' '}
+                                  ·{' '}
+                                  {
+                                    BREAK_TYPE_OPTIONS.find(
+                                      (o) => o.value === b.break_type
+                                    )?.label
+                                  }
+                                </>
                               )}
                             </p>
                             {error && (
@@ -689,6 +677,26 @@ export function ShiftTimesTab() {
                             />
                           </div>
                         </div>
+                        <div className='space-y-1'>
+                          <Label className='text-xs'>Type</Label>
+                          <RadioGroup
+                            value={b.break_type}
+                            onValueChange={(v) =>
+                              updateBreak(i, { break_type: v as BreakType })
+                            }
+                            className='flex gap-4'
+                          >
+                            {BREAK_TYPE_OPTIONS.map((option) => (
+                              <Label
+                                key={option.value}
+                                className='flex cursor-pointer items-center gap-1.5 font-normal'
+                              >
+                                <RadioGroupItem value={option.value} />
+                                {option.label}
+                              </Label>
+                            ))}
+                          </RadioGroup>
+                        </div>
                         <div className='flex items-start gap-2'>
                           <div className='flex-1 space-y-1'>
                             <Label className='text-xs'>From</Label>
@@ -715,7 +723,7 @@ export function ShiftTimesTab() {
                           <div className='flex-1 space-y-1'>
                             <Label className='text-xs'>Duration</Label>
                             <BreakDurationInput
-                              disabled={breakType === 'unpaid'}
+                              disabled={b.break_type === 'unpaid'}
                               value={b.duration_minutes}
                               onChange={(value) =>
                                 updateBreak(i, { duration_minutes: value })

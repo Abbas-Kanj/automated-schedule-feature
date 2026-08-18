@@ -28,7 +28,6 @@ export const emptyShiftFormValues: ShiftFormValues = {
     false
   ),
   break_enabled: false,
-  break_type: undefined,
   breaks: [],
   description: '',
   is_active: true,
