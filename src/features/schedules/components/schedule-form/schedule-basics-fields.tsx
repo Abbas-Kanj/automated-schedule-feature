@@ -58,7 +58,7 @@ export function ScheduleBasicsFields({
                   <SelectValue placeholder='Select a template' />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value='blank'>Start from scratch</SelectItem>
+                  <SelectItem value='blank'>Custom template</SelectItem>
                   <SelectItem value='template-standard-9-5' disabled>
                     Standard 9–5 (coming soon)
                   </SelectItem>
@@ -69,8 +69,8 @@ export function ScheduleBasicsFields({
               </Select>
             </FormControl>
             <p className='text-sm text-muted-foreground'>
-              Predefined templates are coming soon — starting from scratch is
-              fully supported today.
+              Predefined templates are coming soon — building a custom
+              template is fully supported today.
             </p>
             <FormMessage />
           </FormItem>

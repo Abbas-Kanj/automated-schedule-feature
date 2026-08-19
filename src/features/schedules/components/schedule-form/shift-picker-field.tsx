@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { CheckIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -14,13 +13,19 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { ShiftFormDialog } from '@/features/shifts/components/shift-form-dialog'
 import {
   DAY_LABELS,
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_COMPONENTS,
-  SHIFT_POLICY_TYPE_OPTIONS,
-  SHIFT_TYPE_OPTIONS,
 } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
@@ -243,19 +248,11 @@ export function ShiftPickerField({
                       const color = SHIFT_BADGE_COLOR_OPTIONS.find(
                         (o) => o.value === shift.badge_color
                       )
-                      const shiftTypeLabel = SHIFT_TYPE_OPTIONS.find(
-                        (o) => o.value === shift.shift_type
-                      )?.label
-                      const policyLabel = shift.policy_type
-                        ? SHIFT_POLICY_TYPE_OPTIONS.find(
-                            (o) => o.value === shift.policy_type
-                          )?.label
-                        : undefined
                       return (
                         <Card key={shift.id} className='gap-0 py-3'>
                           <CardContent className='flex items-start gap-3 px-4'>
                             <div className='min-w-0 flex-1 space-y-1'>
-                              <div className='flex flex-wrap items-center gap-2'>
+                              <div className='flex items-center gap-2'>
                                 <span
                                   className={cn(
                                     'size-2 shrink-0 rounded-full',
@@ -268,30 +265,37 @@ export function ShiftPickerField({
                                 <span className='truncate text-sm font-medium'>
                                   {shift.name}
                                 </span>
-                                <span className='shrink-0 text-xs text-muted-foreground'>
-                                  {shift.short_code}
-                                </span>
-                                {shiftTypeLabel && (
-                                  <Badge variant='secondary'>
-                                    {shiftTypeLabel}
-                                  </Badge>
-                                )}
-                                {policyLabel && (
-                                  <Badge variant='outline'>{policyLabel}</Badge>
-                                )}
                               </div>
                               {enabledDays.length ? (
-                                <div className='flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground'>
-                                  {enabledDays.map((day) => (
-                                    <span key={day.day}>
-                                      {DAY_LABELS[day.day]}:{' '}
-                                      {day.times
-                                        .map(
-                                          (t) => `${t.from_time}–${t.to_time}`
-                                        )
-                                        .join(', ')}
-                                    </span>
-                                  ))}
+                                <div className='overflow-hidden rounded-md border'>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className='hover:bg-transparent'>
+                                        <TableHead className='h-8'>Day</TableHead>
+                                        <TableHead className='h-8'>Times</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {enabledDays.map((day) => (
+                                        <TableRow
+                                          key={day.day}
+                                          className='hover:bg-transparent'
+                                        >
+                                          <TableCell className='py-1.5 text-muted-foreground'>
+                                            {DAY_LABELS[day.day]}
+                                          </TableCell>
+                                          <TableCell className='py-1.5 whitespace-normal text-muted-foreground'>
+                                            {day.times
+                                              .map(
+                                                (t) =>
+                                                  `${t.from_time}–${t.to_time}`
+                                              )
+                                              .join(', ')}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
                                 </div>
                               ) : (
                                 <p className='text-sm text-muted-foreground'>

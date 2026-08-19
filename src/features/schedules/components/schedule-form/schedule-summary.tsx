@@ -209,31 +209,44 @@ function RotateSummary({ values }: { values: any }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pattern = (values.pattern ?? []) as any[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const shiftCounts = (values.custom_shift_counts ?? []) as any[]
+  const shiftRepeat = (values.shift_repeat ?? []) as any[]
 
   return (
     <SummarySection title='Rotate config'>
       <SummaryRow label='Cycle type' value={cycleTypeLabel} />
-      <SummaryRow
-        label='Cycle length'
-        value={
-          values.cycle_length
-            ? `${cycleUnitLabel} · ${values.cycle_length.days} day(s)`
-            : undefined
-        }
-      />
+      {values.cycle_type !== 'custom_shifts' && (
+        <SummaryRow
+          label='Cycle length'
+          value={
+            values.cycle_length
+              ? `${cycleUnitLabel} · ${values.cycle_length.days} day(s)`
+              : undefined
+          }
+        />
+      )}
       {values.cycle_type === 'custom_shifts' &&
-        shiftCounts.some((c) => c.count > 0) && (
+        shiftRepeat.length > 0 && (
           <div className='space-y-1 border-t pt-2'>
-            {shiftCounts
-              .filter((c) => c.count > 0)
-              .map((c) => (
+            {shiftRepeat.map((r) => {
+              const shift = shifts.find((s) => s.id === r.shift_id)
+              const unitLabel =
+                r.frequency === 'daily'
+                  ? 'Day(s)'
+                  : r.frequency === 'weekly'
+                    ? 'Week(s)'
+                    : 'Month(s)'
+              return (
                 <SummaryRow
-                  key={c.shift_id}
-                  label={shifts.find((s) => s.id === c.shift_id)?.name ?? 'Shift'}
-                  value={`${c.count} day(s)`}
+                  key={r.shift_id}
+                  label={shift?.name ?? 'Shift'}
+                  value={`Every ${r.interval} ${unitLabel}`}
                 />
-              ))}
+              )
+            })}
+            <SummaryRow
+              label='Total pattern length'
+              value={`${pattern.length} card(s)`}
+            />
           </div>
         )}
 
@@ -274,7 +287,7 @@ function RegularSummary({
       <ShiftDefinitionSummary values={values} />
       {values.type === 'rotate' && <RotateSummary values={values} />}
 
-      {values.type !== 'rotate' && endSettings && (
+      {endSettings && (
         <SummarySection title='Occurrence'>
           <SummaryRow
             label='End'

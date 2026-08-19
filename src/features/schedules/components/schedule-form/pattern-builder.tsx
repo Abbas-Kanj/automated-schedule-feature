@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -16,20 +16,21 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { SelectDropdown } from '@/components/select-dropdown'
+import { RecurrenceFrequencyFields } from '@/components/recurrence-frequency-fields'
+import {
+  SHIFT_BADGE_COLOR_OPTIONS,
+  SHIFT_ICON_COMPONENTS,
+} from '@/features/shifts/data/data'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import {
   CYCLE_LENGTH_QUICK_PICKS,
   CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS,
   CYCLE_LENGTH_UNIT_OPTIONS,
   CYCLE_TYPE_OPTIONS,
+  SHIFT_REPEAT_FREQUENCY_OPTIONS,
 } from '../../data/data'
-import {
-  type CustomShiftCount,
-  type RotatePatternEntry,
-} from '../../data/schema'
-import { DateField } from './date-field'
+import { type RotatePatternEntry, type ShiftRepeat } from '../../data/schema'
 import { DirectionPreview } from './direction-preview'
 
 type PatternBuilderProps = {
@@ -49,21 +50,55 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
   const cycleType = useWatch({ control, name: 'cycle_type' }) as
     | string
     | undefined
+  const shiftRepeatRaw = useWatch({ control, name: 'shift_repeat' }) as
+    | ShiftRepeat[]
+    | undefined
+  const shiftRepeat = useMemo(() => shiftRepeatRaw ?? [], [shiftRepeatRaw])
+
+  const isCustomShifts = cycleType === 'custom_shifts'
   const days = cycleLength?.days ?? 0
+
+  const totalPatternLength = isCustomShifts
+    ? shiftRepeat.reduce((sum, r) => sum + r.interval, 0)
+    : days
 
   const { fields, replace } = useFieldArray({ control, name: 'pattern' })
 
+  // Pattern_shifts: keep pattern synced with cycle_length.days
   useEffect(() => {
+    if (isCustomShifts) return
     if (!days) return
     const current =
       (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
     if (current.length === days) return
     const next = Array.from(
       { length: days },
-      (_, i) => current[i] ?? { position: i + 1, is_off: true, shift_id: undefined }
+      (_, i) =>
+        current[i] ?? { position: i + 1, is_off: true, shift_id: undefined }
     )
     replace(next)
-  }, [days])
+  }, [days, isCustomShifts])
+
+  // Custom_shifts: auto-populate pattern from shift_repeat settings
+  useEffect(() => {
+    if (!isCustomShifts) return
+    if (totalPatternLength <= 0) {
+      replace([])
+      return
+    }
+    const next: RotatePatternEntry[] = []
+    let position = 1
+    for (const r of shiftRepeat) {
+      for (let i = 0; i < r.interval; i++, position++) {
+        next.push({ position, is_off: false, shift_id: r.shift_id })
+      }
+    }
+    while (position <= totalPatternLength) {
+      next.push({ position, is_off: true, shift_id: undefined })
+      position++
+    }
+    replace(next)
+  }, [isCustomShifts, totalPatternLength, shiftRepeat, replace])
 
   // Every day's dropdown picks from the shifts selected back in the
   // "Shifts" step — no more hand-authored blocks (see `data/schema.ts`).
@@ -72,166 +107,8 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     .filter((s): s is NonNullable<typeof s> => s !== undefined)
     .map((s) => ({ value: s.id, label: s.name }))
 
-  const applyCountsToDays = (counts: CustomShiftCount[]) => {
-    if (!days) return
-    const next: RotatePatternEntry[] = []
-    let position = 1
-    for (const c of counts) {
-      for (let i = 0; i < c.count && position <= days; i++, position++) {
-        next.push({ position, is_off: false, shift_id: c.shift_id })
-      }
-    }
-    while (position <= days) {
-      next.push({ position, is_off: true, shift_id: undefined })
-      position++
-    }
-    setValue('pattern', next, { shouldValidate: true, shouldDirty: true })
-  }
-
   return (
     <div className='space-y-4'>
-      <FormField
-        control={control}
-        name='start_date'
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Start date</FormLabel>
-            <FormControl>
-              <DateField
-                value={field.value}
-                onChange={field.onChange}
-                disabled={disabled}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <Card className='gap-3 py-4'>
-        <CardHeader className='px-4'>
-          <CardTitle className='text-sm font-medium'>Cycle length</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-3 px-4'>
-          <FormField
-            control={control}
-            name='cycle_length.unit'
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Unit</FormLabel>
-                <SelectDropdown
-                  isControlled
-                  defaultValue={field.value}
-                  onValueChange={(unit) => {
-                    field.onChange(unit)
-                    // Switching units resets to a clean 1-unit default
-                    // (1 week / 1 month) instead of carrying over a day
-                    // count that made sense under the old unit.
-                    const multiplier =
-                      CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS[
-                        unit as keyof typeof CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS
-                      ]
-                    if (multiplier) {
-                      setValue('cycle_length.days', multiplier, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    } else if (!cycleLength?.days) {
-                      setValue('cycle_length.days', 7, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
-                  }}
-                  placeholder='Select a unit'
-                  items={CYCLE_LENGTH_UNIT_OPTIONS}
-                  disabled={disabled}
-                />
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {cycleLength?.unit === 'custom_days' ? (
-            <FormField
-              control={control}
-              name='cycle_length.days'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cycle length (days)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={1}
-                      disabled={disabled}
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                    />
-                  </FormControl>
-                  {!disabled && (
-                    <div className='flex flex-wrap gap-1.5 pt-1'>
-                      {CYCLE_LENGTH_QUICK_PICKS.map((quickPickDays) => (
-                        <Button
-                          key={quickPickDays}
-                          type='button'
-                          variant='outline'
-                          size='sm'
-                          className={cn(
-                            'h-7',
-                            cycleLength?.days === quickPickDays &&
-                              'border-primary'
-                          )}
-                          onClick={() => field.onChange(quickPickDays)}
-                        >
-                          {quickPickDays}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          ) : (
-            <FormField
-              control={control}
-              name='cycle_length.days'
-              render={({ field }) => {
-                const isMonthly = cycleLength?.unit === 'monthly'
-                const multiplier = isMonthly ? 30 : 7
-                const count = field.value
-                  ? Math.round(field.value / multiplier)
-                  : ''
-                return (
-                  <FormItem>
-                    <FormLabel>
-                      Cycle length ({isMonthly ? 'month(s)' : 'week(s)'})
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type='number'
-                        min={1}
-                        disabled={disabled}
-                        value={count}
-                        onChange={(e) => {
-                          const nextCount = e.target.valueAsNumber
-                          field.onChange(
-                            Number.isNaN(nextCount)
-                              ? undefined
-                              : nextCount * multiplier
-                          )
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
-
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>
           <CardTitle className='text-sm font-medium'>Create pattern</CardTitle>
@@ -255,148 +132,228 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
               </FormItem>
             )}
           />
+        </CardContent>
+      </Card>
 
-          {!days ? (
-            <p className='text-sm text-muted-foreground'>
-              Set the cycle length to build the pattern.
-            </p>
-          ) : !shiftOptions.length ? (
-            <p className='text-sm text-muted-foreground'>
-              Pick shifts in the previous step to assign them to days.
-            </p>
-          ) : (
-            <>
-              {cycleType === 'custom_shifts' && (
-                <CustomShiftCounts
-                  shiftIds={shiftIds}
-                  days={days}
-                  disabled={disabled}
-                  onApply={applyCountsToDays}
-                />
+      {!isCustomShifts && (
+        <Card className='gap-3 py-4'>
+          <CardHeader className='px-4'>
+            <CardTitle className='text-sm font-medium'>Cycle length</CardTitle>
+          </CardHeader>
+          <CardContent className='space-y-3 px-4'>
+            <FormField
+              control={control}
+              name='cycle_length.unit'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unit</FormLabel>
+                  <SelectDropdown
+                    isControlled
+                    defaultValue={field.value}
+                    onValueChange={(unit) => {
+                      field.onChange(unit)
+                      const multiplier =
+                        CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS[
+                          unit as keyof typeof CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS
+                        ]
+                      if (multiplier) {
+                        setValue('cycle_length.days', multiplier, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      } else if (!cycleLength?.days) {
+                        setValue('cycle_length.days', 7, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }
+                    }}
+                    placeholder='Select a unit'
+                    items={CYCLE_LENGTH_UNIT_OPTIONS}
+                    disabled={disabled}
+                  />
+                  <FormMessage />
+                </FormItem>
               )}
+            />
+
+            {cycleLength?.unit === 'custom_days' ? (
+              <FormField
+                control={control}
+                name='cycle_length.days'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cycle length (days)</FormLabel>
+                    <FormControl>
+                      <input
+                        type='number'
+                        min={1}
+                        className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
+                        disabled={disabled}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                      />
+                    </FormControl>
+                    {!disabled && (
+                      <div className='flex flex-wrap gap-1.5 pt-1'>
+                        {CYCLE_LENGTH_QUICK_PICKS.map((quickPickDays) => (
+                          <Button
+                            key={quickPickDays}
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            className={cn(
+                              'h-7',
+                              cycleLength?.days === quickPickDays &&
+                                'border-primary'
+                            )}
+                            onClick={() => field.onChange(quickPickDays)}
+                          >
+                            {quickPickDays}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={control}
+                name='cycle_length.days'
+                render={({ field }) => {
+                  const isMonthly = cycleLength?.unit === 'monthly'
+                  const multiplier = isMonthly ? 30 : 7
+                  const count = field.value
+                    ? Math.round(field.value / multiplier)
+                    : ''
+                  return (
+                    <FormItem>
+                      <FormLabel>
+                        Cycle length ({isMonthly ? 'month(s)' : 'week(s)'})
+                      </FormLabel>
+                      <FormControl>
+                        <input
+                          type='number'
+                          min={1}
+                          className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
+                          disabled={disabled}
+                          value={count}
+                          onChange={(e) => {
+                            const nextCount = e.target.valueAsNumber
+                            field.onChange(
+                              Number.isNaN(nextCount)
+                                ? undefined
+                                : nextCount * multiplier
+                            )
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {isCustomShifts && shiftOptions.length > 0 && (
+        <ShiftRepeats shiftIds={shiftIds} disabled={disabled} />
+      )}
+
+      {((isCustomShifts && totalPatternLength > 0) ||
+        (!isCustomShifts && days > 0)) &&
+        shiftOptions.length > 0 && (
+          <Card className='gap-3 py-4'>
+            <CardHeader className='px-4'>
+              <CardTitle className='text-sm font-medium'>Pattern</CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-3 px-4'>
               <PatternDayGrid
                 fields={fields}
                 shiftOptions={shiftOptions}
                 cycleLengthUnit={cycleLength?.unit}
                 disabled={disabled}
               />
-            </>
-          )}
-          <DirectionPreview />
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+
+      {!isCustomShifts && !days && (
+        <p className='text-sm text-muted-foreground'>
+          Set the cycle length to build the pattern.
+        </p>
+      )}
+
+      {shiftOptions.length === 0 && (
+        <p className='text-sm text-muted-foreground'>
+          Pick shifts in the previous step to assign them to days.
+        </p>
+      )}
+
+      <DirectionPreview />
     </div>
   )
 }
 
-type CustomShiftCountsProps = {
+type ShiftRepeatsProps = {
   shiftIds: string[]
-  days: number
   disabled?: boolean
-  onApply: (counts: CustomShiftCount[]) => void
 }
 
-function CustomShiftCounts({
-  shiftIds,
-  days,
-  disabled,
-  onApply,
-}: CustomShiftCountsProps) {
+function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, getValues, formState } = useFormContext<any>()
+  const { control, getValues } = useFormContext<any>()
   const shifts = useShiftsStore((s) => s.shifts)
-  const { fields, replace } = useFieldArray({
-    control,
-    name: 'custom_shift_counts',
-  })
+  const { replace } = useFieldArray({ control, name: 'shift_repeat' })
 
-  // Keep one count row per currently-selected shift, in `shift_ids` order —
-  // adding/removing a shift in the previous step should add/drop its row
-  // here rather than leaving stale entries behind.
+  // Keep one repeat row per currently-selected shift, preserving existing
+  // repeat settings when a shift is already configured.
   const shiftIdsKey = shiftIds.join(',')
   useEffect(() => {
     const current =
-      (getValues('custom_shift_counts') as CustomShiftCount[] | undefined) ??
-      []
+      (getValues('shift_repeat') as ShiftRepeat[] | undefined) ?? []
     const next = shiftIds.map(
-      (id) => current.find((c) => c.shift_id === id) ?? { shift_id: id, count: 0 }
+      (id) =>
+        current.find((r) => r.shift_id === id) ?? {
+          shift_id: id,
+          frequency: 'daily' as const,
+          interval: 1,
+        }
     )
     const changed =
       next.length !== current.length ||
-      next.some((c, i) => c.shift_id !== current[i]?.shift_id)
+      next.some((r, i) => r.shift_id !== current[i]?.shift_id)
     if (changed) replace(next)
   }, [shiftIdsKey])
-
-  const counts = (useWatch({ control, name: 'custom_shift_counts' }) as
-    | CustomShiftCount[]
-    | undefined) ?? []
-  const totalAssigned = counts.reduce((sum, c) => sum + (c.count || 0), 0)
-  const countsError = formState.errors?.custom_shift_counts as
-    | { message?: string; root?: { message?: string } }
-    | undefined
 
   return (
     <Card className='gap-3 py-4'>
       <CardHeader className='px-4'>
-        <CardTitle className='text-sm font-medium'>Shift counts</CardTitle>
+        <CardTitle className='text-sm font-medium'>Shift repeats</CardTitle>
       </CardHeader>
-      <CardContent className='space-y-3 px-4'>
-        {(fields as (CustomShiftCount & { id: string })[]).map(
-          (field, index) => {
-            const shift = shifts.find((s) => s.id === field.shift_id)
-            return (
-              <FormField
-                key={field.id}
+      <CardContent className='space-y-4 px-4'>
+        {shiftIds.map((shiftId, index) => {
+          const shift = shifts.find((s) => s.id === shiftId)
+          return (
+            <div key={shiftId} className='space-y-3'>
+              <p className='text-sm font-medium'>
+                {shift?.name ?? 'Shift'}
+              </p>
+              <RecurrenceFrequencyFields
                 control={control}
-                name={`custom_shift_counts.${index}.count`}
-                render={({ field: countField }) => (
-                  <FormItem className='flex items-center justify-between gap-4 space-y-0'>
-                    <FormLabel className='font-normal'>
-                      {shift?.name ?? 'Shift'}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type='number'
-                        min={0}
-                        className='w-24'
-                        disabled={disabled}
-                        value={countField.value ?? 0}
-                        onChange={(e) =>
-                          countField.onChange(e.target.valueAsNumber || 0)
-                        }
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
+                name={`shift_repeat.${index}`}
+                frequencyOptions={SHIFT_REPEAT_FREQUENCY_OPTIONS}
+                weekdayOptions={[]}
+                hideWeekdays
+                disabled={disabled}
               />
-            )
-          }
-        )}
-
-        <div className='flex flex-wrap items-center justify-between gap-3 border-t pt-3'>
-          <p
-            className={cn(
-              'text-sm',
-              totalAssigned > days ? 'text-destructive' : 'text-muted-foreground'
-            )}
-          >
-            {totalAssigned} / {days} day(s) assigned
-          </p>
-          <Button
-            type='button'
-            variant='outline'
-            size='sm'
-            disabled={disabled || !days}
-            onClick={() => onApply(counts)}
-          >
-            Apply to days
-          </Button>
-        </div>
-        {(countsError?.message || countsError?.root?.message) && (
-          <p className='text-sm font-medium text-destructive'>
-            {countsError.message ?? countsError.root?.message}
-          </p>
-        )}
+            </div>
+          )
+        })}
       </CardContent>
     </Card>
   )
@@ -509,6 +466,7 @@ type PatternDayCardProps = {
 function PatternDayCard({ index, shiftOptions, disabled }: PatternDayCardProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, setValue } = useFormContext<any>()
+  const shifts = useShiftsStore((s) => s.shifts)
   const isOff = useWatch({ control, name: `pattern.${index}.is_off` })
   const shiftId = useWatch({ control, name: `pattern.${index}.shift_id` }) as
     | string
@@ -516,12 +474,39 @@ function PatternDayCard({ index, shiftOptions, disabled }: PatternDayCardProps) 
   const value = !isOff && shiftId ? shiftId : 'off'
   const items = [{ value: 'off', label: 'Off' }, ...shiftOptions]
 
+  const assignedShift = shiftId ? shifts.find((s) => s.id === shiftId) : null
+  const Icon = assignedShift
+    ? SHIFT_ICON_COMPONENTS[assignedShift.icon]
+    : undefined
+  const color = assignedShift
+    ? SHIFT_BADGE_COLOR_OPTIONS.find(
+        (o) => o.value === assignedShift.badge_color
+      )
+    : undefined
+
   return (
     <Card className='gap-1 py-2'>
       <CardContent className='space-y-1 px-2'>
-        <p className='text-center text-xs text-muted-foreground'>
-          Day {index + 1}
-        </p>
+        <div className='flex min-h-4 items-center justify-center gap-1'>
+          {assignedShift && (
+            <>
+              <span
+                className={cn(
+                  'size-1.5 shrink-0 rounded-full',
+                  color?.swatchClassName
+                )}
+              />
+              {Icon && <Icon className='size-3 shrink-0' />}
+            </>
+          )}
+          <p className='truncate text-center text-xs text-muted-foreground'>
+            {assignedShift
+              ? assignedShift.name
+              : isOff
+                ? 'Off'
+                : `Day ${index + 1}`}
+          </p>
+        </div>
         <SelectDropdown
           isControlled
           defaultValue={value}

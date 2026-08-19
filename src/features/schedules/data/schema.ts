@@ -231,19 +231,22 @@ const rotatePatternEntrySchema = z.object({
   is_off: z.boolean(),
 })
 
-// "Custom shifts" mode: one count per selected shift ("how many days in the
-// cycle it covers"), kept in `shift_ids` order — see the "Apply to days"
-// action in `pattern-builder.tsx` that seeds `pattern` from these counts.
-const customShiftCountSchema = z.object({
+// "Custom shifts" mode: each selected shift gets its own repeat config —
+// how often it recurs and for how many units. The pattern grid's total
+// length equals the plain sum of all shifts' intervals (a weekly x3 shift
+// contributes 3 cards, a daily x5 contributes 5 — no unit conversion).
+export const SHIFT_REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
+const shiftRepeatSchema = z.object({
   shift_id: z.string(),
-  count: z.number().min(0),
+  frequency: z.enum(SHIFT_REPEAT_FREQUENCIES),
+  interval: z.number().min(1),
 })
 
 const rotateFieldsSchema = z.object({
   cycle_type: cycleTypeSchema,
   cycle_length: cycleLengthSchema,
   pattern: z.array(rotatePatternEntrySchema).min(1),
-  custom_shift_counts: z.array(customShiftCountSchema).default([]),
+  shift_repeat: z.array(shiftRepeatSchema).default([]),
 })
 
 // --- assemble the three `regular` arms ---
@@ -264,14 +267,16 @@ const regularFlexibleSchema = z.object({
 
 // rotate's step 1/2 are the same `ScheduleBasicsFields`/`ShiftPickerField`
 // fixed and flexible use — it only diverges from them at step 3 (its own
-// cycle/pattern config, in place of fixed/flexible's `end_settings`), so it
-// shares `shiftDefinitionFieldsSchema` too rather than a rotate-only shape.
+// cycle/pattern config). It gets the same `start_date`/`end_settings` as
+// fixed/flexible, collected in a shared "Start & End" step (see
+// `schedule-start-end-fields.tsx`).
 const regularRotateSchema = z.object({
   parent_type: z.literal('regular'),
   type: z.literal('rotate'),
-  start_date: dateStringSchema,
   ...shiftDefinitionFieldsSchema.shape,
   ...rotateFieldsSchema.shape,
+  start_date: dateStringSchema,
+  end_settings: endSettingsSchema,
 })
 
 const regularScheduleSchema = z
@@ -300,10 +305,21 @@ const regularScheduleSchema = z
     }
 
     if (val.type === 'rotate') {
-      if (val.pattern.length !== val.cycle_length.days) {
+      // For pattern_shifts, pattern length must match cycle_length.days.
+      // For custom_shifts, pattern length must equal the plain sum of all
+      // shifts' repeat intervals (weekly x3 + daily x5 => 8 cards).
+      const expectedPatternLength =
+        val.cycle_type === 'custom_shifts'
+          ? val.shift_repeat.reduce((sum, r) => sum + r.interval, 0)
+          : val.cycle_length.days
+
+      if (val.pattern.length !== expectedPatternLength) {
         ctx.addIssue({
           code: 'custom',
-          message: `Assign all ${val.cycle_length.days} day(s) of the cycle`,
+          message:
+            val.cycle_type === 'custom_shifts'
+              ? `Pattern must have ${expectedPatternLength} card(s) based on shift repeat settings`
+              : `Assign all ${val.cycle_length.days} day(s) of the cycle`,
           path: ['pattern'],
         })
       }
@@ -328,15 +344,23 @@ const regularScheduleSchema = z
       })
 
       if (val.cycle_type === 'custom_shifts') {
-        const totalCount = val.custom_shift_counts.reduce(
-          (sum, c) => sum + c.count,
-          0
-        )
-        if (totalCount > val.cycle_length.days) {
+        if (val.shift_repeat.length === 0) {
           ctx.addIssue({
             code: 'custom',
-            message: `Shift counts add up to more than the ${val.cycle_length.days}-day cycle`,
-            path: ['custom_shift_counts'],
+            message: 'Add at least one shift repeat configuration',
+            path: ['shift_repeat'],
+          })
+        }
+
+        const repeatShiftIds = val.shift_repeat.map((r) => r.shift_id)
+        const invalidIds = repeatShiftIds.filter(
+          (id) => !val.shift_ids.includes(id)
+        )
+        if (invalidIds.length > 0) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Shift repeat references a shift not in the selection',
+            path: ['shift_repeat'],
           })
         }
       }
@@ -375,11 +399,12 @@ export type EndSettings = z.infer<typeof endSettingsSchema>
 export type RecurrenceEndType = (typeof RECURRENCE_END_TYPES)[number]
 export type CycleType = (typeof CYCLE_TYPES)[number]
 export type CycleLengthUnit = (typeof CYCLE_LENGTH_UNITS)[number]
+export type ShiftRepeatFrequency = (typeof SHIFT_REPEAT_FREQUENCIES)[number]
 export type RotatePatternEntry = Extract<
   RegularSchedule,
   { type: 'rotate' }
 >['pattern'][number]
-export type CustomShiftCount = Extract<
+export type ShiftRepeat = Extract<
   RegularSchedule,
   { type: 'rotate' }
->['custom_shift_counts'][number]
+>['shift_repeat'][number]

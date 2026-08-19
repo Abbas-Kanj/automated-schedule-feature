@@ -25,6 +25,7 @@ import {
   type CYCLE_TYPES,
   type RECURRENCE_END_TYPES,
   type REGULAR_TYPES,
+  type ShiftRepeatFrequency,
 } from './schema'
 
 export const DAY_OPTIONS = DAYS_OF_WEEK.map((day) => ({
@@ -148,7 +149,7 @@ export const CYCLE_TYPE_OPTIONS = [
     value: 'custom_shifts',
     label: 'Custom shifts',
     description:
-      'Set how many days each shift repeats, then apply that to the cycle.',
+      'Set a repeat frequency for each shift, then edit the auto-generated pattern.',
   },
 ] satisfies {
   value: (typeof CYCLE_TYPES)[number]
@@ -181,3 +182,12 @@ export const RECURRENCE_END_TYPE_OPTIONS = [
   { value: 'after_occurrences', label: 'End after' },
   { value: 'on_date', label: 'End on' },
 ] satisfies { value: (typeof RECURRENCE_END_TYPES)[number]; label: string }[]
+
+export const SHIFT_REPEAT_FREQUENCY_OPTIONS = [
+  { value: 'daily', label: 'Days' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+] satisfies {
+  value: ShiftRepeatFrequency
+  label: string
+}[]

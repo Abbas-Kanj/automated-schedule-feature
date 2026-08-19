@@ -1,4 +1,4 @@
-import { Loader } from 'lucide-react'
+import { Loader, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FormControl } from '@/components/ui/form'
 import {
@@ -14,7 +14,10 @@ type SelectDropdownProps = {
   defaultValue: string | undefined
   placeholder?: string
   isPending?: boolean
-  items: { label: string; value: string }[] | undefined
+  // `icon` is optional per-item — only rotate's per-day shift picker uses it
+  // today (see `pattern-builder.tsx`), every other call site keeps passing
+  // plain `{ label, value }` pairs.
+  items: { label: string; value: string; icon?: LucideIcon }[] | undefined
   disabled?: boolean
   className?: string
   isControlled?: boolean
@@ -50,9 +53,16 @@ export function SelectDropdown({
             </div>
           </SelectItem>
         ) : (
-          items?.map(({ label, value }) => (
+          items?.map(({ label, value, icon: Icon }) => (
             <SelectItem key={value} value={value}>
-              {label}
+              {Icon ? (
+                <span className='flex items-center gap-2'>
+                  <Icon className='size-4 shrink-0 text-muted-foreground' />
+                  {label}
+                </span>
+              ) : (
+                label
+              )}
             </SelectItem>
           ))
         )}

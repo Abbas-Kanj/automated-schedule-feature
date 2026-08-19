@@ -33,7 +33,7 @@ import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
 import { PatternBuilder } from './pattern-builder'
 import { ScheduleBasicsFields } from './schedule-basics-fields'
-import { ScheduleEndSettingsFields } from './schedule-end-settings-fields'
+import { ScheduleStartEndFields } from './schedule-start-end-fields'
 import { ScheduleSummary } from './schedule-summary'
 import { ShiftPickerField } from './shift-picker-field'
 import { WeeklyFields } from './weekly-fields'
@@ -53,17 +53,22 @@ function getSteps(parentType: string, regularType?: RegularType): VerticalTabsSt
     ]
   }
 
-  // rotate shares fixed/flexible's first two steps exactly — basics
-  // (`ScheduleBasicsFields`) and shift picking (`ShiftPickerField`, just
-  // gated to require >=2 shifts). It only diverges after that: a "Pattern"
-  // step (its own cycle/rotation config) in place of fixed/flexible's
-  // "Start & End".
+  // rotate gets its own pattern step (cycle/pattern config) PLUS the same
+  // shared "Start & End" step as fixed/flexible (start date + end
+  // frequency) — see `schedule-start-end-fields.tsx`.
+  if (regularType === 'rotate') {
+    return [
+      { id: 'basics', label: 'Basics' },
+      { id: 'shifts', label: 'Shifts' },
+      { id: 'pattern', label: 'Pattern' },
+      { id: 'end-settings', label: 'Start & End' },
+      { id: 'summary', label: 'Summary' },
+    ]
+  }
   return [
     { id: 'basics', label: 'Basics' },
     { id: 'shifts', label: 'Shifts' },
-    regularType === 'rotate'
-      ? { id: 'pattern', label: 'Pattern' }
-      : { id: 'end-settings', label: 'Start & End' },
+    { id: 'end-settings', label: 'Start & End' },
     { id: 'summary', label: 'Summary' },
   ]
 }
@@ -112,6 +117,7 @@ function getRegularTypeDefaults(type: RegularType) {
       parent_type: 'regular' as const,
       type,
       start_date: startDate,
+      end_settings: DEFAULT_END_SETTINGS,
       shift_ids: [] as string[],
       temporary_schedule: false,
       cycle_type: 'pattern_shifts' as const,
@@ -121,7 +127,11 @@ function getRegularTypeDefaults(type: RegularType) {
         is_off: true,
         shift_id: undefined,
       })),
-      custom_shift_counts: [] as { shift_id: string; count: number }[],
+      shift_repeat: [] as {
+        shift_id: string
+        frequency: string
+        interval: number
+      }[],
     }
   }
 
@@ -159,11 +169,10 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   }
   if (stepId === 'pattern') {
     return [
-      'start_date',
       'cycle_type',
       'cycle_length',
       'pattern',
-      'custom_shift_counts',
+      'shift_repeat',
     ]
   }
   if (stepId === 'type') {
@@ -391,9 +400,8 @@ export function ScheduleForm({
               )}
 
             {(disabled || currentStepId === 'end-settings') &&
-              parentType === 'regular' &&
-              regularType !== 'rotate' && (
-                <ScheduleEndSettingsFields disabled={disabled} />
+              parentType === 'regular' && (
+                <ScheduleStartEndFields disabled={disabled} />
               )}
 
             {!disabled && currentStepId === 'summary' && (
