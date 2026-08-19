@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { CheckIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTimeFormat } from '@/lib/time-format'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -27,7 +28,7 @@ import {
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_COMPONENTS,
 } from '@/features/shifts/data/data'
-import { type Shift } from '@/features/shifts/data/schema'
+import { type DayTimeEntry, type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 
 type ShiftPickerFieldProps = {
@@ -39,6 +40,66 @@ type ShiftPickerFieldProps = {
   minSelection?: number
 }
 
+// A shift's enabled days as a "Day | Times" table, with consecutive days
+// sharing the exact same times collapsed into a single row (e.g.
+// "Mon–Fri  09:00–17:00") instead of N identical rows.
+function ShiftDaysTable({
+  days,
+  formatTime,
+}: {
+  days: DayTimeEntry[]
+  formatTime: (time: string) => string
+}) {
+  const rows: { days: DayTimeEntry[]; key: string }[] = []
+  for (const day of days) {
+    const key = day.times
+      .map((t) => `${t.from_time}–${t.to_time}`)
+      .join(', ')
+    const last = rows[rows.length - 1]
+    if (last && last.key === key) {
+      last.days.push(day)
+    } else {
+      rows.push({ days: [day], key })
+    }
+  }
+
+  return (
+    <div className='overflow-hidden rounded-md border'>
+      <Table>
+        <TableHeader>
+          <TableRow className='hover:bg-transparent'>
+            <TableHead className='h-8'>Day</TableHead>
+            <TableHead className='h-8'>Times</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row, i) => {
+            const first = row.days[0]
+            const lastDay = row.days[row.days.length - 1]
+            const label =
+              first.day === lastDay.day
+                ? DAY_LABELS[first.day]
+                : `${DAY_LABELS[first.day]}–${DAY_LABELS[lastDay.day]}`
+            const times = row.days[0].times
+              .map((t) => `${formatTime(t.from_time)}–${formatTime(t.to_time)}`)
+              .join(', ')
+            return (
+              <TableRow key={i} className='hover:bg-transparent'>
+                <TableCell className='py-1.5 text-muted-foreground whitespace-nowrap'>
+                  {label}
+                </TableCell>
+                <TableCell className='py-1.5 whitespace-normal text-muted-foreground'>
+                  {times}
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
 export function ShiftPickerField({
   disabled,
   onDialogOpenChange,
@@ -47,6 +108,7 @@ export function ShiftPickerField({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, setValue } = useFormContext<any>()
   const shifts = useShiftsStore((s) => s.shifts)
+  const formatTime = useTimeFormat()
 
   const selectedIds = useWatch({ control, name: 'shift_ids' }) as
     | string[]
@@ -267,36 +329,10 @@ export function ShiftPickerField({
                                 </span>
                               </div>
                               {enabledDays.length ? (
-                                <div className='overflow-hidden rounded-md border'>
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow className='hover:bg-transparent'>
-                                        <TableHead className='h-8'>Day</TableHead>
-                                        <TableHead className='h-8'>Times</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {enabledDays.map((day) => (
-                                        <TableRow
-                                          key={day.day}
-                                          className='hover:bg-transparent'
-                                        >
-                                          <TableCell className='py-1.5 text-muted-foreground'>
-                                            {DAY_LABELS[day.day]}
-                                          </TableCell>
-                                          <TableCell className='py-1.5 whitespace-normal text-muted-foreground'>
-                                            {day.times
-                                              .map(
-                                                (t) =>
-                                                  `${t.from_time}–${t.to_time}`
-                                              )
-                                              .join(', ')}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
+                                <ShiftDaysTable
+                                  days={enabledDays}
+                                  formatTime={formatTime}
+                                />
                               ) : (
                                 <p className='text-sm text-muted-foreground'>
                                   No enabled days

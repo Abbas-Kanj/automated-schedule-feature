@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { showSubmittedData } from '@/lib/show-submitted-data'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Form,
   FormControl,
@@ -13,6 +15,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  type TimeFormat,
+  useDisplayPreferencesStore,
+} from '@/stores/display-preferences-store'
 
 const items = [
   {
@@ -60,12 +66,40 @@ export function DisplayForm() {
     defaultValues,
   })
 
+  const timeFormat = useDisplayPreferencesStore((s) => s.time_format)
+  const setTimeFormat = useDisplayPreferencesStore((s) => s.setTimeFormat)
+
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit((data) => showSubmittedData(data))}
         className='space-y-8'
       >
+        <div className='space-y-3'>
+          <div className='mb-4'>
+            <Label className='text-base'>Time format</Label>
+            <FormDescription>
+              Choose how times are shown across the app — in 12-hour form
+              with am/pm or 24-hour form. Time inputs themselves stay the
+              same either way.
+            </FormDescription>
+          </div>
+          <RadioGroup
+            value={timeFormat}
+            onValueChange={(value) => setTimeFormat(value as TimeFormat)}
+            className='gap-2'
+          >
+            <Label className='flex cursor-pointer items-center gap-2 rounded-md border p-3 font-normal'>
+              <RadioGroupItem value='12h' />
+              12-hour (e.g. 3:30 pm)
+            </Label>
+            <Label className='flex cursor-pointer items-center gap-2 rounded-md border p-3 font-normal'>
+              <RadioGroupItem value='24h' />
+              24-hour (e.g. 15:30)
+            </Label>
+          </RadioGroup>
+        </div>
+
         <FormField
           control={form.control}
           name='items'

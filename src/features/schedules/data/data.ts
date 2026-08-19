@@ -142,12 +142,12 @@ export const SCHEDULE_ICON_OPTIONS = SCHEDULE_ICONS.map((value) => ({
 export const CYCLE_TYPE_OPTIONS = [
   {
     value: 'pattern_shifts',
-    label: 'Pattern shifts',
+    label: 'Rotate pattern',
     description: 'Assign a shift or day off to each day of the cycle directly.',
   },
   {
     value: 'custom_shifts',
-    label: 'Custom shifts',
+    label: 'Custom alternate',
     description:
       'Set a repeat frequency for each shift, then edit the auto-generated pattern.',
   },

@@ -83,7 +83,7 @@ export function WeeklyOneFields({ disabled }: WeeklyOneFieldsProps) {
             return (
               <Card key={field.id} className='gap-3 py-3'>
                 <CardHeader className='px-3'>
-                  <CardTitle className='text-sm font-medium capitalize'>
+                  <CardTitle className='text-base font-semibold capitalize'>
                     {day}
                   </CardTitle>
                 </CardHeader>

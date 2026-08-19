@@ -206,8 +206,8 @@ const regularSharedSchema = z.object({
 
 // --- rotate: cycle / pattern config ---
 
-// "Pattern shifts" builds the cycle day-by-day (a shift or day-off picked
-// per position, see `rotatePatternEntrySchema`). "Custom shifts" starts
+// "Rotate pattern" builds the cycle day-by-day (a shift or day-off picked
+// per position, see `rotatePatternEntrySchema`). "Custom alternate" starts
 // from how many times each selected shift repeats (`customShiftCountSchema`)
 // and uses that to seed the same per-day pattern, which stays editable
 // afterward — both modes end up driving the same `pattern` array.

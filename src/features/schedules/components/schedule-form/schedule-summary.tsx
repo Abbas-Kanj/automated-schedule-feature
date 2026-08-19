@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { type Control, useWatch } from 'react-hook-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useTimeFormat } from '@/lib/time-format'
 import {
   CYCLE_LENGTH_UNIT_OPTIONS,
   CYCLE_TYPE_OPTIONS,
@@ -27,7 +28,7 @@ function SummarySection({
   return (
     <Card className='gap-3 py-4'>
       <CardHeader className='px-4'>
-        <CardTitle className='text-sm font-medium'>{title}</CardTitle>
+        <CardTitle className='text-base font-semibold'>{title}</CardTitle>
       </CardHeader>
       <CardContent className='space-y-2 px-4'>{children}</CardContent>
     </Card>
@@ -43,9 +44,14 @@ function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-function formatTimes(times?: { from_time: string; to_time: string }[]) {
+function formatTimes(
+  times: { from_time: string; to_time: string }[] | undefined,
+  formatTime: (time: string) => string
+) {
   if (!times?.length) return '—'
-  return times.map((t) => `${t.from_time}–${t.to_time}`).join(', ')
+  return times
+    .map((t) => `${formatTime(t.from_time)}–${formatTime(t.to_time)}`)
+    .join(', ')
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,6 +59,7 @@ function DailySummary({ values }: { values: any }) {
   const typeLabel =
     SCHEDULE_TYPES.find((t) => t.value === values.type)?.label ?? values.type
   const employees = values.employees ?? []
+  const formatTime = useTimeFormat()
 
   return (
     <SummarySection title='Type'>
@@ -73,7 +80,7 @@ function DailySummary({ values }: { values: any }) {
             >
               <span className='capitalize'>{d.day}</span>
               <span className='text-muted-foreground'>
-                {formatTimes(d.times)} · {calculateHours(d.times ?? [])}h
+                {formatTimes(d.times, formatTime)} · {calculateHours(d.times ?? [])}h
               </span>
             </div>
           ))}
@@ -99,7 +106,7 @@ function DailySummary({ values }: { values: any }) {
                     >
                       <span className='text-muted-foreground'>Day {d.day}</span>
                       <span className='text-muted-foreground'>
-                        {formatTimes(d.times)}
+                        {formatTimes(d.times, formatTime)}
                       </span>
                     </div>
                   ))}
@@ -130,6 +137,7 @@ function RegularBasicsSummary({ values }: { values: any }) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ShiftDefinitionSummary({ values }: { values: any }) {
   const shifts = useShiftsStore((s) => s.shifts)
+  const formatTime = useTimeFormat()
   const resolvedShifts: Shift[] = (
     (values.shift_ids as string[] | undefined)
       ?.map((id) => shifts.find((s) => s.id === id))
@@ -181,7 +189,7 @@ function ShiftDefinitionSummary({ values }: { values: any }) {
                       {d.day}
                     </span>
                     <span className='text-muted-foreground'>
-                      {formatTimes(d.times)}
+                      {formatTimes(d.times, formatTime)}
                     </span>
                   </div>
                 ))}

@@ -25,7 +25,7 @@ export function RepeatTab() {
         name='repeat_enabled'
         render={({ field }) => (
           <FormItem className='flex w-fit flex-row items-center gap-4 rounded-md border p-3'>
-            <FormLabel className='cursor-pointer'>Repeat</FormLabel>
+            <FormLabel className='cursor-pointer text-base font-semibold'>Repeat</FormLabel>
             <FormControl>
               <Switch
                 checked={!!field.value}

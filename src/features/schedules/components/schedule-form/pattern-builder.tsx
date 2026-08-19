@@ -111,7 +111,7 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     <div className='space-y-4'>
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>
-          <CardTitle className='text-sm font-medium'>Create pattern</CardTitle>
+          <CardTitle className='text-base font-semibold'>Create pattern</CardTitle>
         </CardHeader>
         <CardContent className='space-y-3 px-4'>
           <FormField
@@ -138,7 +138,7 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       {!isCustomShifts && (
         <Card className='gap-3 py-4'>
           <CardHeader className='px-4'>
-            <CardTitle className='text-sm font-medium'>Cycle length</CardTitle>
+            <CardTitle className='text-base font-semibold'>Cycle length</CardTitle>
           </CardHeader>
           <CardContent className='space-y-3 px-4'>
             <FormField
@@ -269,7 +269,7 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
         shiftOptions.length > 0 && (
           <Card className='gap-3 py-4'>
             <CardHeader className='px-4'>
-              <CardTitle className='text-sm font-medium'>Pattern</CardTitle>
+              <CardTitle className='text-base font-semibold'>Pattern</CardTitle>
             </CardHeader>
             <CardContent className='space-y-3 px-4'>
               <PatternDayGrid
@@ -333,16 +333,33 @@ function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
   return (
     <Card className='gap-3 py-4'>
       <CardHeader className='px-4'>
-        <CardTitle className='text-sm font-medium'>Shift repeats</CardTitle>
+        <CardTitle className='text-base font-semibold'>Shift repeats</CardTitle>
       </CardHeader>
       <CardContent className='space-y-4 px-4'>
         {shiftIds.map((shiftId, index) => {
           const shift = shifts.find((s) => s.id === shiftId)
+          const Icon = shift ? SHIFT_ICON_COMPONENTS[shift.icon] : undefined
+          const color = shift
+            ? SHIFT_BADGE_COLOR_OPTIONS.find(
+                (o) => o.value === shift.badge_color
+              )
+            : undefined
           return (
             <div key={shiftId} className='space-y-3'>
-              <p className='text-sm font-medium'>
-                {shift?.name ?? 'Shift'}
-              </p>
+              <div className='flex items-center gap-2'>
+                <span
+                  className={cn(
+                    'size-2 shrink-0 rounded-full',
+                    color?.swatchClassName
+                  )}
+                />
+                {Icon && (
+                  <Icon className='text-muted-foreground size-4 shrink-0' />
+                )}
+                <p className='text-sm font-medium'>
+                  {shift?.name ?? 'Shift'}
+                </p>
+              </div>
               <RecurrenceFrequencyFields
                 control={control}
                 name={`shift_repeat.${index}`}

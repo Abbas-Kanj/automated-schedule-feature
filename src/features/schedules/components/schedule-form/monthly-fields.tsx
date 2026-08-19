@@ -156,7 +156,7 @@ function MonthDaysCard({
   return (
     <Card className='gap-3 py-4'>
       <CardHeader className='px-4'>
-        <CardTitle className='text-sm font-medium'>{monthLabel}</CardTitle>
+        <CardTitle className='text-base font-semibold'>{monthLabel}</CardTitle>
       </CardHeader>
       <CardContent className='space-y-4 px-4'>
         <div className='grid grid-cols-7 gap-1.5'>

@@ -2,6 +2,7 @@ import { Copy, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { cn } from '@/lib/utils'
+import { useTimeFormat } from '@/lib/time-format'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -116,6 +117,7 @@ export function ShiftTimesTab() {
   const [editingBreakIndex, setEditingBreakIndex] = useState<number | null>(
     null
   )
+  const formatTime = useTimeFormat()
 
   // The "Overnight" category implies every time range on this shift
   // crosses midnight — see the "Check next day" indicator on the General
@@ -327,7 +329,7 @@ export function ShiftTimesTab() {
         name='hours_mode'
         render={() => (
           <FormItem>
-            <FormLabel>Hours</FormLabel>
+            <FormLabel className='text-base font-semibold'>Hours</FormLabel>
             <FormControl>
               <RadioGroup
                 value={mode}
@@ -434,7 +436,7 @@ export function ShiftTimesTab() {
       />
 
       <div className='space-y-1.5'>
-        <Label>Week days</Label>
+        <Label className='text-base font-semibold'>Week days</Label>
         {days.map((d) => {
           const dayCollides =
             mode === 'different' && d.enabled && dayTimesCollide(d.times)
@@ -566,7 +568,7 @@ export function ShiftTimesTab() {
         name='break_enabled'
         render={({ field }) => (
           <FormItem className='space-y-3 rounded-md border p-3'>
-            <Label className='flex cursor-pointer items-center justify-between font-normal'>
+            <Label className='flex cursor-pointer items-center justify-between font-semibold text-base'>
               Break time
               <FormControl>
                 <Switch
@@ -606,7 +608,7 @@ export function ShiftTimesTab() {
                               {b.name?.trim() || 'Break'}
                             </p>
                             <p className='text-muted-foreground text-xs'>
-                              {b.from_time}–{b.to_time} ·{' '}
+                              {formatTime(b.from_time)}–{formatTime(b.to_time)} ·{' '}
                               {formatDurationHM(
                                 b.break_type === 'paid'
                                   ? (b.duration_minutes ?? span)
