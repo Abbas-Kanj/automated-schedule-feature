@@ -64,13 +64,33 @@ $ErrorActionPreference = "Stop"
 # top. Hiding the window from inside the actual tracked process avoids the
 # indirection (and the bug) entirely. Non-fatal if it fails for any reason -
 # worst case the console stays visible, the watcher still works.
+#
+# Loads a PRECOMPILED helper (HideConsole.dll, built by
+# Build-HideConsoleDll.ps1) instead of compiling the P/Invoke shim from
+# inline C# via Add-Type -MemberDefinition on every startup. That used to
+# be the only path - fine for one watcher, but a session start fires every
+# enabled agent's task at once (a dozen+ processes machine-wide), and that
+# many concurrent csc.exe cold-starts made the combined compile time long
+# enough for the console window to actually be visible for several seconds
+# (not the sub-second flash this was designed around) - confirmed via
+# screenshots 2026-08-17. Add-Type -Path (a plain assembly load) has no
+# compiler involved, so it's near-instant regardless of how many watchers
+# start together. Falls back to the old inline-compile path if the dll is
+# missing (e.g. a bridge folder copied without it) so this still degrades
+# gracefully rather than failing outright - just slow again in that case.
 try {
-    Add-Type -Name Window -Namespace Console -MemberDefinition '
-        [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
-        [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    ' -ErrorAction Stop
-    $consolePtr = [Console.Window]::GetConsoleWindow()
-    if ($consolePtr -ne [IntPtr]::Zero) { [Console.Window]::ShowWindow($consolePtr, 0) | Out-Null } # 0 = SW_HIDE
+    $hideDll = Join-Path $PSScriptRoot "HideConsole.dll"
+    if (Test-Path $hideDll) {
+        Add-Type -Path $hideDll -ErrorAction Stop
+        [BridgeConsole.Window]::Hide()
+    } else {
+        Add-Type -Name Window -Namespace Console -MemberDefinition '
+            [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+            [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        ' -ErrorAction Stop
+        $consolePtr = [Console.Window]::GetConsoleWindow()
+        if ($consolePtr -ne [IntPtr]::Zero) { [Console.Window]::ShowWindow($consolePtr, 0) | Out-Null } # 0 = SW_HIDE
+    }
 } catch {
     # non-fatal, see comment above
 }
