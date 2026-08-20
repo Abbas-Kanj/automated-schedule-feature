@@ -42,6 +42,7 @@ export function ScheduleCalendarPreview({ values }: ScheduleCalendarPreviewProps
     start_date: values.start_date,
     shift_ids: values.shift_ids,
     pattern: values.pattern,
+    shift_repeat: values.shift_repeat,
     end_settings: values.end_settings,
   }
 

@@ -234,7 +234,19 @@ const rotatePatternEntrySchema = z.object({
 // "Custom shifts" mode: each selected shift gets its own repeat config —
 // how often it recurs and for how many units. The pattern grid's total
 // length equals the plain sum of all shifts' intervals (a weekly x3 shift
-// contributes 3 cards, a daily x5 contributes 5 — no unit conversion).
+// contributes 3 cards, a daily x5 contributes 5 — no unit conversion), and
+// that card order is exactly the order shifts show up on the calendar
+// (card 1 starts at start_date, card 2 starts right after card 1 ends,
+// etc.). What a card's own real calendar-day span looks like now depends
+// on `frequency` (see `expandRotatePatternDays` in `utils.ts`): a `daily`
+// card is still a single day, always active. A `weekly` card instead spans
+// a real calendar week, active only on that shift's own `weekdays`
+// selection — so `weekdays` now genuinely drives which real weekday a
+// shift lands on, not just validation/UI. `monthly`'s fields
+// (`monthly_mode`/`day_of_month`/`date_specific_*`/`day_position_rules`)
+// are still parity-only for now — a `monthly` card behaves like `daily`
+// (1 day per card, no weekday/date filtering) until a later pass wires
+// those up too.
 export const SHIFT_REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 
 // Each shift's repeat row reuses `shifts`' own "Repeat" tab fields (weekday
@@ -410,6 +422,23 @@ const regularScheduleSchema = z
         // `repeatConfigSchema`'s superRefine in shifts/data/schema.ts),
         // minus its end-frequency checks — not applicable here.
         val.shift_repeat.forEach((r, i) => {
+          // The pattern grid auto-populates each shift's exact `interval`
+          // count of cards (see `pattern-builder.tsx`'s custom_shifts
+          // effect), but every card stays manually reassignable afterward —
+          // this catches a manual edit that pushes one shift past what its
+          // own repeat interval allows (the UI also disables that option
+          // once a shift's cards are used up, this is the safety net).
+          const assignedCount = val.pattern.filter(
+            (p) => !p.is_off && p.shift_id === r.shift_id
+          ).length
+          if (assignedCount > r.interval) {
+            ctx.addIssue({
+              code: 'custom',
+              message: `This shift is assigned to ${assignedCount} day(s) in the pattern, but its repeat settings only allow ${r.interval}`,
+              path: ['pattern'],
+            })
+          }
+
           if (r.frequency === 'weekly' && !r.weekdays?.length) {
             ctx.addIssue({
               code: 'custom',

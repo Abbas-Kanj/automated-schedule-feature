@@ -82,13 +82,44 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     replace(next)
   }, [days, isCustomShifts])
 
-  // Custom_shifts: auto-populate pattern from shift_repeat settings
+  // Custom_shifts: auto-populate pattern from shift_repeat settings.
+  //
+  // `PatternBuilder` unmounts whenever the wizard leaves the "pattern" step
+  // (see `schedule-form.tsx`'s `currentStepId === 'pattern'` gate) and
+  // remounts fresh on the way back — so this effect also runs on every
+  // return trip, not just when `shift_repeat` first changes. It must stay
+  // idempotent against a `pattern` that already matches `shift_repeat`'s
+  // composition (same shift_ids, same per-shift card counts), or it would
+  // silently blow away a manual drag-reorder every time the user leaves and
+  // returns to this step — only truly rebuild when the composition itself
+  // has changed (a shift was added/removed, or an `interval` changed),
+  // since only then does the old card order stop being valid.
   useEffect(() => {
     if (!isCustomShifts) return
     if (totalPatternLength <= 0) {
       replace([])
       return
     }
+
+    const expectedCounts = new Map<string, number>()
+    for (const r of shiftRepeat) {
+      expectedCounts.set(r.shift_id, (expectedCounts.get(r.shift_id) ?? 0) + r.interval)
+    }
+
+    const current =
+      (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
+    const currentCounts = new Map<string, number>()
+    for (const p of current) {
+      if (!p.is_off && p.shift_id) {
+        currentCounts.set(p.shift_id, (currentCounts.get(p.shift_id) ?? 0) + 1)
+      }
+    }
+    const alreadyMatches =
+      current.length === totalPatternLength &&
+      expectedCounts.size === currentCounts.size &&
+      [...expectedCounts].every(([id, count]) => currentCounts.get(id) === count)
+    if (alreadyMatches) return
+
     const next: RotatePatternEntry[] = []
     let position = 1
     for (const r of shiftRepeat) {
@@ -101,7 +132,7 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       position++
     }
     replace(next)
-  }, [isCustomShifts, totalPatternLength, shiftRepeat, replace])
+  }, [isCustomShifts, totalPatternLength, shiftRepeat, replace, getValues])
 
   // Every day's dropdown picks from the shifts selected back in the
   // "Shifts" step — no more hand-authored blocks (see `data/schema.ts`).
@@ -280,6 +311,12 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                 shiftOptions={shiftOptions}
                 cycleLengthUnit={cycleLength?.unit}
                 disabled={disabled}
+                // "Custom alternate" cards are drag-to-swap only (each
+                // shift's own repeat "interval" already fixes how many
+                // cards it gets — see the auto-populate effect above — so
+                // reassigning by picking from a dropdown isn't offered,
+                // only reordering which day holds which shift).
+                isCustomShifts={isCustomShifts}
               />
             </CardContent>
           </Card>
@@ -397,6 +434,9 @@ type PatternDayGridProps = {
   shiftOptions: { value: string; label: string }[]
   cycleLengthUnit?: string
   disabled?: boolean
+  // "Custom alternate" only — swaps cards by drag-and-drop instead of a
+  // per-day dropdown (see `PatternDayCard`).
+  isCustomShifts?: boolean
 }
 
 // A monthly cycle's day count is always a multiple of this (see the
@@ -404,14 +444,87 @@ type PatternDayGridProps = {
 // used to split the cycle into one box per month.
 const DAYS_PER_MONTH_BOX = 30
 
+type DropTarget = { index: number; side: 'before' | 'after' }
+
+// "Custom alternate" cards drag-reorder like a sortable list — dragging one
+// card onto another *moves* it into that slot and shifts everything between
+// the two over by one, rather than just exchanging the two cards' shifts
+// (each shift's own repeat "interval" still fixes how many cards it holds
+// in total — see the custom_shifts auto-populate effect in
+// `PatternBuilder` — a move can't change that count any more than a swap
+// could). Lives in the grid (not each card) since a drag started on one
+// card needs to update state a sibling card renders (the drop-line
+// indicator).
+function usePatternReorder() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { getValues, setValue } = useFormContext<any>()
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
+
+  return {
+    draggingIndex,
+    dropTarget,
+    start(index: number) {
+      setDraggingIndex(index)
+    },
+    hover(index: number, side: DropTarget['side']) {
+      if (index === draggingIndex) {
+        setDropTarget(null)
+        return
+      }
+      setDropTarget((prev) =>
+        prev?.index === index && prev.side === side ? prev : { index, side }
+      )
+    },
+    end() {
+      setDraggingIndex(null)
+      setDropTarget(null)
+    },
+    drop() {
+      const from = draggingIndex
+      const to = dropTarget
+      setDraggingIndex(null)
+      setDropTarget(null)
+      if (from == null || !to || from === to.index) return
+
+      const pattern = getValues('pattern') as RotatePatternEntry[]
+      const content = pattern.map((p) => ({
+        is_off: p.is_off,
+        shift_id: p.shift_id,
+      }))
+      const [moved] = content.splice(from, 1)
+      let insertAt = to.side === 'after' ? to.index + 1 : to.index
+      // Removing `from` shifted every later index left by one — account for
+      // that before splicing back in.
+      if (from < insertAt) insertAt--
+      content.splice(insertAt, 0, moved)
+
+      content.forEach((c, i) => {
+        setValue(`pattern.${i}.shift_id`, c.shift_id, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+        setValue(`pattern.${i}.is_off`, c.is_off, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+      })
+    },
+  }
+}
+
+type PatternReorder = ReturnType<typeof usePatternReorder>
+
 function PatternDayGrid({
   fields,
   shiftOptions,
   cycleLengthUnit,
   disabled,
+  isCustomShifts,
 }: PatternDayGridProps) {
   const [openMonthIndex, setOpenMonthIndex] = useState<number | null>(null)
   const isMonthly = cycleLengthUnit === 'monthly'
+  const reorder = usePatternReorder()
 
   // Weekly/custom-days cycles are short enough (max 7 per row) to show
   // directly.
@@ -424,6 +537,8 @@ function PatternDayGrid({
             index={index}
             shiftOptions={shiftOptions}
             disabled={disabled}
+            isCustomShifts={isCustomShifts}
+            reorder={reorder}
           />
         ))}
       </div>
@@ -480,6 +595,8 @@ function PatternDayGrid({
                   index={openMonth.start + i}
                   shiftOptions={shiftOptions}
                   disabled={disabled}
+                  isCustomShifts={isCustomShifts}
+                  reorder={reorder}
                 />
               ))}
             </div>
@@ -494,9 +611,18 @@ type PatternDayCardProps = {
   index: number
   shiftOptions: { value: string; label: string }[]
   disabled?: boolean
+  // "Custom alternate" only — see `PatternDayGrid`/`usePatternReorder`.
+  isCustomShifts?: boolean
+  reorder?: PatternReorder
 }
 
-function PatternDayCard({ index, shiftOptions, disabled }: PatternDayCardProps) {
+function PatternDayCard({
+  index,
+  shiftOptions,
+  disabled,
+  isCustomShifts,
+  reorder,
+}: PatternDayCardProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, setValue } = useFormContext<any>()
   const shifts = useShiftsStore((s) => s.shifts)
@@ -516,6 +642,69 @@ function PatternDayCard({ index, shiftOptions, disabled }: PatternDayCardProps) 
         (o) => o.value === assignedShift.badge_color
       )
     : undefined
+
+  if (isCustomShifts && reorder) {
+    const isDragging = reorder.draggingIndex === index
+    const dropSide =
+      reorder.dropTarget?.index === index ? reorder.dropTarget.side : null
+
+    return (
+      <Card
+        draggable={!disabled}
+        onDragStart={(e) => {
+          // Firefox requires data to be set for the drag to start at all;
+          // the actual move logic reads from `reorder` state, not this.
+          e.dataTransfer.setData('text/plain', String(index))
+          e.dataTransfer.effectAllowed = 'move'
+          reorder.start(index)
+        }}
+        onDragOver={(e) => {
+          if (disabled) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          const rect = e.currentTarget.getBoundingClientRect()
+          const side = e.clientX - rect.left < rect.width / 2 ? 'before' : 'after'
+          reorder.hover(index, side)
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          if (disabled) return
+          reorder.drop()
+        }}
+        onDragEnd={() => reorder.end()}
+        className={cn(
+          'relative gap-1 py-2 transition-colors',
+          !disabled && 'cursor-grab active:cursor-grabbing',
+          isDragging && 'opacity-40'
+        )}
+      >
+        {dropSide && (
+          <span
+            className={cn(
+              'absolute inset-y-0 z-10 w-0.5 rounded-full bg-primary',
+              dropSide === 'before' ? '-left-1.5' : '-right-1.5'
+            )}
+          />
+        )}
+        <CardContent className='flex min-h-8 items-center justify-center gap-1 px-2'>
+          {assignedShift && (
+            <>
+              <span
+                className={cn(
+                  'size-1.5 shrink-0 rounded-full',
+                  color?.swatchClassName
+                )}
+              />
+              {Icon && <Icon className='size-3 shrink-0' />}
+            </>
+          )}
+          <p className='truncate text-center text-xs'>
+            {assignedShift ? assignedShift.name : `Day ${index + 1}`}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className='gap-1 py-2'>
