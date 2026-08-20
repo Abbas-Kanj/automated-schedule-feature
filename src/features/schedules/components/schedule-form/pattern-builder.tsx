@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/form'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { RecurrenceFrequencyFields } from '@/components/recurrence-frequency-fields'
+import { RepeatMonthlyFields } from '@/components/repeat-monthly-fields'
 import {
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_COMPONENTS,
@@ -29,6 +30,8 @@ import {
   CYCLE_LENGTH_UNIT_OPTIONS,
   CYCLE_TYPE_OPTIONS,
   SHIFT_REPEAT_FREQUENCY_OPTIONS,
+  SHIFT_REPEAT_MONTHLY_MODE_OPTIONS,
+  SHIFT_REPEAT_WEEKDAY_OPTIONS,
 } from '../../data/data'
 import { type RotatePatternEntry, type ShiftRepeat } from '../../data/schema'
 import { DirectionPreview } from './direction-preview'
@@ -311,7 +314,11 @@ function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
   const { replace } = useFieldArray({ control, name: 'shift_repeat' })
 
   // Keep one repeat row per currently-selected shift, preserving existing
-  // repeat settings when a shift is already configured.
+  // repeat settings when a shift is already configured. Defaults to
+  // "Weekly" (pre-selected, like shifts' own Repeat tab defaults to
+  // "Daily" — see `shifts/data/defaults.ts`) with Monday pre-checked so a
+  // freshly-added row isn't immediately invalid (weekly requires at least
+  // one weekday — see the `shift_repeat` superRefine in `data/schema.ts`).
   const shiftIdsKey = shiftIds.join(',')
   useEffect(() => {
     const current =
@@ -320,8 +327,9 @@ function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
       (id) =>
         current.find((r) => r.shift_id === id) ?? {
           shift_id: id,
-          frequency: 'daily' as const,
+          frequency: 'weekly' as const,
           interval: 1,
+          weekdays: ['mon'],
         }
     )
     const changed =
@@ -364,9 +372,17 @@ function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
                 control={control}
                 name={`shift_repeat.${index}`}
                 frequencyOptions={SHIFT_REPEAT_FREQUENCY_OPTIONS}
-                weekdayOptions={[]}
-                hideWeekdays
+                weekdayOptions={SHIFT_REPEAT_WEEKDAY_OPTIONS}
                 disabled={disabled}
+                monthlyFields={
+                  <RepeatMonthlyFields
+                    control={control}
+                    name={`shift_repeat.${index}`}
+                    monthlyModeOptions={SHIFT_REPEAT_MONTHLY_MODE_OPTIONS}
+                    weekdayOptions={SHIFT_REPEAT_WEEKDAY_OPTIONS}
+                    disabled={disabled}
+                  />
+                }
               />
             </div>
           )

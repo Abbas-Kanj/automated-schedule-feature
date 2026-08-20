@@ -16,7 +16,8 @@ import {
 } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
-import { calculateHours } from '../../utils'
+import { calculateHours, formatTimes } from '../../utils'
+import { ScheduleCalendarPreview } from './schedule-calendar-preview'
 
 function SummarySection({
   title,
@@ -42,16 +43,6 @@ function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
       <span className='font-medium'>{value || '—'}</span>
     </div>
   )
-}
-
-function formatTimes(
-  times: { from_time: string; to_time: string }[] | undefined,
-  formatTime: (time: string) => string
-) {
-  if (!times?.length) return '—'
-  return times
-    .map((t) => `${formatTime(t.from_time)}–${formatTime(t.to_time)}`)
-    .join(', ')
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -257,25 +248,6 @@ function RotateSummary({ values }: { values: any }) {
             />
           </div>
         )}
-
-      {pattern.length > 0 && (
-        <div className='space-y-1 border-t pt-2'>
-          {pattern.map((p) => (
-            <div
-              key={p.position}
-              className='flex items-center justify-between text-sm'
-            >
-              <span>Day {p.position}</span>
-              <span className='text-muted-foreground'>
-                {p.is_off
-                  ? 'Day off'
-                  : (shifts.find((s) => s.id === p.shift_id)?.name ??
-                    'Unassigned')}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
     </SummarySection>
   )
 }
@@ -294,6 +266,10 @@ function RegularSummary({
 
       <ShiftDefinitionSummary values={values} />
       {values.type === 'rotate' && <RotateSummary values={values} />}
+
+      <SummarySection title='Calendar preview'>
+        <ScheduleCalendarPreview values={values} />
+      </SummarySection>
 
       {endSettings && (
         <SummarySection title='Occurrence'>

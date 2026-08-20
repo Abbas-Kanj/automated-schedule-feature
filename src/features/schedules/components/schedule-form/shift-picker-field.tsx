@@ -42,7 +42,7 @@ type ShiftPickerFieldProps = {
 
 // A shift's enabled days as a "Day | Times" table, with consecutive days
 // sharing the exact same times collapsed into a single row (e.g.
-// "Mon–Fri  09:00–17:00") instead of N identical rows.
+// "Mon → Fri  09:00–17:00") instead of N identical rows.
 function ShiftDaysTable({
   days,
   formatTime,
@@ -79,7 +79,7 @@ function ShiftDaysTable({
             const label =
               first.day === lastDay.day
                 ? DAY_LABELS[first.day]
-                : `${DAY_LABELS[first.day]}–${DAY_LABELS[lastDay.day]}`
+                : `${DAY_LABELS[first.day]} → ${DAY_LABELS[lastDay.day]}`
             const times = row.days[0].times
               .map((t) => `${formatTime(t.from_time)}–${formatTime(t.to_time)}`)
               .join(', ')

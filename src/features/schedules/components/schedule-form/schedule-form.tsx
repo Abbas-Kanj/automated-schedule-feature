@@ -105,8 +105,14 @@ function getTypeDefaults(type: ScheduleType) {
   }
 }
 
+// "Never ends" is the "Start & End" step's default — pre-selected rather
+// than starting blank. `end_occurrences` gets a default too, so the "End
+// after" input isn't empty the moment it's switched to (see
+// `EndFrequencyFields`'s always-visible end-settings inputs; mirrors
+// shifts' own `repeat` defaults, see `shifts/data/defaults.ts`).
 const DEFAULT_END_SETTINGS = {
   end_type: 'never' as const,
+  end_occurrences: 1,
 }
 
 function getRegularTypeDefaults(type: RegularType) {

@@ -96,10 +96,6 @@ type RecurrenceFrequencyFieldsProps = {
   // between features (a simple day range vs. day-of-month/date-specific/
   // day-position sub-modes) that each feature still owns it.
   monthlyFields?: React.ReactNode
-  // Opt-out of the weekly "Repeat on" weekday picker entirely (label and
-  // chips) for consumers that don't need it — e.g. a rotate schedule's
-  // custom-shifts repeat rows, where only frequency + interval matter.
-  hideWeekdays?: boolean
 }
 
 // Shared "Repeat frequency" + "Repeat every" + "Repeat on" block for a
@@ -108,8 +104,10 @@ type RecurrenceFrequencyFieldsProps = {
 // (day(s)/week(s)/month(s)) — same pattern for all three, so monthly's own
 // `monthlyFields` never needs to render its own copy. "Repeat on" (the
 // weekday picker, single- or multi-select per `weeklySingleDay`) only ever
-// shows for weekly. Used by `shifts`' RepeatFields — see its own
-// monthly-specific fields, passed in via `monthlyFields`.
+// shows for weekly. Used by `shifts`' RepeatFields and schedules' rotate
+// "Custom alternate" per-shift repeat rows alike — each passes its own
+// monthly-specific fields via `monthlyFields` (typically the shared
+// `RepeatMonthlyFields`, see `@/components/repeat-monthly-fields`).
 export function RecurrenceFrequencyFields({
   control,
   name,
@@ -118,7 +116,6 @@ export function RecurrenceFrequencyFields({
   weeklySingleDay,
   disabled,
   monthlyFields,
-  hideWeekdays,
 }: RecurrenceFrequencyFieldsProps) {
   const frequency = useWatch({ control, name: `${name}.frequency` }) as
     | string
@@ -189,7 +186,7 @@ export function RecurrenceFrequencyFields({
         />
       )}
 
-      {frequency === 'weekly' && !hideWeekdays && (
+      {frequency === 'weekly' && (
         <FormField
           control={control}
           name={`${name}.weekdays`}

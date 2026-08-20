@@ -21,11 +21,13 @@ import {
   BADGE_COLORS,
   DAYS_OF_WEEK,
   SCHEDULE_ICONS,
+  SHIFT_REPEAT_WEEKDAYS,
   type CYCLE_LENGTH_UNITS,
   type CYCLE_TYPES,
   type RECURRENCE_END_TYPES,
   type REGULAR_TYPES,
   type ShiftRepeatFrequency,
+  type ShiftRepeatMonthlyMode,
 } from './schema'
 
 export const DAY_OPTIONS = DAYS_OF_WEEK.map((day) => ({
@@ -191,3 +193,34 @@ export const SHIFT_REPEAT_FREQUENCY_OPTIONS = [
   value: ShiftRepeatFrequency
   label: string
 }[]
+
+// Weekday chips + monthly sub-mode options for the "Custom alternate" per-
+// shift repeat rows (see `schedule-form/pattern-builder.tsx`'s
+// `ShiftRepeats`) — mirrors shifts' own `DAY_LABELS`/
+// `REPEAT_MONTHLY_MODE_OPTIONS` (see `shifts/data/data.ts`) since both
+// render the identical shared `RecurrenceFrequencyFields`/`RepeatMonthlyFields`.
+const SHIFT_REPEAT_DAY_LABELS: Record<
+  (typeof SHIFT_REPEAT_WEEKDAYS)[number],
+  string
+> = {
+  mon: 'Mon',
+  tue: 'Tue',
+  wed: 'Wed',
+  thu: 'Thu',
+  fri: 'Fri',
+  sat: 'Sat',
+  sun: 'Sun',
+}
+
+export const SHIFT_REPEAT_WEEKDAY_OPTIONS = SHIFT_REPEAT_WEEKDAYS.map(
+  (day) => ({
+    value: day,
+    label: SHIFT_REPEAT_DAY_LABELS[day],
+  })
+)
+
+export const SHIFT_REPEAT_MONTHLY_MODE_OPTIONS = [
+  { value: 'day_month', label: 'Day of month' },
+  { value: 'date_specific', label: 'Date specific' },
+  { value: 'day_position', label: 'Day position' },
+] satisfies { value: ShiftRepeatMonthlyMode; label: string }[]

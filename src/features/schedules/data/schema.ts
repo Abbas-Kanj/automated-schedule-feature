@@ -236,10 +236,52 @@ const rotatePatternEntrySchema = z.object({
 // length equals the plain sum of all shifts' intervals (a weekly x3 shift
 // contributes 3 cards, a daily x5 contributes 5 — no unit conversion).
 export const SHIFT_REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
+
+// Each shift's repeat row reuses `shifts`' own "Repeat" tab fields (weekday
+// picker, monthly sub-modes — see `shift-form/repeat-fields.tsx`) so the two
+// features present identical repeat UI, minus its end-frequency section
+// (end_type/end_date/end_occurrences), which doesn't apply here — the
+// pattern's own length already bounds how long each shift repeats. Kept as
+// its own copy of the weekday/monthly-mode enums rather than importing
+// `shifts`' schema pieces directly, same as `SHIFT_REPEAT_FREQUENCIES` above
+// (see CLAUDE.md — `shifts` is a standalone feature).
+export const SHIFT_REPEAT_WEEKDAYS = [
+  'mon',
+  'tue',
+  'wed',
+  'thu',
+  'fri',
+  'sat',
+  'sun',
+] as const
+const shiftRepeatWeekdaySchema = z.enum(SHIFT_REPEAT_WEEKDAYS)
+
+export const SHIFT_REPEAT_MONTHLY_MODES = [
+  'day_month',
+  'date_specific',
+  'day_position',
+] as const
+const shiftRepeatMonthlyModeSchema = z.enum(SHIFT_REPEAT_MONTHLY_MODES)
+
+const shiftRepeatDayPositionRuleSchema = z.object({
+  position: z.number().min(1).max(28),
+  weekday: shiftRepeatWeekdaySchema,
+})
+
 const shiftRepeatSchema = z.object({
   shift_id: z.string(),
   frequency: z.enum(SHIFT_REPEAT_FREQUENCIES),
   interval: z.number().min(1),
+  weekdays: z.array(shiftRepeatWeekdaySchema).optional(),
+  // Monthly only — which of the 3 sub-modes below is active.
+  monthly_mode: shiftRepeatMonthlyModeSchema.optional(),
+  // monthly_mode === 'day_month'
+  day_of_month: z.number().min(1).max(28).optional(),
+  // monthly_mode === 'date_specific'
+  date_specific_1: z.number().min(1).max(28).optional(),
+  date_specific_2: z.number().min(1).max(28).optional(),
+  // monthly_mode === 'day_position'
+  day_position_rules: z.array(shiftRepeatDayPositionRuleSchema).max(1).optional(),
 })
 
 const rotateFieldsSchema = z.object({
@@ -363,6 +405,59 @@ const regularScheduleSchema = z
             path: ['shift_repeat'],
           })
         }
+
+        // Same per-frequency requirements as shifts' own "Repeat" tab (see
+        // `repeatConfigSchema`'s superRefine in shifts/data/schema.ts),
+        // minus its end-frequency checks — not applicable here.
+        val.shift_repeat.forEach((r, i) => {
+          if (r.frequency === 'weekly' && !r.weekdays?.length) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'Select at least one day',
+              path: ['shift_repeat', i, 'weekdays'],
+            })
+          }
+
+          if (r.frequency === 'monthly') {
+            if (!r.monthly_mode) {
+              ctx.addIssue({
+                code: 'custom',
+                message: 'Select how it repeats monthly',
+                path: ['shift_repeat', i, 'monthly_mode'],
+              })
+            } else if (r.monthly_mode === 'day_month' && !r.day_of_month) {
+              ctx.addIssue({
+                code: 'custom',
+                message: 'Select the day of the month',
+                path: ['shift_repeat', i, 'day_of_month'],
+              })
+            } else if (r.monthly_mode === 'date_specific') {
+              if (!r.date_specific_1) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: 'Select the first date',
+                  path: ['shift_repeat', i, 'date_specific_1'],
+                })
+              }
+              if (!r.date_specific_2) {
+                ctx.addIssue({
+                  code: 'custom',
+                  message: 'Select the second date',
+                  path: ['shift_repeat', i, 'date_specific_2'],
+                })
+              }
+            } else if (
+              r.monthly_mode === 'day_position' &&
+              !r.day_position_rules?.length
+            ) {
+              ctx.addIssue({
+                code: 'custom',
+                message: 'Add a day-position rule',
+                path: ['shift_repeat', i, 'day_position_rules'],
+              })
+            }
+          }
+        })
       }
     }
   })
@@ -400,6 +495,8 @@ export type RecurrenceEndType = (typeof RECURRENCE_END_TYPES)[number]
 export type CycleType = (typeof CYCLE_TYPES)[number]
 export type CycleLengthUnit = (typeof CYCLE_LENGTH_UNITS)[number]
 export type ShiftRepeatFrequency = (typeof SHIFT_REPEAT_FREQUENCIES)[number]
+export type ShiftRepeatWeekday = (typeof SHIFT_REPEAT_WEEKDAYS)[number]
+export type ShiftRepeatMonthlyMode = (typeof SHIFT_REPEAT_MONTHLY_MODES)[number]
 export type RotatePatternEntry = Extract<
   RegularSchedule,
   { type: 'rotate' }
