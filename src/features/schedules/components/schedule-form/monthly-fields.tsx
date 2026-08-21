@@ -15,6 +15,8 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { ToggleButton } from '@/components/toggle-button'
 import { MONTHS } from '../../data/data'
 import { getDaysInMonthArray } from '../../utils'
 import { TimeRangeFields } from './time-range-fields'
@@ -67,7 +69,7 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
       <FormField
         control={control}
         name='months'
-        render={({ fieldState }) => (
+        render={() => (
           <FormItem>
             <FormLabel>Months</FormLabel>
             <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
@@ -77,10 +79,10 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
                   (f) => (f as unknown as { month: number }).month === monthNum
                 )
                 return (
-                  <label
+                  <Label
                     key={month.value}
                     className={cn(
-                      'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm',
+                      'cursor-pointer rounded-md border px-3 py-2 font-normal',
                       checked && 'border-primary'
                     )}
                   >
@@ -92,15 +94,11 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
                       }
                     />
                     {month.label}
-                  </label>
+                  </Label>
                 )
               })}
             </div>
-            {fieldState.error && (
-              <p className='text-destructive text-sm'>
-                {fieldState.error.message}
-              </p>
-            )}
+            <FormMessage />
           </FormItem>
         )}
       />
@@ -165,21 +163,15 @@ function MonthDaysCard({
               (f) => (f as unknown as { day: number }).day === day
             )
             return (
-              <button
+              <ToggleButton
                 key={day}
-                type='button'
+                selected={checked}
                 disabled={disabled}
                 onClick={() => toggleDay(day, !checked)}
-                className={cn(
-                  'flex size-8 items-center justify-center rounded-md border text-xs',
-                  checked
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-input',
-                  disabled && 'cursor-not-allowed'
-                )}
+                className='size-8 p-0 text-xs'
               >
                 {day}
-              </button>
+              </ToggleButton>
             )
           })}
         </div>

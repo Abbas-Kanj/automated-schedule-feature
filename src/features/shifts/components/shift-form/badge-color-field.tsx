@@ -50,15 +50,20 @@ export function BadgeColorField({
         <PopoverContent className='w-56 p-2'>
           <div className='grid grid-cols-4 gap-2'>
             {SHIFT_BADGE_COLOR_OPTIONS.map((o) => (
-              <button
+              <Button
                 key={o.value}
                 type='button'
+                variant='ghost'
+                size='icon'
                 title={o.label}
                 onClick={() => onChange(o.value)}
                 className={cn(
-                  'size-8 rounded-full ring-offset-2 transition-shadow',
+                  'size-8 rounded-full ring-offset-2 transition-shadow hover:opacity-80',
                   o.swatchClassName,
-                  value === o.value && 'ring-2 ring-ring'
+                  // The swatch IS the colour, so keep Button's hover/active
+                  // background from painting over it.
+                  'hover:bg-[unset] dark:hover:bg-[unset]',
+                  value === o.value && 'ring-ring ring-2'
                 )}
               />
             ))}

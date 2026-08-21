@@ -59,9 +59,12 @@ export const sidebarData: SidebarData = {
               ],
             },
             {
-              title: 'Shifts',
+              title: 'Shift management',
               icon: Timer,
-              url: '/shifts',
+              items: [
+                { title: 'Shifts', url: '/shifts' },
+                { title: 'Shift policies', url: '/shift-policies' },
+              ],
             },
           ],
         },

@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { SelectDropdown } from '@/components/select-dropdown'
+import { ToggleButton } from '@/components/toggle-button'
 import { MONTHS } from '../../data/data'
 import { type DayOfWeek } from '../../data/schema'
 import { getDaysOfMonth } from '../../utils'
@@ -143,22 +144,18 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
                 (r) => r.date_str === d.date_str
               )
               return (
-                <button
+                <ToggleButton
                   key={d.date_str}
-                  type='button'
+                  selected={inRange}
                   disabled={disabled}
                   onClick={() => handleSelectStart(d.date_str)}
                   className={cn(
-                    'rounded-md border p-2 text-sm transition-colors',
-                    inRange
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'hover:bg-accent',
-                    isStart && 'ring-primary ring-2 ring-offset-1',
-                    disabled && 'cursor-not-allowed'
+                    'h-9 w-full px-1 text-sm',
+                    isStart && 'ring-primary ring-2 ring-offset-1'
                   )}
                 >
                   {format(d.date, 'd')}
-                </button>
+                </ToggleButton>
               )
             })}
           </div>
@@ -182,21 +179,15 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
           </FormLabel>
           <div className='flex gap-2'>
             {Array.from({ length: 7 }, (_, i) => i + 1).map((length) => (
-              <button
+              <ToggleButton
                 key={length}
-                type='button'
+                selected={length === selectedRangeDays.length}
                 disabled={disabled || length > maxLength}
                 onClick={() => handleSelectLength(length)}
-                className={cn(
-                  'h-8 w-8 rounded-md border text-sm transition-colors',
-                  length === selectedRangeDays.length
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'hover:bg-accent disabled:hover:bg-transparent',
-                  length > maxLength && 'cursor-not-allowed opacity-40'
-                )}
+                className='size-8 p-0 text-sm'
               >
                 {length}
-              </button>
+              </ToggleButton>
             ))}
           </div>
         </FormItem>
@@ -206,7 +197,7 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
         <FormField
           control={control}
           name='days'
-          render={({ fieldState }) => (
+          render={() => (
             <FormItem>
               <FormLabel>Days</FormLabel>
               <div className='grid gap-3 sm:grid-cols-2'>
@@ -252,11 +243,7 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
                   )
                 })}
               </div>
-              {fieldState.error && (
-                <p className='text-destructive text-sm'>
-                  {fieldState.error.message}
-                </p>
-              )}
+              <FormMessage />
             </FormItem>
           )}
         />

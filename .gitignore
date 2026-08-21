@@ -52,3 +52,6 @@ bridge/agents/*/pending/*
 # Vitest artifacts (browser screenshots/attachments)
 **/__screenshots__/
 .vitest-attachments/
+
+# TanStack Router plugin scratch output (generated)
+.tanstack

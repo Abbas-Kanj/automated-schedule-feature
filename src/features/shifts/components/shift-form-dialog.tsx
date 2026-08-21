@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { type Resolver, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { generateId } from '@/lib/id'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,7 +18,7 @@ import { emptyShiftFormValues } from '../data/defaults'
 import { type Shift, type ShiftFormValues, shiftFormSchema } from '../data/schema'
 import { useDeriveShortCode } from '../hooks/use-derive-short-code'
 import { useShiftsStore } from '../stores/shifts-store'
-import { generateId, normalizeShiftFormValues } from '../utils'
+import { normalizeShiftFormValues } from '../utils'
 import { ShiftFormTabs } from './shift-form/shift-form-tabs'
 
 type ShiftFormDialogProps = {

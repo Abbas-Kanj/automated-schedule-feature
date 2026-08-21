@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { create } from 'zustand'
 import { defaultShifts } from '../data/shifts'
 import { type Shift, shiftSchema } from '../data/schema'
-import { deriveShortCode, generateId } from '../utils'
+import { generateId } from '@/lib/id'
+import { deriveShortCode } from '../utils'
 
 const STORAGE_KEY = 'shifts'
 

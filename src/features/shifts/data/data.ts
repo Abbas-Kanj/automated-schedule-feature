@@ -22,11 +22,9 @@ import {
   SHIFT_BADGE_COLORS,
   type SHIFT_CATEGORIES,
   SHIFT_ICONS,
-  type SHIFT_POLICY_TYPES,
   type SHIFT_STATUSES,
   type SHIFT_TIME_SLOT_TYPES,
   type SHIFT_TYPES,
-  type ShiftPolicyType,
 } from './schema'
 
 // Tailwind's JIT scanner needs static class strings, so these can't be built
@@ -136,88 +134,17 @@ export const SHIFT_TIME_SLOT_TYPE_OPTIONS: {
   { value: 'overtime', label: 'Overtime' },
 ]
 
-// Mirrors `schedules`' POLICY_TYPE_OPTIONS/POLICY_DETAILS — its own copy
-// since `shifts` is a standalone feature (see CLAUDE.md).
-export const SHIFT_POLICY_TYPE_OPTIONS = (
-  ['standard', 'flexible', 'strict'] satisfies (typeof SHIFT_POLICY_TYPES)[number][]
-).map((value) => ({
-  value,
-  label: value.charAt(0).toUpperCase() + value.slice(1),
-}))
-
-export type ShiftPolicyDetail = {
-  summary: string
-  sections: { title: string; content: string }[]
-}
-
-export const SHIFT_POLICY_DETAILS: Record<ShiftPolicyType, ShiftPolicyDetail> = {
-  standard: {
-    summary: 'Default working hours and leave rules for most shifts.',
-    sections: [
-      {
-        title: 'Overview',
-        content:
-          'Applies the organization’s default working-hours and leave rules. Best suited for shifts that don’t need a custom arrangement.',
-      },
-      {
-        title: 'Attendance rules',
-        content:
-          'Clock-in/clock-out is expected within a 15-minute grace window of the shift time. Repeated late arrivals are flagged for manager review.',
-      },
-      {
-        title: 'Leave & exceptions',
-        content:
-          'Standard annual/sick leave accrual applies. Public holidays and approved sick leave are automatically excluded from the shift.',
-      },
-    ],
-  },
-  flexible: {
-    summary: 'Allows flexible start/end times within core working hours.',
-    sections: [
-      {
-        title: 'Overview',
-        content:
-          'Employees can shift their start and end times as long as they cover the defined core hours and meet their total shift length.',
-      },
-      {
-        title: 'Attendance rules',
-        content:
-          'No fixed clock-in time is enforced outside of core hours. Total hours worked are still tracked against the shift length.',
-      },
-      {
-        title: 'Leave & exceptions',
-        content:
-          'Leave and public-holiday exceptions still apply, but employees may make up missed core-hour time within the same week.',
-      },
-    ],
-  },
-  strict: {
-    summary: 'Enforces exact clock-in/clock-out times with no tolerance.',
-    sections: [
-      {
-        title: 'Overview',
-        content:
-          'Used for shifts with hard coverage requirements (e.g. front desk, security). Times are enforced exactly as scheduled.',
-      },
-      {
-        title: 'Attendance rules',
-        content:
-          'No grace window — clock-in/clock-out outside the scheduled time is logged as an exception and requires manager approval.',
-      },
-      {
-        title: 'Leave & exceptions',
-        content:
-          'Public holidays and approved sick leave are excluded automatically; all other absences must be pre-approved before the shift.',
-      },
-    ],
-  },
-}
-
+// "Monthly" stays visible but unselectable for now — see the matching note
+// on `CYCLE_LENGTH_UNIT_OPTIONS` in `schedules/data/data.ts`.
 export const REPEAT_FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Days' },
   { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-] satisfies { value: (typeof REPEAT_FREQUENCIES)[number]; label: string }[]
+  { value: 'monthly', label: 'Monthly', disabled: true },
+] satisfies {
+  value: (typeof REPEAT_FREQUENCIES)[number]
+  label: string
+  disabled?: boolean
+}[]
 
 export const REPEAT_END_TYPE_OPTIONS = [
   { value: 'never', label: 'Never ends' },
@@ -271,8 +198,7 @@ export const DAY_LABELS: Record<(typeof DAYS_OF_WEEK)[number], string> = {
 
 // The IANA time zone the browser is currently running in — used for the
 // "Local" radio option in the timezone field.
-export const LOCAL_TIMEZONE =
-  Intl.DateTimeFormat().resolvedOptions().timeZone
+export const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
 
 // The "Global" radio option's dropdown. `Intl.supportedValuesOf` covers
 // every modern evergreen browser target this app ships to, but the

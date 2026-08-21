@@ -27,7 +27,7 @@ function makeShift(overrides: Partial<Shift> & Pick<Shift, 'id' | 'name'>): Shif
     breaks: [],
     description: undefined,
     is_active: true,
-    policy_type: undefined,
+    policy_ids: [],
     status: 'confirmed',
     time_slot_type: 'regular',
     repeat_enabled: false,

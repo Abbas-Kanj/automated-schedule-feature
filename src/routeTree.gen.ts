@@ -34,6 +34,7 @@ import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_auth
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
+import { Route as AuthenticatedShiftPoliciesIndexRouteImport } from './routes/_authenticated/shift-policies/index'
 import { Route as AuthenticatedShiftsIndexRouteImport } from './routes/_authenticated/shifts/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
@@ -176,6 +177,12 @@ const AuthenticatedSettingsNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedShiftPoliciesIndexRoute =
+  AuthenticatedShiftPoliciesIndexRouteImport.update({
+    id: '/shift-policies/',
+    path: '/shift-policies/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedShiftsIndexRoute =
   AuthenticatedShiftsIndexRouteImport.update({
     id: '/shifts/',
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/shift-policies/': typeof AuthenticatedShiftPoliciesIndexRoute
   '/shifts/': typeof AuthenticatedShiftsIndexRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
@@ -292,6 +300,7 @@ export interface FileRoutesByTo {
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/schedules': typeof AuthenticatedSchedulesIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/shift-policies': typeof AuthenticatedShiftPoliciesIndexRoute
   '/shifts': typeof AuthenticatedShiftsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
@@ -330,6 +339,7 @@ export interface FileRoutesById {
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/shift-policies/': typeof AuthenticatedShiftPoliciesIndexRoute
   '/_authenticated/shifts/': typeof AuthenticatedShiftsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
@@ -366,6 +376,7 @@ export interface FileRouteTypes {
     | '/help-center/'
     | '/schedules/'
     | '/settings/'
+    | '/shift-policies/'
     | '/shifts/'
     | '/tasks/'
     | '/users/'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/help-center'
     | '/schedules'
     | '/settings'
+    | '/shift-policies'
     | '/shifts'
     | '/tasks'
     | '/users'
@@ -436,6 +448,7 @@ export interface FileRouteTypes {
     | '/_authenticated/help-center/'
     | '/_authenticated/schedules/'
     | '/_authenticated/settings/'
+    | '/_authenticated/shift-policies/'
     | '/_authenticated/shifts/'
     | '/_authenticated/tasks/'
     | '/_authenticated/users/'
@@ -636,6 +649,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/shift-policies/': {
+      id: '/_authenticated/shift-policies/'
+      path: '/shift-policies'
+      fullPath: '/shift-policies/'
+      preLoaderRoute: typeof AuthenticatedShiftPoliciesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/shifts/': {
       id: '/_authenticated/shifts/'
       path: '/shifts'
@@ -740,6 +760,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedSchedulesIndexRoute: typeof AuthenticatedSchedulesIndexRoute
+  AuthenticatedShiftPoliciesIndexRoute: typeof AuthenticatedShiftPoliciesIndexRoute
   AuthenticatedShiftsIndexRoute: typeof AuthenticatedShiftsIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
@@ -757,6 +778,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedSchedulesIndexRoute: AuthenticatedSchedulesIndexRoute,
+  AuthenticatedShiftPoliciesIndexRoute: AuthenticatedShiftPoliciesIndexRoute,
   AuthenticatedShiftsIndexRoute: AuthenticatedShiftsIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
