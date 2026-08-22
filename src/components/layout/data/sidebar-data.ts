@@ -1,11 +1,13 @@
 import {
   CalendarClock,
+  CalendarDays,
   AudioWaveform,
   Clock,
   Command,
   GalleryVerticalEnd,
   ShoppingCart,
   Timer,
+  Users,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -67,6 +69,16 @@ export const sidebarData: SidebarData = {
               ],
             },
           ],
+        },
+        {
+          title: 'Employees',
+          url: '/employees-list',
+          icon: Users,
+        },
+        {
+          title: 'Holidays',
+          url: '/official-holidays',
+          icon: CalendarDays,
         },
         {
           title: 'POS',
