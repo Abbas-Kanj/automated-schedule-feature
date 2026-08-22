@@ -251,23 +251,47 @@ a genuine missing-import that `tsc -b` caught.
 - Tests now **161 passed / 3 failed** — the 3 are still the unowned,
   pre-existing `search-provider.test.tsx` failures.
 
+## Session state (2026-08-22, later)
+
+- **Pulled three screens over from the sibling `../schedule-feature`
+  checkout** (`7e3450a`, same owner, different repo, branch `mahmoud-main`):
+  `employees` (add/edit form, sidebar tabs), `employees-list` (table over
+  seeded JSON) and `official-holidays` (per-year records, open-year
+  seeding, bulk delete, faceted filter). Routes at `/employees`,
+  `/employees-list`, `/official-holidays`; sidebar gained **Employees**
+  and **Holidays**. No new dependencies — the two repos' deps are
+  identical and every shared module these import is byte-identical.
+  → Full state, the porting fixes, and two open calls (no persistence /
+  no zustand; both tables bypass the shared `DataTable`):
+  `.claude/handoff/employees-and-holidays-screens.md`
+- **Shipped as two commits pushed to `main`**: `efb71a0` (the
+  shift-policies UI batch that had been sitting uncommitted — 24-hour rule
+  times, policy search dropdown, shift `start_date`) and `7e3450a` (the
+  three screens above).
+- `npm run build` clean; tests 164 passed / 3 failed (still only the
+  pre-existing `search-provider.test.tsx` failures). **Neither batch has
+  been verified in a real browser.**
+
 ## Pick up here next session
 
-1. **Click through the schedule form** — the `ToggleButton` conversions in
+1. **Click through the three newly-pulled screens** (`/employees`,
+   `/employees-list`, `/official-holidays`) — ported, typechecked and
+   linted, but never opened in a browser here.
+2. **Click through the schedule form** — the `ToggleButton` conversions in
    the weekday / month-day / cycle-length / calendar grids shipped without
    a browser check (see `.claude/handoff/shift-policies.md`).
-2. Decide on the repo-wide Prettier normalization — still open, and still
+3. Decide on the repo-wide Prettier normalization — still open, and still
    its own commit if it happens (running `prettier --write` on an
    untouched HEAD file reorders unrelated Tailwind classes).
-3. Authenticate mem0 with a **correct** key (`m0-...` format, from
+4. Authenticate mem0 with a **correct** key (`m0-...` format, from
    https://app.mem0.ai/dashboard/api-keys) via `mem0 init --api-key <key>`,
    then run the Step 1 cross-project search before other work.
-4. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
+5. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
    surfaced by graphify (`shadcn-admin.netlify.app` vs. the real GitHub
    Pages deploy target).
-5. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
+6. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
    remove the references to it in `ARCHITECTURE.md`/`FEATURE_MAPPING.md`.
    `docs/ARCHITECTURE.md` / `FEATURE_MAPPING.md` also predate
    `shift-policies` and the shared `DataTable`.
-6. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
+7. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
    work — not needed for anything done so far.
