@@ -10,18 +10,18 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { shiftSchema } from '../data/schema'
+import { type Shift } from '../data/schema'
 import { useShiftsStore } from '../stores/shifts-store'
 import { useShifts } from './shifts-provider'
 
-type DataTableRowActionsProps<TData> = {
-  row: Row<TData>
+type DataTableRowActionsProps = {
+  row: Row<Shift>
 }
 
-export function DataTableRowActions<TData>({
-  row,
-}: DataTableRowActionsProps<TData>) {
-  const shift = shiftSchema.parse(row.original)
+// `row.original` is already a validated `Shift` — the store parses on load
+// (see `shifts-store.ts`), so this doesn't re-run the schema per render.
+export function DataTableRowActions({ row }: DataTableRowActionsProps) {
+  const shift = row.original
   const { setOpen, setCurrentRow } = useShifts()
   const cloneShift = useShiftsStore((s) => s.cloneShift)
 
@@ -65,7 +65,7 @@ export function DataTableRowActions<TData>({
             setOpen('policy')
           }}
         >
-          Modify Policy
+          Modify policies
           <DropdownMenuShortcut>
             <Shield size={16} />
           </DropdownMenuShortcut>

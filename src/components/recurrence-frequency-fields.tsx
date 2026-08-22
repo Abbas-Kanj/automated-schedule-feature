@@ -1,5 +1,4 @@
 import { type Control, useWatch } from 'react-hook-form'
-import { cn } from '@/lib/utils'
 import {
   FormControl,
   FormField,
@@ -15,8 +14,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ToggleButton } from '@/components/toggle-button'
 
-export type RecurrenceOption = { value: string; label: string }
+// `disabled` greys the option out while leaving it visible — used for
+// frequencies that aren't supported yet (see the "Monthly" entries in
+// `schedules/data/data.ts` and `shifts/data/data.ts`).
+export type RecurrenceOption = {
+  value: string
+  label: string
+  disabled?: boolean
+}
 
 type RecurrenceWeekdayChipsProps = {
   options: RecurrenceOption[]
@@ -57,21 +64,15 @@ export function RecurrenceWeekdayChips({
       {options.map((day) => {
         const checked = selected.includes(day.value)
         return (
-          <button
+          <ToggleButton
             key={day.value}
-            type='button'
-            disabled={disabled}
+            selected={checked}
+            disabled={disabled || day.disabled}
             onClick={() => toggle(day.value)}
-            className={cn(
-              'rounded-md border p-2 text-xs transition-colors',
-              checked
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'hover:bg-accent',
-              disabled && 'cursor-not-allowed opacity-50'
-            )}
+            className='h-9 w-full px-1 text-xs'
           >
             {day.label}
-          </button>
+          </ToggleButton>
         )
       })}
     </div>
@@ -118,8 +119,7 @@ export function RecurrenceFrequencyFields({
   monthlyFields,
 }: RecurrenceFrequencyFieldsProps) {
   const frequency = useWatch({ control, name: `${name}.frequency` }) as
-    | string
-    | undefined
+    string | undefined
 
   return (
     <div className='space-y-3'>
@@ -131,7 +131,21 @@ export function RecurrenceFrequencyFields({
             <FormLabel>Repeat frequency</FormLabel>
             <Select
               value={field.value}
-              onValueChange={field.onChange}
+              // Radix Select keeps a hidden native <select> for form
+              // participation, and re-emits its value back through
+              // `onValueChange` whenever it syncs. When the value goes from
+              // undefined to a *programmatically* set one (rotate's
+              // "Custom alternate" writes `frequency: 'weekly'` into a
+              // freshly-created `shift_repeat` row — see
+              // `pattern-builder.tsx`'s `ShiftRepeats`), that hidden select
+              // hasn't got a matching <option> yet, so it bounces back an
+              // empty string and wipes the default a frame later. A real
+              // user pick is never empty (there's no clear affordance), so
+              // dropping empty values is safe.
+              onValueChange={(value) => {
+                if (!value) return
+                field.onChange(value)
+              }}
               disabled={disabled}
             >
               <FormControl>
@@ -141,7 +155,11 @@ export function RecurrenceFrequencyFields({
               </FormControl>
               <SelectContent>
                 {frequencyOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    disabled={option.disabled}
+                  >
                     {option.label}
                   </SelectItem>
                 ))}
@@ -172,7 +190,7 @@ export function RecurrenceFrequencyFields({
                     onChange={(e) => field.onChange(e.target.valueAsNumber)}
                   />
                 </FormControl>
-                <span className='text-muted-foreground text-sm'>
+                <span className='text-sm text-muted-foreground'>
                   {frequency === 'daily'
                     ? 'day(s)'
                     : frequency === 'weekly'

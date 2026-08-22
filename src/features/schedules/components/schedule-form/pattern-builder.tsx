@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
+import { GripVerticalIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -16,9 +18,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { SelectDropdown } from '@/components/select-dropdown'
 import { RecurrenceFrequencyFields } from '@/components/recurrence-frequency-fields'
 import { RepeatMonthlyFields } from '@/components/repeat-monthly-fields'
+import { SelectDropdown } from '@/components/select-dropdown'
 import {
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_COMPONENTS,
@@ -44,18 +46,14 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, getValues, setValue } = useFormContext<any>()
   const shifts = useShiftsStore((s) => s.shifts)
-  const shiftIds = (useWatch({ control, name: 'shift_ids' }) as
-    | string[]
-    | undefined) ?? []
+  const shiftIds =
+    (useWatch({ control, name: 'shift_ids' }) as string[] | undefined) ?? []
   const cycleLength = useWatch({ control, name: 'cycle_length' }) as
-    | { unit: string; days: number }
-    | undefined
+    { unit: string; days: number } | undefined
   const cycleType = useWatch({ control, name: 'cycle_type' }) as
-    | string
-    | undefined
+    string | undefined
   const shiftRepeatRaw = useWatch({ control, name: 'shift_repeat' }) as
-    | ShiftRepeat[]
-    | undefined
+    ShiftRepeat[] | undefined
   const shiftRepeat = useMemo(() => shiftRepeatRaw ?? [], [shiftRepeatRaw])
 
   const isCustomShifts = cycleType === 'custom_shifts'
@@ -103,7 +101,10 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
 
     const expectedCounts = new Map<string, number>()
     for (const r of shiftRepeat) {
-      expectedCounts.set(r.shift_id, (expectedCounts.get(r.shift_id) ?? 0) + r.interval)
+      expectedCounts.set(
+        r.shift_id,
+        (expectedCounts.get(r.shift_id) ?? 0) + r.interval
+      )
     }
 
     const current =
@@ -117,7 +118,9 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     const alreadyMatches =
       current.length === totalPatternLength &&
       expectedCounts.size === currentCounts.size &&
-      [...expectedCounts].every(([id, count]) => currentCounts.get(id) === count)
+      [...expectedCounts].every(
+        ([id, count]) => currentCounts.get(id) === count
+      )
     if (alreadyMatches) return
 
     const next: RotatePatternEntry[] = []
@@ -145,7 +148,9 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     <div className='space-y-4'>
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>
-          <CardTitle className='text-base font-semibold'>Create pattern</CardTitle>
+          <CardTitle className='text-base font-semibold'>
+            Create pattern
+          </CardTitle>
         </CardHeader>
         <CardContent className='space-y-3 px-4'>
           <FormField
@@ -172,7 +177,9 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       {!isCustomShifts && (
         <Card className='gap-3 py-4'>
           <CardHeader className='px-4'>
-            <CardTitle className='text-base font-semibold'>Cycle length</CardTitle>
+            <CardTitle className='text-base font-semibold'>
+              Cycle length
+            </CardTitle>
           </CardHeader>
           <CardContent className='space-y-3 px-4'>
             <FormField
@@ -196,7 +203,7 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                           shouldDirty: true,
                         })
                       } else if (!cycleLength?.days) {
-                        setValue('cycle_length.days', 7, {
+                        setValue('cycle_length.days', 6, {
                           shouldValidate: true,
                           shouldDirty: true,
                         })
@@ -219,10 +226,9 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                   <FormItem>
                     <FormLabel>Cycle length (days)</FormLabel>
                     <FormControl>
-                      <input
+                      <Input
                         type='number'
                         min={1}
-                        className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
                         disabled={disabled}
                         value={field.value ?? ''}
                         onChange={(e) => field.onChange(e.target.valueAsNumber)}
@@ -258,7 +264,7 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                 name='cycle_length.days'
                 render={({ field }) => {
                   const isMonthly = cycleLength?.unit === 'monthly'
-                  const multiplier = isMonthly ? 30 : 7
+                  const multiplier = isMonthly ? 30 : 6
                   const count = field.value
                     ? Math.round(field.value / multiplier)
                     : ''
@@ -268,10 +274,9 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                         Cycle length ({isMonthly ? 'month(s)' : 'week(s)'})
                       </FormLabel>
                       <FormControl>
-                        <input
+                        <Input
                           type='number'
                           min={1}
-                          className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
                           disabled={disabled}
                           value={count}
                           onChange={(e) => {
@@ -399,11 +404,9 @@ function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
                   )}
                 />
                 {Icon && (
-                  <Icon className='text-muted-foreground size-4 shrink-0' />
+                  <Icon className='size-4 shrink-0 text-muted-foreground' />
                 )}
-                <p className='text-sm font-medium'>
-                  {shift?.name ?? 'Shift'}
-                </p>
+                <p className='text-sm font-medium'>{shift?.name ?? 'Shift'}</p>
               </div>
               <RecurrenceFrequencyFields
                 control={control}
@@ -515,6 +518,20 @@ function usePatternReorder() {
 
 type PatternReorder = ReturnType<typeof usePatternReorder>
 
+// Drag-to-reorder is only discoverable by trying it, so say so out loud
+// wherever the draggable cards render (inline grid and the per-month
+// dialog alike). Only shown when the cards are actually draggable —
+// "Rotate pattern" mode uses per-day dropdowns instead, and a read-only
+// form can't reorder anything.
+function PatternDragHint() {
+  return (
+    <p className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+      <GripVerticalIcon className='size-3.5 shrink-0' />
+      Drag and drop a day card to move it
+    </p>
+  )
+}
+
 function PatternDayGrid({
   fields,
   shiftOptions,
@@ -530,17 +547,20 @@ function PatternDayGrid({
   // directly.
   if (!isMonthly) {
     return (
-      <div className='grid grid-cols-3 gap-2 sm:grid-cols-7'>
-        {fields.map((field, index) => (
-          <PatternDayCard
-            key={field.id}
-            index={index}
-            shiftOptions={shiftOptions}
-            disabled={disabled}
-            isCustomShifts={isCustomShifts}
-            reorder={reorder}
-          />
-        ))}
+      <div className='space-y-2'>
+        {isCustomShifts && !disabled && <PatternDragHint />}
+        <div className='grid grid-cols-3 gap-2 sm:grid-cols-7'>
+          {fields.map((field, index) => (
+            <PatternDayCard
+              key={field.id}
+              index={index}
+              shiftOptions={shiftOptions}
+              disabled={disabled}
+              isCustomShifts={isCustomShifts}
+              reorder={reorder}
+            />
+          ))}
+        </div>
       </div>
     )
   }
@@ -556,25 +576,25 @@ function PatternDayGrid({
       return { index: i, start, end }
     }
   )
-  const openMonth =
-    openMonthIndex != null ? months[openMonthIndex] : undefined
+  const openMonth = openMonthIndex != null ? months[openMonthIndex] : undefined
 
   return (
     <>
       <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
         {months.map((month) => (
-          <button
+          <Button
             key={month.index}
             type='button'
+            variant='outline'
             onClick={() => setOpenMonthIndex(month.index)}
             disabled={disabled}
-            className='flex flex-col items-center justify-center gap-0.5 rounded-md border px-3 py-4 text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60'
+            className='h-auto flex-col gap-0.5 px-3 py-4 text-sm'
           >
             <span className='font-medium'>Month {month.index + 1}</span>
             <span className='text-xs text-muted-foreground'>
               Days {month.start + 1}–{month.end}
             </span>
-          </button>
+          </Button>
         ))}
       </div>
       <Dialog
@@ -588,17 +608,22 @@ function PatternDayGrid({
             </DialogTitle>
           </DialogHeader>
           {openMonth && (
-            <div className='grid max-h-[65vh] grid-cols-3 gap-2 overflow-y-auto pe-1 sm:grid-cols-7'>
-              {fields.slice(openMonth.start, openMonth.end).map((field, i) => (
-                <PatternDayCard
-                  key={field.id}
-                  index={openMonth.start + i}
-                  shiftOptions={shiftOptions}
-                  disabled={disabled}
-                  isCustomShifts={isCustomShifts}
-                  reorder={reorder}
-                />
-              ))}
+            <div className='space-y-2'>
+              {isCustomShifts && !disabled && <PatternDragHint />}
+              <div className='grid max-h-[65vh] grid-cols-3 gap-2 overflow-y-auto pe-1 sm:grid-cols-7'>
+                {fields
+                  .slice(openMonth.start, openMonth.end)
+                  .map((field, i) => (
+                    <PatternDayCard
+                      key={field.id}
+                      index={openMonth.start + i}
+                      shiftOptions={shiftOptions}
+                      disabled={disabled}
+                      isCustomShifts={isCustomShifts}
+                      reorder={reorder}
+                    />
+                  ))}
+              </div>
             </div>
           )}
         </DialogContent>
@@ -628,8 +653,7 @@ function PatternDayCard({
   const shifts = useShiftsStore((s) => s.shifts)
   const isOff = useWatch({ control, name: `pattern.${index}.is_off` })
   const shiftId = useWatch({ control, name: `pattern.${index}.shift_id` }) as
-    | string
-    | undefined
+    string | undefined
   const value = !isOff && shiftId ? shiftId : 'off'
   const items = [{ value: 'off', label: 'Off' }, ...shiftOptions]
 
@@ -663,7 +687,8 @@ function PatternDayCard({
           e.preventDefault()
           e.dataTransfer.dropEffect = 'move'
           const rect = e.currentTarget.getBoundingClientRect()
-          const side = e.clientX - rect.left < rect.width / 2 ? 'before' : 'after'
+          const side =
+            e.clientX - rect.left < rect.width / 2 ? 'before' : 'after'
           reorder.hover(index, side)
         }}
         onDrop={(e) => {

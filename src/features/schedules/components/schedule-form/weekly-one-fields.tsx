@@ -1,7 +1,12 @@
 import { useFieldArray, useFormContext } from 'react-hook-form'
-import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FormField, FormItem, FormLabel } from '@/components/ui/form'
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { ToggleButton } from '@/components/toggle-button'
 import { type DayOfWeek } from '../../data/schema'
 import { TimeRangeFields } from './time-range-fields'
 
@@ -40,7 +45,7 @@ export function WeeklyOneFields({ disabled }: WeeklyOneFieldsProps) {
       <FormField
         control={control}
         name='days'
-        render={({ fieldState }) => (
+        render={() => (
           <FormItem>
             <FormLabel>Days</FormLabel>
             <div className='grid grid-cols-7 gap-1 text-center'>
@@ -49,29 +54,19 @@ export function WeeklyOneFields({ disabled }: WeeklyOneFieldsProps) {
                   (f) => (f as unknown as { day: string }).day === day
                 )
                 return (
-                  <button
+                  <ToggleButton
                     key={day}
-                    type='button'
+                    selected={checked}
                     disabled={disabled}
                     onClick={() => toggleDay(day, !checked)}
-                    className={cn(
-                      'rounded-md border p-2 text-sm capitalize transition-colors',
-                      checked
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'hover:bg-accent',
-                      disabled && 'cursor-not-allowed'
-                    )}
+                    className='h-9 w-full px-1 text-sm capitalize'
                   >
                     {day.slice(0, 3)}
-                  </button>
+                  </ToggleButton>
                 )
               })}
             </div>
-            {fieldState.error && (
-              <p className='text-destructive text-sm'>
-                {fieldState.error.message}
-              </p>
-            )}
+            <FormMessage />
           </FormItem>
         )}
       />

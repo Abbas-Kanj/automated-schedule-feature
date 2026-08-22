@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 import { CheckIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useTimeFormat } from '@/lib/time-format'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -13,22 +13,18 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { ShiftDaysTable } from '@/features/shifts/components/shift-days-table'
 import { ShiftFormDialog } from '@/features/shifts/components/shift-form-dialog'
 import {
-  DAY_LABELS,
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_COMPONENTS,
 } from '@/features/shifts/data/data'
-import { type DayTimeEntry, type Shift } from '@/features/shifts/data/schema'
+import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 
 type ShiftPickerFieldProps = {
@@ -38,66 +34,6 @@ type ShiftPickerFieldProps = {
   // fine with just one. Purely a UI hint — the real gate is the schema's
   // own superRefine on `shift_ids` (see `data/schema.ts`).
   minSelection?: number
-}
-
-// A shift's enabled days as a "Day | Times" table, with consecutive days
-// sharing the exact same times collapsed into a single row (e.g.
-// "Mon → Fri  09:00–17:00") instead of N identical rows.
-function ShiftDaysTable({
-  days,
-  formatTime,
-}: {
-  days: DayTimeEntry[]
-  formatTime: (time: string) => string
-}) {
-  const rows: { days: DayTimeEntry[]; key: string }[] = []
-  for (const day of days) {
-    const key = day.times
-      .map((t) => `${t.from_time}–${t.to_time}`)
-      .join(', ')
-    const last = rows[rows.length - 1]
-    if (last && last.key === key) {
-      last.days.push(day)
-    } else {
-      rows.push({ days: [day], key })
-    }
-  }
-
-  return (
-    <div className='overflow-hidden rounded-md border'>
-      <Table>
-        <TableHeader>
-          <TableRow className='hover:bg-transparent'>
-            <TableHead className='h-8'>Day</TableHead>
-            <TableHead className='h-8'>Times</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row, i) => {
-            const first = row.days[0]
-            const lastDay = row.days[row.days.length - 1]
-            const label =
-              first.day === lastDay.day
-                ? DAY_LABELS[first.day]
-                : `${DAY_LABELS[first.day]} → ${DAY_LABELS[lastDay.day]}`
-            const times = row.days[0].times
-              .map((t) => `${formatTime(t.from_time)}–${formatTime(t.to_time)}`)
-              .join(', ')
-            return (
-              <TableRow key={i} className='hover:bg-transparent'>
-                <TableCell className='py-1.5 text-muted-foreground whitespace-nowrap'>
-                  {label}
-                </TableCell>
-                <TableCell className='py-1.5 whitespace-normal text-muted-foreground'>
-                  {times}
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
-    </div>
-  )
 }
 
 export function ShiftPickerField({
@@ -111,8 +47,7 @@ export function ShiftPickerField({
   const formatTime = useTimeFormat()
 
   const selectedIds = useWatch({ control, name: 'shift_ids' }) as
-    | string[]
-    | undefined
+    string[] | undefined
 
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -240,18 +175,16 @@ export function ShiftPickerField({
                               (o) => o.value === shift.badge_color
                             )
                             return (
-                              <button
+                              <Button
                                 key={shift.id}
                                 type='button'
+                                variant='ghost'
                                 onClick={() =>
                                   selectShift(shift.id, field.onChange)
                                 }
                                 disabled={disabled}
                                 className={cn(
-                                  'flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left transition-colors',
-                                  disabled
-                                    ? 'cursor-not-allowed opacity-60'
-                                    : 'cursor-pointer hover:bg-accent',
+                                  'h-auto w-full justify-start gap-3 rounded-sm px-3 py-2 text-start font-normal',
                                   isSelected && 'bg-primary/5'
                                 )}
                               >
@@ -275,7 +208,7 @@ export function ShiftPickerField({
                                 {isSelected && (
                                   <CheckIcon className='size-4 shrink-0 text-primary' />
                                 )}
-                              </button>
+                              </Button>
                             )
                           })}
                         </div>
@@ -345,7 +278,9 @@ export function ShiftPickerField({
                               size='icon'
                               className='shrink-0'
                               disabled={disabled}
-                              onClick={() => removeShift(shift.id, field.onChange)}
+                              onClick={() =>
+                                removeShift(shift.id, field.onChange)
+                              }
                               title={`Remove ${shift.name}`}
                             >
                               <XIcon className='size-4' />

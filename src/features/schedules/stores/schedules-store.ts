@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { create } from 'zustand'
 import { defaultSchedules } from '../data/schedules'
 import { type Schedule, scheduleSchema } from '../data/schema'
-import { generateId } from '../utils'
+import { generateId } from '@/lib/id'
 
 const STORAGE_KEY = 'schedules'
 

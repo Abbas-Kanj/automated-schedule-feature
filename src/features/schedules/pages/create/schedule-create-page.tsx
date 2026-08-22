@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { generateId } from '@/lib/id'
 import { Button } from '@/components/ui/button'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
@@ -11,7 +12,6 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { ScheduleForm } from '../../components/schedule-form/schedule-form'
 import { type Schedule } from '../../data/schema'
 import { useSchedulesStore } from '../../stores/schedules-store'
-import { generateId } from '../../utils'
 
 export function ScheduleCreatePage() {
   const navigate = useNavigate()

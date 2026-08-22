@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { toMinutes } from '@/lib/time'
 
 export const SHIFT_BADGE_COLORS = [
   'red',
@@ -57,12 +58,6 @@ const shiftTimezoneModeSchema = z.enum(SHIFT_TIMEZONE_MODES)
 export const SHIFT_HOURS_MODES = ['same', 'different'] as const
 const shiftHoursModeSchema = z.enum(SHIFT_HOURS_MODES)
 
-// Mirrors `schedules`' policy_type (see `schedules/data/schema.ts`) — kept
-// as its own copy rather than a shared import since `shifts` is a
-// standalone feature (see CLAUDE.md).
-export const SHIFT_POLICY_TYPES = ['standard', 'flexible', 'strict'] as const
-const shiftPolicyTypeSchema = z.enum(SHIFT_POLICY_TYPES)
-
 export const SHIFT_STATUSES = ['tentative', 'published', 'confirmed'] as const
 const shiftStatusSchema = z.enum(SHIFT_STATUSES)
 
@@ -107,11 +102,6 @@ const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
 const timeStringSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required')
-
-function toMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number)
-  return hours * 60 + minutes
-}
 
 // One contiguous time range within a day. Lets the range cross midnight
 // (e.g. 22:00 -> 06:00) instead of failing the "end after start" check
@@ -222,6 +212,11 @@ const shiftFieldsSchema = z
     // each day carry its own range. See `shift-form/shift-times-tab.tsx`.
     hours_mode: shiftHoursModeSchema,
     days: z.array(dayTimeEntrySchema).length(7, 'All 7 days are required'),
+    // "Shift times" tab — how long a full/half day of work counts for, in
+    // hours. Both optional: a shift is still valid without them, and
+    // neither feeds any other validation today.
+    full_day_hours: z.number().min(0).max(24).optional(),
+    half_day_hours: z.number().min(0).max(24).optional(),
     // Break-time toggle, a field on the "Shift times" tab — off by
     // default, `breaks` is only validated once it's on. Paid/unpaid is set
     // per break entry (see `breakEntrySchema.break_type`), not shift-wide.
@@ -229,9 +224,11 @@ const shiftFieldsSchema = z
     breaks: z.array(breakEntrySchema).default([]),
     description: z.string().max(200).optional(),
     is_active: z.boolean().default(true),
-    // Optional, unlike `schedules`' required `policy_type` — a shift
+    // Shift policies attached to this shift, by id — the records the
+    // "Shift policy" tab and the table's policy drawer search, attach and
+    // create (see `features/shift-policies`). Optional by design: a shift
     // definition is useful without one, so we don't force a pick.
-    policy_type: shiftPolicyTypeSchema.optional(),
+    policy_ids: z.array(z.string()).default([]),
     status: shiftStatusSchema,
     time_slot_type: shiftTimeSlotTypeSchema,
     // "Repeat" tab's toggle — off by default, `repeat` is only validated
@@ -445,7 +442,6 @@ export type ShiftHoursMode = (typeof SHIFT_HOURS_MODES)[number]
 export type DayOfWeek = (typeof DAYS_OF_WEEK)[number]
 export type DayTimeEntry = z.infer<typeof dayTimeEntrySchema>
 export type TimeRangeEntry = z.infer<typeof timeRangeEntrySchema>
-export type ShiftPolicyType = (typeof SHIFT_POLICY_TYPES)[number]
 export type ShiftStatus = (typeof SHIFT_STATUSES)[number]
 export type ShiftTimeSlotType = (typeof SHIFT_TIME_SLOT_TYPES)[number]
 export type RepeatFrequency = (typeof REPEAT_FREQUENCIES)[number]

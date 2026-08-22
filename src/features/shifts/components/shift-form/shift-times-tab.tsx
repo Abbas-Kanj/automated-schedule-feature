@@ -4,7 +4,13 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { cn } from '@/lib/utils'
 import { useTimeFormat } from '@/lib/time-format'
 import { Button } from '@/components/ui/button'
-import { FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -562,6 +568,75 @@ export function ShiftTimesTab() {
           after start).
         </p>
       )}
+
+      {/* Free-standing day-length definitions — not derived from the day
+          ranges above (a shift can count a "full day" as something other
+          than its own scheduled span), so they're plain optional inputs. */}
+      <div className='space-y-1.5'>
+        <Label className='text-base font-semibold'>Day duration</Label>
+        <div className='flex items-start gap-3'>
+          <FormField
+            control={form.control}
+            name='full_day_hours'
+            render={({ field }) => (
+              <FormItem className='flex-1 space-y-1'>
+                <FormLabel className='font-normal'>Full Day</FormLabel>
+                <div className='flex items-center gap-2'>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      max={24}
+                      step='any'
+                      placeholder='Full day work duration'
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value === ''
+                            ? undefined
+                            : e.target.valueAsNumber
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <span className='text-muted-foreground text-sm'>hours</span>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name='half_day_hours'
+            render={({ field }) => (
+              <FormItem className='flex-1 space-y-1'>
+                <FormLabel className='font-normal'>Half Day</FormLabel>
+                <div className='flex items-center gap-2'>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      max={24}
+                      step='any'
+                      placeholder='Half day work duration'
+                      value={field.value ?? ''}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value === ''
+                            ? undefined
+                            : e.target.valueAsNumber
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <span className='text-muted-foreground text-sm'>hours</span>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </div>
 
       <FormField
         control={form.control}

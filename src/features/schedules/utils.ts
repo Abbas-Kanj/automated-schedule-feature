@@ -15,10 +15,6 @@ import {
 } from '@/features/shifts/data/schema'
 import { getShiftTimeRange } from '@/features/shifts/utils'
 
-export function generateId() {
-  return crypto.randomUUID()
-}
-
 export function deriveShortCode(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return ''

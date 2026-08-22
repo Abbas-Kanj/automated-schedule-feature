@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { type Control, type Resolver, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { cn } from '@/lib/utils'
+import { generateId } from '@/lib/id'
 import { showSubmittedData } from '@/lib/show-submitted-data'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -28,7 +29,6 @@ import {
   type ScheduleType,
   scheduleSchema,
 } from '../../data/schema'
-import { generateId } from '../../utils'
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
 import { PatternBuilder } from './pattern-builder'
@@ -44,7 +44,10 @@ import { WeeklyOneFields } from './weekly-one-fields'
 // `regular` schedules (fixed/rotate/flexible) now. The 'daily' branches
 // below are kept only so pre-existing daily schedules (view/edit) still
 // render correctly; there's no UI path left to create a new one.
-function getSteps(parentType: string, regularType?: RegularType): VerticalTabsStep[] {
+function getSteps(
+  parentType: string,
+  regularType?: RegularType
+): VerticalTabsStep[] {
   if (parentType === 'daily') {
     return [
       { id: 'basics', label: 'Basics' },
@@ -127,7 +130,7 @@ function getRegularTypeDefaults(type: RegularType) {
       shift_ids: [] as string[],
       temporary_schedule: false,
       cycle_type: 'pattern_shifts' as const,
-      cycle_length: { unit: 'weekly' as const, days: 7 },
+      cycle_length: { unit: 'weekly' as const, days: 6 },
       pattern: Array.from({ length: 7 }, (_, i) => ({
         position: i + 1,
         is_off: true,
@@ -174,12 +177,7 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
     return ['start_date', 'end_settings']
   }
   if (stepId === 'pattern') {
-    return [
-      'cycle_type',
-      'cycle_length',
-      'pattern',
-      'shift_repeat',
-    ]
+    return ['cycle_type', 'cycle_length', 'pattern', 'shift_repeat']
   }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
@@ -223,8 +221,7 @@ export function ScheduleForm({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const looseControl = form.control as unknown as Control<any>
   const regularType = useWatch({ control: looseControl, name: 'type' }) as
-    | RegularType
-    | undefined
+    RegularType | undefined
 
   const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
@@ -373,7 +370,11 @@ export function ScheduleForm({
                           <TabsTrigger
                             key={t.value}
                             value={t.value}
-                            disabled={disabled}
+                            // Monthly is legacy-only: an existing monthly
+                            // schedule still renders, but it can't be
+                            // switched to. Same call as the other greyed-out
+                            // monthly options (see `data/data.ts`).
+                            disabled={disabled || t.value === 'monthly'}
                           >
                             {t.label}
                           </TabsTrigger>

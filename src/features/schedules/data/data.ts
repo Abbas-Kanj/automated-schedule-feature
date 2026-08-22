@@ -159,13 +159,24 @@ export const CYCLE_TYPE_OPTIONS = [
   description: string
 }[]
 
+// "Monthly" is listed but not selectable — a month-long cycle is still
+// modelled as a flat 30 days (see `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS`) and
+// nothing downstream honours real calendar months yet, so it stays greyed
+// out rather than disappearing. Same reasoning for every other `disabled:
+// true` monthly option below (and in `shifts/data/data.ts`). Existing
+// monthly data still renders — only picking it anew is blocked.
 export const CYCLE_LENGTH_UNIT_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
+  { value: 'monthly', label: 'Monthly', disabled: true },
   { value: 'custom_days', label: 'Custom days' },
-] satisfies { value: (typeof CYCLE_LENGTH_UNITS)[number]; label: string }[]
+] satisfies {
+  value: (typeof CYCLE_LENGTH_UNITS)[number]
+  label: string
+  disabled?: boolean
+}[]
 
-export const CYCLE_LENGTH_QUICK_PICKS = [7, 14, 6, 28, 35]
+export const CYCLE_LENGTH_QUICK_PICKS = [6, 8, 10]
+// export const CYCLE_LENGTH_QUICK_PICKS = [7, 14, 6, 28, 35]
 
 // Weekly/monthly cycle lengths are entered as a week/month count in the UI
 // (e.g. "2 week(s)", "1 month") and converted to the stored day count using
@@ -188,10 +199,11 @@ export const RECURRENCE_END_TYPE_OPTIONS = [
 export const SHIFT_REPEAT_FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Days' },
   { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
+  { value: 'monthly', label: 'Monthly', disabled: true },
 ] satisfies {
   value: ShiftRepeatFrequency
   label: string
+  disabled?: boolean
 }[]
 
 // Weekday chips + monthly sub-mode options for the "Custom alternate" per-
