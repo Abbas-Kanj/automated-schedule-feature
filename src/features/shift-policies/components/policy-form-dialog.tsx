@@ -1,4 +1,4 @@
-import { type Resolver, useForm, useWatch } from 'react-hook-form'
+import { type Resolver, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { generateId } from '@/lib/id'
@@ -20,19 +20,9 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { POLICY_TYPE_OPTIONS } from '../data/data'
 import { emptyShiftPolicyFormValues } from '../data/defaults'
 import {
-  policyTypeHasRules,
-  type PolicyType,
   type ShiftPolicy,
   type ShiftPolicyFormValues,
   shiftPolicyFormSchema,
@@ -71,7 +61,6 @@ export function PolicyFormDialog({
     ) as Resolver<ShiftPolicyFormValues>,
     defaultValues: isEdit ? currentRow : emptyShiftPolicyFormValues,
   })
-  const policyType = useWatch({ control: form.control, name: 'policy_type' })
 
   const onSubmit = (values: ShiftPolicyFormValues) => {
     const saved: ShiftPolicy = {
@@ -107,7 +96,7 @@ export function PolicyFormDialog({
           <DialogDescription>
             {isEdit
               ? 'Update this policy and the rules it applies.'
-              : 'Name the policy, pick what it covers, then define its rules.'}
+              : 'Name the policy, then add the rules it applies.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -154,54 +143,7 @@ export function PolicyFormDialog({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name='policy_type'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Policy type</FormLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={(value) => {
-                      // Radix's hidden form-participation <select> bounces
-                      // an empty value back through onValueChange when it
-                      // syncs a programmatic write, which would wipe the
-                      // pick. A real choice is never empty. See the
-                      // `radix-select-bubble-select-wipes-programmatic-value`
-                      // skill.
-                      if (!value) return
-                      field.onChange(value)
-                      // Rules belong to rule-bearing types only. Dropping
-                      // them here (rather than at submit) keeps a hidden,
-                      // half-filled rule from failing validation against a
-                      // section the user can no longer see.
-                      if (!policyTypeHasRules(value as PolicyType)) {
-                        form.setValue('rules', [])
-                      }
-                    }}
-                  >
-                    <FormControl>
-                      <SelectTrigger className='w-full'>
-                        <SelectValue placeholder='Select a policy type' />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {POLICY_TYPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* "Missed punch error" is a flag-only policy — no window, no
-                factor — so the rules section only exists for the other
-                types. */}
-            {policyTypeHasRules(policyType) && <PolicyRulesField />}
+            <PolicyRulesField />
           </form>
         </Form>
 

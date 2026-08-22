@@ -1,8 +1,8 @@
-import { Copy, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
-import { cn } from '@/lib/utils'
+import { Copy, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useTimeFormat } from '@/lib/time-format'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
   FormControl,
@@ -76,9 +76,7 @@ function BreakDurationInput({
   disabled?: boolean
 }) {
   const [prevValue, setPrevValue] = useState(value)
-  const [text, setText] = useState(
-    value != null ? formatDurationHM(value) : ''
-  )
+  const [text, setText] = useState(value != null ? formatDurationHM(value) : '')
   if (value !== prevValue) {
     setPrevValue(value)
     setText(value != null ? formatDurationHM(value) : '')
@@ -175,7 +173,9 @@ export function ShiftTimesTab() {
     setDays(
       days.map((d) => ({
         ...d,
-        times: d.times.map((t) => (t.overnight ? t : { ...t, overnight: true })),
+        times: d.times.map((t) =>
+          t.overnight ? t : { ...t, overnight: true }
+        ),
       }))
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -254,7 +254,9 @@ export function ShiftTimesTab() {
     const source = days[sourceIndex]
     setDays(
       days.map((d, i) =>
-        i > sourceIndex ? { ...d, times: source.times.map((t) => ({ ...t })) } : d
+        i > sourceIndex
+          ? { ...d, times: source.times.map((t) => ({ ...t })) }
+          : d
       )
     )
   }
@@ -301,7 +303,8 @@ export function ShiftTimesTab() {
       })
     )
 
-  const isTimeValid = (t: TimeRangeEntry) => t.overnight || t.to_time > t.from_time
+  const isTimeValid = (t: TimeRangeEntry) =>
+    t.overnight || t.to_time > t.from_time
   const isDayValid = (d: DayTimeEntry) =>
     !d.enabled ||
     (d.times.length > 0 &&
@@ -414,7 +417,7 @@ export function ShiftTimesTab() {
                       </div>
                     </div>
                     {!masterValid && (
-                      <p className='text-destructive text-sm'>
+                      <p className='text-sm text-destructive'>
                         End time must be after start time.
                       </p>
                     )}
@@ -466,7 +469,7 @@ export function ShiftTimesTab() {
               {mode === 'different' && (
                 <div className='flex-1 space-y-1.5 pt-1.5'>
                   {!d.enabled ? (
-                    <span className='text-muted-foreground text-sm'>
+                    <span className='text-sm text-muted-foreground'>
                       Not available
                     </span>
                   ) : (
@@ -486,7 +489,7 @@ export function ShiftTimesTab() {
                               })
                             }
                           />
-                          <span className='text-muted-foreground text-xs'>
+                          <span className='text-xs text-muted-foreground'>
                             to
                           </span>
                           <Input
@@ -499,7 +502,7 @@ export function ShiftTimesTab() {
                               })
                             }
                           />
-                          <span className='text-muted-foreground text-xs whitespace-nowrap'>
+                          <span className='text-xs whitespace-nowrap text-muted-foreground'>
                             {isTimeValid(t)
                               ? formatDurationHours(
                                   calculateShiftHours(t.from_time, t.to_time)
@@ -545,9 +548,9 @@ export function ShiftTimesTab() {
                         </div>
                       ))}
                       {dayCollides && (
-                        <p className='text-destructive text-xs'>
-                          These times overlap — adjust them so they
-                          don&apos;t collide.
+                        <p className='text-xs text-destructive'>
+                          These times overlap — adjust them so they don&apos;t
+                          collide.
                         </p>
                       )}
                     </>
@@ -560,81 +563,61 @@ export function ShiftTimesTab() {
       </div>
 
       {!anyEnabled && isSubmitted && (
-        <p className='text-destructive text-sm'>Select at least one day.</p>
+        <p className='text-sm text-destructive'>Select at least one day.</p>
       )}
       {anyEnabled && !allValid && (
-        <p className='text-destructive text-sm'>
-          Every selected day needs valid, non-overlapping time ranges (end
-          after start).
+        <p className='text-sm text-destructive'>
+          Every selected day needs valid, non-overlapping time ranges (end after
+          start).
         </p>
       )}
 
       {/* Free-standing day-length definitions — not derived from the day
           ranges above (a shift can count a "full day" as something other
           than its own scheduled span), so they're plain optional inputs. */}
-      <div className='space-y-1.5'>
+      <div className='space-y-2'>
         <Label className='text-base font-semibold'>Day duration</Label>
-        <div className='flex items-start gap-3'>
-          <FormField
-            control={form.control}
-            name='full_day_hours'
-            render={({ field }) => (
-              <FormItem className='flex-1 space-y-1'>
-                <FormLabel className='font-normal'>Full Day</FormLabel>
-                <div className='flex items-center gap-2'>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={0}
-                      max={24}
-                      step='any'
-                      placeholder='Full day work duration'
-                      value={field.value ?? ''}
-                      onChange={(e) =>
-                        field.onChange(
-                          e.target.value === ''
-                            ? undefined
-                            : e.target.valueAsNumber
-                        )
-                      }
-                    />
-                  </FormControl>
-                  <span className='text-muted-foreground text-sm'>hours</span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name='half_day_hours'
-            render={({ field }) => (
-              <FormItem className='flex-1 space-y-1'>
-                <FormLabel className='font-normal'>Half Day</FormLabel>
-                <div className='flex items-center gap-2'>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={0}
-                      max={24}
-                      step='any'
-                      placeholder='Half day work duration'
-                      value={field.value ?? ''}
-                      onChange={(e) =>
-                        field.onChange(
-                          e.target.value === ''
-                            ? undefined
-                            : e.target.valueAsNumber
-                        )
-                      }
-                    />
-                  </FormControl>
-                  <span className='text-muted-foreground text-sm'>hours</span>
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <div className='space-y-2'>
+          {(
+            [
+              ['full_day_hours', 'Full Day'],
+              ['half_day_hours', 'Half Day'],
+            ] as const
+          ).map(([name, label]) => (
+            <FormField
+              key={name}
+              control={form.control}
+              name={name}
+              render={({ field }) => (
+                <FormItem className='space-y-1'>
+                  <div className='flex items-center gap-3'>
+                    <FormLabel className='w-20 shrink-0 font-normal'>
+                      {label}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={0}
+                        max={24}
+                        step='any'
+                        className='h-8 w-24'
+                        value={field.value ?? ''}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value === ''
+                              ? undefined
+                              : e.target.valueAsNumber
+                          )
+                        }
+                      />
+                    </FormControl>
+                    <span className='text-sm text-muted-foreground'>hours</span>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          ))}
         </div>
       </div>
 
@@ -643,7 +626,7 @@ export function ShiftTimesTab() {
         name='break_enabled'
         render={({ field }) => (
           <FormItem className='space-y-3 rounded-md border p-3'>
-            <Label className='flex cursor-pointer items-center justify-between font-semibold text-base'>
+            <Label className='flex cursor-pointer items-center justify-between text-base font-semibold'>
               Break time
               <FormControl>
                 <Switch
@@ -673,7 +656,7 @@ export function ShiftTimesTab() {
                           key={i}
                           className='flex items-center gap-2 rounded-md border p-2'
                         >
-                          <span className='bg-muted flex size-8 shrink-0 items-center justify-center rounded-md'>
+                          <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-muted'>
                             {BreakIcon ? (
                               <BreakIcon className='size-4' />
                             ) : null}
@@ -682,8 +665,9 @@ export function ShiftTimesTab() {
                             <p className='truncate text-sm font-medium'>
                               {b.name?.trim() || 'Break'}
                             </p>
-                            <p className='text-muted-foreground text-xs'>
-                              {formatTime(b.from_time)}–{formatTime(b.to_time)} ·{' '}
+                            <p className='text-xs text-muted-foreground'>
+                              {formatTime(b.from_time)}–{formatTime(b.to_time)}{' '}
+                              ·{' '}
                               {formatDurationHM(
                                 b.break_type === 'paid'
                                   ? (b.duration_minutes ?? span)
@@ -702,7 +686,7 @@ export function ShiftTimesTab() {
                               )}
                             </p>
                             {error && (
-                              <p className='text-destructive text-xs'>
+                              <p className='text-xs text-destructive'>
                                 {error}
                               </p>
                             )}
@@ -732,13 +716,18 @@ export function ShiftTimesTab() {
                     }
 
                     return (
-                      <div key={i} className='space-y-1.5 rounded-md border p-2'>
+                      <div
+                        key={i}
+                        className='space-y-1.5 rounded-md border p-2'
+                      >
                         <div className='flex items-start gap-2'>
                           <div className='space-y-1'>
                             <Label className='text-xs'>Icon</Label>
                             <IconPickerField
                               value={b.icon}
-                              onChange={(value) => updateBreak(i, { icon: value })}
+                              onChange={(value) =>
+                                updateBreak(i, { icon: value })
+                              }
                               showClear={false}
                             />
                           </div>
@@ -809,7 +798,7 @@ export function ShiftTimesTab() {
                           </div>
                         </div>
                         {error && (
-                          <p className='text-destructive text-sm'>{error}</p>
+                          <p className='text-sm text-destructive'>{error}</p>
                         )}
                         <Button
                           type='button'

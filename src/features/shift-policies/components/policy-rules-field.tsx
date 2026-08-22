@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
-import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react'
 import { generateId } from '@/lib/id'
+import { useTimeFormat } from '@/lib/time-format'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -24,34 +26,74 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ATTENDANCE_TYPE_OPTIONS } from '../data/data'
+import {
+  ATTENDANCE_TYPE_OPTIONS,
+  getAttendanceTypeLabel,
+  getComparisonOperatorLabel,
+  getMissedPunchDeductionUnitLabel,
+  getMissedPunchPeriodUnitLabel,
+  getPolicyTypeLabel,
+  POLICY_TYPE_OPTIONS,
+} from '../data/data'
 import {
   getRuleResultMinutes,
+  type PolicyType,
   type ShiftPolicyFormValues,
 } from '../data/schema'
-import { buildDefaultRule, formatMinutes } from '../utils'
+import { buildDefaultRule, formatMinutes, retypeRule } from '../utils'
+import { MissedPunchRuleFields } from './missed-punch-fields'
 
-// The rules a policy applies, as a collapsible list — rendered by
-// `PolicyFormDialog` only for policy types that carry rules. Reads and
-// writes through `useFormContext`, so it plugs into that dialog's form
-// without prop-drilling `control`.
+// The rules a policy applies, as a collapsible list. Each rule carries its
+// own `policy_type`, so one policy can mix a tardy window with an overtime
+// one — or with a missed-punch occurrence count, which swaps the rule's
+// inputs entirely. Reads and writes through `useFormContext`, so it plugs
+// into `PolicyFormDialog`'s form without prop-drilling `control`.
 export function PolicyRulesField() {
   const form = useFormContext<ShiftPolicyFormValues>()
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: 'rules',
   })
 
-  // This section mounts the moment a rule-bearing type is picked — seed one
-  // blank rule then, so it opens with something to fill in rather than an
-  // empty panel plus an "Add at least one rule" error. Guarded on the
-  // current length so an existing policy's rules are left alone, and so
-  // clearing every rule by hand stays cleared.
+  // Which rule (if any) is expanded for editing — the rest render as
+  // one-line summaries, mirroring the shift form's break rows. A newly
+  // added rule opens straight into editing; existing ones only on the
+  // pencil.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+
+  // Open with something to fill in rather than an empty panel plus an
+  // "Add at least one rule" error. Guarded on the current length so an
+  // existing policy's rules are left alone, and so clearing every rule by
+  // hand stays cleared.
   useEffect(() => {
     if (form.getValues('rules').length === 0) {
       append(buildDefaultRule(generateId()))
+      setEditingIndex(0)
     }
   }, [append, form])
+
+  const addRule = () => {
+    append(buildDefaultRule(generateId()))
+    setEditingIndex(fields.length)
+  }
+
+  const removeRule = (index: number) => {
+    remove(index)
+    setEditingIndex((current) => {
+      if (current === null) return null
+      if (current === index) return null
+      return current > index ? current - 1 : current
+    })
+  }
+
+  // Switching a rule between the two shapes replaces the whole entry, so it
+  // goes through `useFieldArray.update` rather than a per-field setValue —
+  // the fields being registered change with it.
+  const changeRuleType = (index: number, next: PolicyType) => {
+    const current = form.getValues(`rules.${index}`)
+    if (!current || current.policy_type === next) return
+    update(index, retypeRule(current, next))
+  }
 
   const rulesError = form.formState.errors.rules?.message
 
@@ -63,13 +105,24 @@ export function PolicyRulesField() {
           <ChevronDown className='size-4 shrink-0 transition-transform group-data-[state=open]:rotate-180' />
         </CollapsibleTrigger>
         <CollapsibleContent className='space-y-3 border-t p-3'>
-          {fields.map((field, index) => (
-            <PolicyRuleRow
-              key={field.id}
-              index={index}
-              onRemove={() => remove(index)}
-            />
-          ))}
+          {fields.map((field, index) =>
+            editingIndex === index ? (
+              <PolicyRuleRow
+                key={field.id}
+                index={index}
+                onTypeChange={(next) => changeRuleType(index, next)}
+                onRemove={() => removeRule(index)}
+                onDone={() => setEditingIndex(null)}
+              />
+            ) : (
+              <PolicyRuleSummary
+                key={field.id}
+                index={index}
+                onEdit={() => setEditingIndex(index)}
+                onRemove={() => removeRule(index)}
+              />
+            )
+          )}
 
           {rulesError && (
             <p className='text-sm text-destructive'>{rulesError}</p>
@@ -80,7 +133,7 @@ export function PolicyRulesField() {
             variant='outline'
             size='sm'
             className='w-full'
-            onClick={() => append(buildDefaultRule(generateId()))}
+            onClick={addRule}
           >
             <Plus className='size-4' /> Add rule
           </Button>
@@ -90,24 +143,116 @@ export function PolicyRulesField() {
   )
 }
 
-type PolicyRuleRowProps = {
+type PolicyRuleSummaryProps = {
   index: number
+  onEdit: () => void
   onRemove: () => void
 }
 
-// One rule: its window, the factor applied to it, and how the result is
-// booked. Watches only its own slice of the array so typing in one rule
-// doesn't re-render the others.
-function PolicyRuleRow({ index, onRemove }: PolicyRuleRowProps) {
+// A saved rule, collapsed: name and type on top, then the shape-specific
+// detail on one muted line, with edit/trash actions at the end — the same
+// shape as a collapsed break row.
+function PolicyRuleSummary({
+  index,
+  onEdit,
+  onRemove,
+}: PolicyRuleSummaryProps) {
+  const form = useFormContext<ShiftPolicyFormValues>()
+  const formatTime = useTimeFormat()
+  const rule = useWatch({ control: form.control, name: `rules.${index}` })
+  if (!rule) return null
+
+  // Whatever the resolver flagged for this rule, first message wins — the
+  // row is collapsed, so there's no per-field `FormMessage` to carry it.
+  const fieldErrors = form.formState.errors.rules?.[index]
+  const error = fieldErrors
+    ? Object.values(fieldErrors)
+        .map((entry) => (entry as { message?: string })?.message)
+        .find(Boolean)
+    : undefined
+
+  let detail: string
+  if (rule.policy_type === 'missed_punch_error') {
+    const period = getMissedPunchPeriodUnitLabel(rule.period_unit).toLowerCase()
+    const deducted =
+      rule.deduction_unit === 'hours'
+        ? `${rule.deduction_hours ?? 0}h`
+        : getMissedPunchDeductionUnitLabel(rule.deduction_unit)
+    detail = `${getComparisonOperatorLabel(rule.operator).toLowerCase()} ${rule.occurrences} · ${rule.from_period}–${rule.to_period} ${period} · deduct ${deducted}`
+  } else {
+    const resultMinutes = getRuleResultMinutes({
+      from_time: rule.from_time,
+      to_time: rule.to_time,
+      factor: Number(rule.factor) || 0,
+    })
+    detail = `${formatTime(rule.from_time)}–${formatTime(rule.to_time)} · ×${rule.factor ?? '—'}${
+      resultMinutes > 0 ? ` · ${formatMinutes(resultMinutes)}` : ''
+    } · ${getAttendanceTypeLabel(rule.attendance_type)}`
+  }
+
+  return (
+    <div className='flex items-center gap-2 rounded-md border p-2'>
+      <div className='min-w-0 flex-1'>
+        <p className='flex flex-wrap items-center gap-2'>
+          <span className='truncate text-sm font-medium'>
+            {rule.name?.trim() || 'Rule'}
+          </span>
+          <Badge variant='outline' className='whitespace-nowrap'>
+            {getPolicyTypeLabel(rule.policy_type)}
+          </Badge>
+        </p>
+        <p className='text-xs text-muted-foreground'>{detail}</p>
+        {error && <p className='text-xs text-destructive'>{error}</p>}
+      </div>
+      <Button
+        type='button'
+        variant='ghost'
+        size='icon'
+        className='size-7'
+        onClick={onEdit}
+        aria-label='Edit rule'
+      >
+        <Pencil className='size-4' />
+      </Button>
+      <Button
+        type='button'
+        variant='ghost'
+        size='icon'
+        className='size-7'
+        onClick={onRemove}
+        aria-label='Remove rule'
+      >
+        <Trash2 className='size-4' />
+      </Button>
+    </div>
+  )
+}
+
+type PolicyRuleRowProps = {
+  index: number
+  onTypeChange: (next: PolicyType) => void
+  onRemove: () => void
+  onDone: () => void
+}
+
+// One rule, expanded for editing: its type and name, then whichever set of
+// inputs that type calls for. Watches only its own slice of the array so
+// typing in one rule doesn't re-render the others.
+function PolicyRuleRow({
+  index,
+  onTypeChange,
+  onRemove,
+  onDone,
+}: PolicyRuleRowProps) {
   const form = useFormContext<ShiftPolicyFormValues>()
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
-  const resultMinutes = rule
-    ? getRuleResultMinutes({
-        from_time: rule.from_time,
-        to_time: rule.to_time,
-        factor: Number(rule.factor) || 0,
-      })
-    : 0
+
+  // Collapse only once this rule actually validates, so a half-filled row
+  // can't be folded away into a summary that hides its errors.
+  const save = async () => {
+    const valid = await form.trigger(`rules.${index}`)
+    if (valid) onDone()
+  }
 
   return (
     <div className='space-y-3 rounded-md border p-3'>
@@ -117,7 +262,7 @@ function PolicyRuleRow({ index, onRemove }: PolicyRuleRowProps) {
           name={`rules.${index}.name`}
           render={({ field }) => (
             <FormItem className='flex-1'>
-              <FormLabel className='text-xs'>Policy name</FormLabel>
+              <FormLabel className='text-xs'>Rule name</FormLabel>
               <FormControl>
                 <Input className='h-8' placeholder='Rule name' {...field} />
               </FormControl>
@@ -137,6 +282,77 @@ function PolicyRuleRow({ index, onRemove }: PolicyRuleRowProps) {
         </Button>
       </div>
 
+      {/* The type belongs to the rule, not the policy — changing it swaps
+          the inputs below (see `retypeRule`). */}
+      <FormField
+        control={form.control}
+        name={`rules.${index}.policy_type`}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className='text-xs'>Policy type</FormLabel>
+            <Select
+              value={field.value}
+              onValueChange={(value) => {
+                // Radix's hidden form-participation <select> bounces an
+                // empty value back through onValueChange when it syncs a
+                // programmatic write — and this field is written
+                // programmatically by the rule builders, which is exactly
+                // the case that gets wiped. A real pick is never empty. See
+                // the `radix-select-bubble-select-wipes-programmatic-value`
+                // skill.
+                if (!value) return
+                onTypeChange(value as PolicyType)
+              }}
+            >
+              <FormControl>
+                <SelectTrigger className='h-8 w-full'>
+                  <SelectValue placeholder='Select a policy type' />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {POLICY_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {rule?.policy_type === 'missed_punch_error' ? (
+        <MissedPunchRuleFields index={index} />
+      ) : (
+        <WindowRuleFields index={index} />
+      )}
+
+      <Button type='button' size='sm' className='w-full' onClick={save}>
+        Save
+      </Button>
+    </div>
+  )
+}
+
+// The window/factor half of a rule — every type except missed punch error.
+function WindowRuleFields({ index }: { index: number }) {
+  const form = useFormContext<ShiftPolicyFormValues>()
+  const rule = useWatch({ control: form.control, name: `rules.${index}` })
+  const resultMinutes =
+    rule && rule.policy_type !== 'missed_punch_error'
+      ? getRuleResultMinutes({
+          from_time: rule.from_time,
+          to_time: rule.to_time,
+          factor: Number(rule.factor) || 0,
+        })
+      : 0
+
+  return (
+    <>
+      {/* `lang='en-GB'` forces the native time picker to 24-hour, dropping
+          the AM/PM segment a US-locale browser would otherwise render. The
+          stored value is "HH:mm" either way. */}
       <div className='flex items-start gap-2'>
         <FormField
           control={form.control}
@@ -145,7 +361,7 @@ function PolicyRuleRow({ index, onRemove }: PolicyRuleRowProps) {
             <FormItem className='flex-1'>
               <FormLabel className='text-xs'>From</FormLabel>
               <FormControl>
-                <Input type='time' className='h-8' {...field} />
+                <Input type='time' lang='en-GB' className='h-8' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -158,7 +374,7 @@ function PolicyRuleRow({ index, onRemove }: PolicyRuleRowProps) {
             <FormItem className='flex-1'>
               <FormLabel className='text-xs'>To</FormLabel>
               <FormControl>
-                <Input type='time' className='h-8' {...field} />
+                <Input type='time' lang='en-GB' className='h-8' {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -213,13 +429,7 @@ function PolicyRuleRow({ index, onRemove }: PolicyRuleRowProps) {
             <Select
               value={field.value}
               onValueChange={(value) => {
-                // Radix's hidden form-participation <select> bounces an
-                // empty value back through onValueChange when it syncs a
-                // programmatic write — and this field is written
-                // programmatically by `buildDefaultRule`, which is exactly
-                // the case that gets wiped. A real pick is never empty. See
-                // the `radix-select-bubble-select-wipes-programmatic-value`
-                // skill.
+                // Same Radix bubble-select guard as the type select above.
                 if (!value) return
                 field.onChange(value)
               }}
@@ -241,6 +451,6 @@ function PolicyRuleRow({ index, onRemove }: PolicyRuleRowProps) {
           </FormItem>
         )}
       />
-    </div>
+    </>
   )
 }

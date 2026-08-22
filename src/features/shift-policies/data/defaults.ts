@@ -1,10 +1,9 @@
 import { type DefaultValues } from 'react-hook-form'
 import { type ShiftPolicyFormValues } from './schema'
 
-// Starting point for a brand-new policy. `policy_type` is deliberately
-// absent — the form starts with nothing selected (the rules section only
-// appears once a type is picked) and the schema rejects a submit without
-// one, which `DefaultValues` models without a cast.
+// Starting point for a brand-new policy. Rules start empty and
+// `PolicyRulesField` seeds the first one on mount — the type now lives on
+// each rule, so there is nothing policy-wide left to pick.
 export const emptyShiftPolicyFormValues: DefaultValues<ShiftPolicyFormValues> =
   {
     name: '',

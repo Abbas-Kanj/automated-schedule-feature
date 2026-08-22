@@ -3,21 +3,28 @@ import { useTimeFormat } from '@/lib/time-format'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/data-table'
 import { getAttendanceTypeLabel, getPolicyTypeLabel } from '../data/data'
-import { type PolicyRule, type ShiftPolicy } from '../data/schema'
+import {
+  getPolicyRuleTypes,
+  type PolicyRule,
+  type ShiftPolicy,
+} from '../data/schema'
 import { DataTableRowActions } from './data-table-row-actions'
 
 // Earliest start / latest end across a policy's rules — a summary of when
 // the policy applies, not a promise every rule shares that window.
+// Missed-punch rules count occurrences rather than a window, so they sit
+// this one out.
 function getRuleWindow(rules: PolicyRule[]) {
-  if (!rules.length) return null
+  const windows = rules.filter((r) => r.policy_type !== 'missed_punch_error')
+  if (!windows.length) return null
   return {
-    from_time: rules.reduce(
+    from_time: windows.reduce(
       (min, r) => (r.from_time < min ? r.from_time : min),
-      rules[0].from_time
+      windows[0].from_time
     ),
-    to_time: rules.reduce(
+    to_time: windows.reduce(
       (max, r) => (r.to_time > max ? r.to_time : max),
-      rules[0].to_time
+      windows[0].to_time
     ),
   }
 }
@@ -56,15 +63,28 @@ export const policiesColumns: ColumnDef<ShiftPolicy>[] = [
     ),
   },
   {
-    accessorKey: 'policy_type',
+    // The policy has no type of its own any more — it's whatever its rules
+    // cover, which can be several things at once.
+    id: 'policy_types',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Type' />
     ),
-    cell: ({ row }) => (
-      <Badge variant='outline' className='whitespace-nowrap'>
-        {getPolicyTypeLabel(row.original.policy_type)}
-      </Badge>
-    ),
+    accessorFn: (row) =>
+      getPolicyRuleTypes(row.rules).map(getPolicyTypeLabel).join(', '),
+    cell: ({ row }) => {
+      const types = getPolicyRuleTypes(row.original.rules)
+      if (!types.length)
+        return <span className='text-sm text-muted-foreground'>—</span>
+      return (
+        <div className='flex flex-wrap gap-1'>
+          {types.map((type) => (
+            <Badge key={type} variant='outline' className='whitespace-nowrap'>
+              {getPolicyTypeLabel(type)}
+            </Badge>
+          ))}
+        </div>
+      )
+    },
   },
   {
     id: 'window',

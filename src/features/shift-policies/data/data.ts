@@ -1,6 +1,12 @@
 import {
   type AttendanceType,
   ATTENDANCE_TYPES,
+  COMPARISON_OPERATORS,
+  type ComparisonOperator,
+  MISSED_PUNCH_DEDUCTION_UNITS,
+  MISSED_PUNCH_PERIOD_UNITS,
+  type MissedPunchDeductionUnit,
+  type MissedPunchPeriodUnit,
   type PolicyType,
   POLICY_TYPES,
 } from './schema'
@@ -42,4 +48,58 @@ export function getAttendanceTypeLabel(
   type: AttendanceType | undefined
 ): string {
   return type ? ATTENDANCE_TYPE_LABELS[type] : '—'
+}
+
+const COMPARISON_OPERATOR_LABELS: Record<ComparisonOperator, string> = {
+  eq: 'Is Equal',
+  gt: 'Is Greater Than',
+  lt: 'Is Less Than',
+  gte: 'Is Greater Than or Equal',
+  lte: 'Is Less Than or Equal',
+}
+
+export const COMPARISON_OPERATOR_OPTIONS = COMPARISON_OPERATORS.map(
+  (value) => ({ value, label: COMPARISON_OPERATOR_LABELS[value] })
+)
+
+export function getComparisonOperatorLabel(
+  operator: ComparisonOperator | undefined
+): string {
+  return operator ? COMPARISON_OPERATOR_LABELS[operator] : '—'
+}
+
+const MISSED_PUNCH_PERIOD_UNIT_LABELS: Record<MissedPunchPeriodUnit, string> = {
+  days: 'Days',
+  months: 'Month',
+}
+
+export const MISSED_PUNCH_PERIOD_UNIT_OPTIONS = MISSED_PUNCH_PERIOD_UNITS.map(
+  (value) => ({ value, label: MISSED_PUNCH_PERIOD_UNIT_LABELS[value] })
+)
+
+export function getMissedPunchPeriodUnitLabel(
+  unit: MissedPunchPeriodUnit
+): string {
+  return MISSED_PUNCH_PERIOD_UNIT_LABELS[unit]
+}
+
+const MISSED_PUNCH_DEDUCTION_UNIT_LABELS: Record<
+  MissedPunchDeductionUnit,
+  string
+> = {
+  hours: 'Hours',
+  half_day: 'Half day',
+  full_day: 'Full day',
+}
+
+export const MISSED_PUNCH_DEDUCTION_UNIT_OPTIONS =
+  MISSED_PUNCH_DEDUCTION_UNITS.map((value) => ({
+    value,
+    label: MISSED_PUNCH_DEDUCTION_UNIT_LABELS[value],
+  }))
+
+export function getMissedPunchDeductionUnitLabel(
+  unit: MissedPunchDeductionUnit
+): string {
+  return MISSED_PUNCH_DEDUCTION_UNIT_LABELS[unit]
 }
