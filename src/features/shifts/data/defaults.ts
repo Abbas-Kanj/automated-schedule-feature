@@ -27,6 +27,7 @@ export const emptyShiftFormValues: ShiftFormValues = {
     },
     false
   ),
+  start_date: undefined,
   full_day_hours: undefined,
   half_day_hours: undefined,
   break_enabled: false,

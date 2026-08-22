@@ -1,5 +1,13 @@
 import {
+  getAttendanceTypeLabel,
+  getComparisonOperatorLabel,
+  getMissedPunchDeductionUnitLabel,
+  getMissedPunchPeriodUnitLabel,
+} from './data/data'
+import {
+  getRuleResultMinutes,
   type MissedPunchRule,
+  type PolicyRule,
   type PolicyType,
   type WindowPolicyType,
   type WindowRule,
@@ -65,4 +73,30 @@ export function retypeRule(
     return { ...buildDefaultRule(rule.id, next), name: rule.name }
   }
   return { ...rule, policy_type: next }
+}
+
+// One line describing what a rule does, in whichever shape it takes — the
+// collapsed rule row and the read-only details dialog show the same text.
+// `formatTime` comes from the caller's `useTimeFormat`, so the window
+// follows the user's 12/24-hour display preference.
+export function describeRule(
+  rule: PolicyRule,
+  formatTime: (time: string) => string
+): string {
+  if (rule.policy_type === 'missed_punch_error') {
+    const period = getMissedPunchPeriodUnitLabel(rule.period_unit).toLowerCase()
+    const deducted =
+      rule.deduction_unit === 'hours'
+        ? `${rule.deduction_hours ?? 0}h`
+        : getMissedPunchDeductionUnitLabel(rule.deduction_unit)
+    return `${getComparisonOperatorLabel(rule.operator).toLowerCase()} ${rule.occurrences} · ${rule.from_period}–${rule.to_period} ${period} · deduct ${deducted}`
+  }
+
+  const resultMinutes = getRuleResultMinutes({
+    from_time: rule.from_time,
+    to_time: rule.to_time,
+    factor: Number(rule.factor) || 0,
+  })
+  const result = resultMinutes > 0 ? ` · ${formatMinutes(resultMinutes)}` : ''
+  return `${formatTime(rule.from_time)}–${formatTime(rule.to_time)} · ×${rule.factor ?? '—'}${result} · ${getAttendanceTypeLabel(rule.attendance_type)}`
 }

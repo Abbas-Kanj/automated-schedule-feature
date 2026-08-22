@@ -28,10 +28,6 @@ import {
 } from '@/components/ui/select'
 import {
   ATTENDANCE_TYPE_OPTIONS,
-  getAttendanceTypeLabel,
-  getComparisonOperatorLabel,
-  getMissedPunchDeductionUnitLabel,
-  getMissedPunchPeriodUnitLabel,
   getPolicyTypeLabel,
   POLICY_TYPE_OPTIONS,
 } from '../data/data'
@@ -40,8 +36,14 @@ import {
   type PolicyType,
   type ShiftPolicyFormValues,
 } from '../data/schema'
-import { buildDefaultRule, formatMinutes, retypeRule } from '../utils'
+import {
+  buildDefaultRule,
+  describeRule,
+  formatMinutes,
+  retypeRule,
+} from '../utils'
 import { MissedPunchRuleFields } from './missed-punch-fields'
+import { Time24Input } from './time-24-input'
 
 // The rules a policy applies, as a collapsible list. Each rule carries its
 // own `policy_type`, so one policy can mix a tardy window with an overtime
@@ -171,24 +173,7 @@ function PolicyRuleSummary({
         .find(Boolean)
     : undefined
 
-  let detail: string
-  if (rule.policy_type === 'missed_punch_error') {
-    const period = getMissedPunchPeriodUnitLabel(rule.period_unit).toLowerCase()
-    const deducted =
-      rule.deduction_unit === 'hours'
-        ? `${rule.deduction_hours ?? 0}h`
-        : getMissedPunchDeductionUnitLabel(rule.deduction_unit)
-    detail = `${getComparisonOperatorLabel(rule.operator).toLowerCase()} ${rule.occurrences} · ${rule.from_period}–${rule.to_period} ${period} · deduct ${deducted}`
-  } else {
-    const resultMinutes = getRuleResultMinutes({
-      from_time: rule.from_time,
-      to_time: rule.to_time,
-      factor: Number(rule.factor) || 0,
-    })
-    detail = `${formatTime(rule.from_time)}–${formatTime(rule.to_time)} · ×${rule.factor ?? '—'}${
-      resultMinutes > 0 ? ` · ${formatMinutes(resultMinutes)}` : ''
-    } · ${getAttendanceTypeLabel(rule.attendance_type)}`
-  }
+  const detail = describeRule(rule, formatTime)
 
   return (
     <div className='flex items-center gap-2 rounded-md border p-2'>
@@ -350,9 +335,8 @@ function WindowRuleFields({ index }: { index: number }) {
 
   return (
     <>
-      {/* `lang='en-GB'` forces the native time picker to 24-hour, dropping
-          the AM/PM segment a US-locale browser would otherwise render. The
-          stored value is "HH:mm" either way. */}
+      {/* 24-hour text fields rather than `type='time'` — see
+          `Time24Input` for why the native control can't be kept. */}
       <div className='flex items-start gap-2'>
         <FormField
           control={form.control}
@@ -361,7 +345,12 @@ function WindowRuleFields({ index }: { index: number }) {
             <FormItem className='flex-1'>
               <FormLabel className='text-xs'>From</FormLabel>
               <FormControl>
-                <Input type='time' lang='en-GB' className='h-8' {...field} />
+                <Time24Input
+                  className='h-8'
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -374,7 +363,12 @@ function WindowRuleFields({ index }: { index: number }) {
             <FormItem className='flex-1'>
               <FormLabel className='text-xs'>To</FormLabel>
               <FormControl>
-                <Input type='time' lang='en-GB' className='h-8' {...field} />
+                <Time24Input
+                  className='h-8'
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -36,7 +36,26 @@ function SummarySection({
   )
 }
 
-function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
+// `inline` sits the value right after its label instead of pushing it to
+// the opposite edge — used by the Basics block, whose values are short
+// enough that a full-width gap just makes them harder to pair up.
+function SummaryRow({
+  label,
+  value,
+  inline,
+}: {
+  label: string
+  value: ReactNode
+  inline?: boolean
+}) {
+  if (inline) {
+    return (
+      <div className='flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm'>
+        <span className='text-muted-foreground'>{label}</span>
+        <span className='font-medium'>{value || '—'}</span>
+      </div>
+    )
+  }
   return (
     <div className='flex items-center justify-between gap-4 text-sm'>
       <span className='text-muted-foreground'>{label}</span>
@@ -80,17 +99,18 @@ function BasicsSummary({ values }: { values: any }) {
 
   return (
     <SummarySection title='Basics'>
-      <SummaryRow label='Name' value={values.name} />
-      <SummaryRow label='Description' value={values.description} />
-      <SummaryRow label='Type' value={isRegular ? 'Regular' : 'Daily'} />
-      <SummaryRow label='Schedule type' value={typeLabel} />
+      <SummaryRow inline label='Name' value={values.name} />
+      <SummaryRow inline label='Description' value={values.description} />
+      <SummaryRow inline label='Type' value={isRegular ? 'Regular' : 'Daily'} />
+      <SummaryRow inline label='Schedule type' value={typeLabel} />
       {isRegular && values.type === 'rotate' && (
-        <SummaryRow label='Rotate type' value={rotateTypeLabel} />
+        <SummaryRow inline label='Rotate type' value={rotateTypeLabel} />
       )}
       {isRegular && (
         <>
-          <SummaryRow label='Start date' value={values.start_date} />
+          <SummaryRow inline label='Start date' value={values.start_date} />
           <SummaryRow
+            inline
             label='Ends'
             value={formatEndSettings(values.end_settings)}
           />
@@ -98,6 +118,7 @@ function BasicsSummary({ values }: { values: any }) {
       )}
       {!isRegular && (
         <SummaryRow
+          inline
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           value={employees.map((e: any) => e.label).join(', ')}
           label='Employees'

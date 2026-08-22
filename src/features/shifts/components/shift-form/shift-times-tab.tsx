@@ -37,6 +37,7 @@ import {
   getBreakSpanMinutes,
   parseDurationHM,
 } from '../../utils'
+import { DateField } from './date-field'
 import { IconPickerField } from './icon-picker-field'
 
 const DEFAULT_TIME: TimeRangeEntry = {
@@ -580,10 +581,10 @@ export function ShiftTimesTab() {
         <div className='space-y-2'>
           {(
             [
-              ['full_day_hours', 'Full Day'],
-              ['half_day_hours', 'Half Day'],
+              ['full_day_hours', 'Full Day', 'Full day work duration'],
+              ['half_day_hours', 'Half Day', 'Half day work duration'],
             ] as const
-          ).map(([name, label]) => (
+          ).map(([name, label, placeholder]) => (
             <FormField
               key={name}
               control={form.control}
@@ -600,7 +601,8 @@ export function ShiftTimesTab() {
                         min={0}
                         max={24}
                         step='any'
-                        className='h-8 w-24'
+                        placeholder={placeholder}
+                        className='h-8 w-40'
                         value={field.value ?? ''}
                         onChange={(e) =>
                           field.onChange(
@@ -620,6 +622,28 @@ export function ShiftTimesTab() {
           ))}
         </div>
       </div>
+
+      {/* The day this shift starts applying — free-standing like the day
+          durations above, not derived from anything else on the tab. */}
+      <FormField
+        control={form.control}
+        name='start_date'
+        render={({ field }) => (
+          <FormItem className='space-y-1.5'>
+            <FormLabel className='text-base font-semibold'>
+              Start date
+            </FormLabel>
+            <FormControl>
+              <DateField
+                value={field.value}
+                onChange={field.onChange}
+                placeholder='Pick a start date'
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
       <FormField
         control={form.control}

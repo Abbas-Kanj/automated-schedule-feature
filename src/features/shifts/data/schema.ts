@@ -70,7 +70,11 @@ const shiftTimeSlotTypeSchema = z.enum(SHIFT_TIME_SLOT_TYPES)
 export const REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 const repeatFrequencySchema = z.enum(REPEAT_FREQUENCIES)
 
-export const REPEAT_END_TYPES = ['never', 'on_date', 'after_occurrences'] as const
+export const REPEAT_END_TYPES = [
+  'never',
+  'on_date',
+  'after_occurrences',
+] as const
 const repeatEndTypeSchema = z.enum(REPEAT_END_TYPES)
 
 // Monthly's 3 sub-modes (see the "Case Monthly" wireframe): a single
@@ -212,6 +216,10 @@ const shiftFieldsSchema = z
     // each day carry its own range. See `shift-form/shift-times-tab.tsx`.
     hours_mode: shiftHoursModeSchema,
     days: z.array(dayTimeEntrySchema).length(7, 'All 7 days are required'),
+    // "Shift times" tab — the day this shift starts applying, as
+    // "yyyy-MM-dd". Optional: a shift definition is reusable without one,
+    // and nothing else validates against it today.
+    start_date: z.string().optional(),
     // "Shift times" tab — how long a full/half day of work counts for, in
     // hours. Both optional: a shift is still valid without them, and
     // neither feeds any other validation today.
@@ -418,7 +426,10 @@ const shiftFieldsSchema = z
           path: ['repeat', 'end_date'],
         })
       }
-      if (val.repeat.end_type === 'after_occurrences' && !val.repeat.end_occurrences) {
+      if (
+        val.repeat.end_type === 'after_occurrences' &&
+        !val.repeat.end_occurrences
+      ) {
         ctx.addIssue({
           code: 'custom',
           message: 'Enter a number of occurrences',
