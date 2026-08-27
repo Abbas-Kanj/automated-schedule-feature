@@ -31,6 +31,24 @@ const validMissedPunchRule = {
   deduction_hours: 1,
 }
 
+const validDayOffOvertimeRule = {
+  id: 'rule-3',
+  policy_type: 'working_on_day_off' as const,
+  name: 'Day-off hours',
+  work_hours: 8,
+  work_mode: 'overtime' as const,
+  rate_per_hour: 1.5,
+}
+
+const validHolidaySubstituteRule = {
+  id: 'rule-4',
+  policy_type: 'working_on_public_holiday' as const,
+  name: 'Public holiday hours',
+  work_hours: 8,
+  work_mode: 'substitute' as const,
+  holiday_attendance_type: 'leave' as const,
+}
+
 const policy = (rules: unknown[]) => ({
   name: 'Attendance',
   rules,
@@ -139,6 +157,51 @@ describe('shiftPolicyFormSchema', () => {
         policy([{ ...withoutHours, deduction_unit: 'full_day' }])
       ).success
     ).toBe(true)
+  })
+
+  it('accepts holiday-work rules in each of their cases', () => {
+    expect(
+      shiftPolicyFormSchema.safeParse(policy([validDayOffOvertimeRule])).success
+    ).toBe(true)
+    expect(
+      shiftPolicyFormSchema.safeParse(policy([validHolidaySubstituteRule]))
+        .success
+    ).toBe(true)
+    // Normal work needs neither a rate nor an attendance type.
+    expect(
+      shiftPolicyFormSchema.safeParse(
+        policy([
+          {
+            id: 'rule-5',
+            policy_type: 'working_on_public_holiday',
+            name: 'Holiday',
+            work_hours: 8,
+            work_mode: 'normal',
+          },
+        ])
+      ).success
+    ).toBe(true)
+  })
+
+  it('requires a rate only for the day-off overtime case', () => {
+    const withoutRate = { ...validDayOffOvertimeRule, rate_per_hour: undefined }
+    const result = shiftPolicyFormSchema.safeParse(policy([withoutRate]))
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].path).toEqual(['rules', 0, 'rate_per_hour'])
+  })
+
+  it('requires an attendance type for the substitute case', () => {
+    const withoutAttendance = {
+      ...validHolidaySubstituteRule,
+      holiday_attendance_type: undefined,
+    }
+    const result = shiftPolicyFormSchema.safeParse(policy([withoutAttendance]))
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].path).toEqual([
+      'rules',
+      0,
+      'holiday_attendance_type',
+    ])
   })
 
   it('rejects window fields on a missed-punch rule and vice versa', () => {

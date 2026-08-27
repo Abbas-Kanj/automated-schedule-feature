@@ -2,20 +2,26 @@ import { type ColumnDef } from '@tanstack/react-table'
 import { useTimeFormat } from '@/lib/time-format'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/data-table'
-import { getAttendanceTypeLabel, getPolicyTypeLabel } from '../data/data'
+import {
+  getAttendanceTypeLabel,
+  getHolidayAttendanceTypeLabel,
+  getPolicyTypeLabel,
+} from '../data/data'
 import {
   getPolicyRuleTypes,
+  isHolidayWorkRule,
+  isWindowRule,
   type PolicyRule,
   type ShiftPolicy,
 } from '../data/schema'
 import { DataTableRowActions } from './data-table-row-actions'
 
 // Earliest start / latest end across a policy's rules — a summary of when
-// the policy applies, not a promise every rule shares that window.
-// Missed-punch rules count occurrences rather than a window, so they sit
-// this one out.
+// the policy applies, not a promise every rule shares that window. Only
+// window rules have a from/to span; missed-punch (occurrence count) and
+// holiday-work (flat hours) rules sit this one out.
 function getRuleWindow(rules: PolicyRule[]) {
-  const windows = rules.filter((r) => r.policy_type !== 'missed_punch_error')
+  const windows = rules.filter(isWindowRule)
   if (!windows.length) return null
   return {
     from_time: windows.reduce(
@@ -111,16 +117,25 @@ export const policiesColumns: ColumnDef<ShiftPolicy>[] = [
     ),
     enableSorting: false,
     cell: ({ row }) => {
+      // Holiday-work rules book a different attendance vocabulary (and none
+      // at all for the day-off overtime case), so resolve each rule's label
+      // by its shape. Blanks ('—') drop out.
       const labels = [
-        ...new Set(row.original.rules.map((r) => r.attendance_type)),
-      ]
+        ...new Set(
+          row.original.rules.map((r) =>
+            isHolidayWorkRule(r)
+              ? getHolidayAttendanceTypeLabel(r.holiday_attendance_type)
+              : getAttendanceTypeLabel(r.attendance_type)
+          )
+        ),
+      ].filter((label) => label !== '—')
       if (!labels.length)
         return <span className='text-sm text-muted-foreground'>—</span>
       return (
         <div className='flex flex-wrap gap-1'>
-          {labels.map((type) => (
-            <Badge key={type} variant='secondary' className='whitespace-nowrap'>
-              {getAttendanceTypeLabel(type)}
+          {labels.map((label) => (
+            <Badge key={label} variant='secondary' className='whitespace-nowrap'>
+              {label}
             </Badge>
           ))}
         </div>
