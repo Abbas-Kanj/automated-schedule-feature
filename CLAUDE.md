@@ -272,26 +272,98 @@ a genuine missing-import that `tsc -b` caught.
   pre-existing `search-provider.test.tsx` failures). **Neither batch has
   been verified in a real browser.**
 
+## Session state (2026-08-26)
+
+- **Schedule Rotation screen seed data + naming.** The screen at
+  `/schedule-rotation` (built 2026-08-25) went from one demo rotation to
+  **four, each covering a different case** of the rotate model — one
+  shift per position, a block pattern (repeated positions → fewer crews
+  than positions), `custom_shifts` / "Custom alternate" driven by
+  `shift_repeat` intervals, and a monthly-read on-call cycle — plus the
+  **eight new shifts** carrying their employee/team assignments (the
+  rotation roster is derived from each pattern shift's Assign-to picks,
+  so that's where the people live).
+- **Renamed "Shift Rotation" → "Schedule Rotation"** everywhere
+  user-visible (page `<h2>`, both sidebar entries) and in the code
+  comments naming the screen. Route + feature dir were already
+  `schedule-rotation`. Also added a **top-level sidebar button**
+  (`RotateCw`) — so two sidebar entries now point at that route.
+- `npm run build` clean; all four rotations validated against the real
+  zod schemas and stepped through consecutive periods. **Full suite not
+  run** — vitest browser mode can't bind its port on this machine
+  (`EACCES ::1:63315`); workaround + everything else:
+  → `.claude/handoff/schedule-rotation-screen.md`
+- Still **uncommitted**, and still **not browser-verified**.
+
+## Session state (2026-08-26, later)
+
+- **Pulled the last two screens from `../schedule-feature` @
+  `mahmoud-branch`** (`a37ebb5` publicHoliday + the three ScheduleTemp
+  commits) and rewrote them onto this repo's conventions — zustand +
+  `localStorage` stores, the shared `DataTable`, snake_case schema fields,
+  `lib/id.ts` / `lib/time.ts`, `Badge` variants instead of raw Tailwind
+  palette maps, `useTimeFormat` for clock strings, row-action dropdowns.
+  - **`public-holidays` replaces `official-holidays`** — their commit was
+    itself a rename+rework of that screen (`rigid` → `fixed`), so the old
+    feature + route are **deleted** and the sidebar entry now points at
+    `/public-holidays`. Their calendar multi-select UX was kept; our bulk
+    delete was kept (theirs had dropped it) and now actually deletes.
+  - **`schedule-templates`** is their "Schedule Temp", renamed to avoid
+    colliding with `schedules`' own `temporary_schedule` boolean.
+    Sidebar: Time Track → Schedules → Schedule templates.
+  - **The shared `DataTable` gained `searchKey`, `filters` and a
+    `bulkActions` render prop** (plus faceted row models), which is what
+    let both screens drop their hand-rolled table markup. Additive — the
+    three existing tables are unaffected.
+  → Full adaptation table, the two bugs fixed on the way in, and the
+  deliberate deviations: `.claude/handoff/public-holidays-and-schedule-templates.md`
+- `npm run build` clean, `eslint` clean on the new code, tests 60 passed /
+  3 failed (the 3 are `--environment=node` artifacts, not real). Still
+  **uncommitted** and **not browser-verified**.
+
 ## Pick up here next session
 
-1. **Click through the three newly-pulled screens** (`/employees`,
-   `/employees-list`, `/official-holidays`) — ported, typechecked and
-   linted, but never opened in a browser here.
+1. **Click through the six screens that have never been opened in a
+   browser here**: `/schedule-rotation` (four seeded rotations —
+   **clear `localStorage` keys `schedules` + `shifts` first**, or the
+   cached copies shadow the new seed), `/public-holidays` and
+   `/schedule-templates` (**clear keys `public-holidays` +
+   `schedule-templates` too**), plus `/employees` and `/employees-list`.
 2. **Click through the schedule form** — the `ToggleButton` conversions in
    the weekday / month-day / cycle-length / calendar grids shipped without
    a browser check (see `.claude/handoff/shift-policies.md`).
-3. Decide on the repo-wide Prettier normalization — still open, and still
+3. **Move `employees-list` onto the shared `DataTable`.** The reason it was
+   left hand-rolled (no row selection, no faceted filters) went away on
+   2026-08-26 when `DataTable` gained `searchKey` / `filters` /
+   `bulkActions` — but only `public-holidays` was moved over, so the
+   "extend it and move both, don't half-do it" note in
+   `.claude/handoff/employees-and-holidays-screens.md` is currently
+   half-done. Its columns have no `name` column, so pass a custom
+   `globalFilterFn`. Related: `employees-list` is now the **only** caller
+   of `hooks/use-table-url-state` — either give its route a
+   `validateSearch` or retire the hook with it.
+4. Decide on the repo-wide Prettier normalization — still open, and still
    its own commit if it happens (running `prettier --write` on an
    untouched HEAD file reorders unrelated Tailwind classes).
-4. Authenticate mem0 with a **correct** key (`m0-...` format, from
+5. Authenticate mem0 with a **correct** key (`m0-...` format, from
    https://app.mem0.ai/dashboard/api-keys) via `mem0 init --api-key <key>`,
    then run the Step 1 cross-project search before other work.
-5. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
+6. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
    surfaced by graphify (`shadcn-admin.netlify.app` vs. the real GitHub
    Pages deploy target).
-6. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
+7. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
    remove the references to it in `ARCHITECTURE.md`/`FEATURE_MAPPING.md`.
    `docs/ARCHITECTURE.md` / `FEATURE_MAPPING.md` also predate
    `shift-policies` and the shared `DataTable`.
-7. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
+8. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
    work — not needed for anything done so far.
+9. **Decide on the duplicate sidebar entry** for `/schedule-rotation`
+   (top-level button *and* the Time Track → Schedules leaf) — kept both
+   rather than deleting from a hierarchy that was deliberate and recent.
+10. **`pattern-builder.tsx` week-count readout divides by a hardcoded `6`**
+   while `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is `7` — a 7-day
+   weekly cycle renders as "1 week" correct by luck. Found, not fixed.
+11. **`eslint` now reports 11 errors / 3 warnings** (mostly
+    `react-hooks/set-state-in-effect`) in files untouched since the
+    2026-08-25 session recorded "eslint clean" — reconcile before
+    treating lint as a gate.
