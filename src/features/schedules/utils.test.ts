@@ -36,6 +36,8 @@ function makeShift(overrides: Partial<Shift> & Pick<Shift, 'id' | 'name'>): Shif
     work_type_group: undefined,
     service_resource: undefined,
     service_territory: undefined,
+    employee_ids: [],
+    team_ids: [],
     ...overrides,
   }
 }

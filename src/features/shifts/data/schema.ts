@@ -248,11 +248,21 @@ const shiftFieldsSchema = z
     // enables/disables the fields it sits above in the UI.
     assign_to_enabled: z.boolean().default(false),
     // "Assign to" tab — all optional, freeform picks with no downstream
-    // validation of their own. `work_type_group` is multi-select (a shift
-    // can span more than one work type), the other two stay single-select.
-    work_type_group: z.array(z.string()).optional(),
+    // validation of their own. `work_type_group` is a single-select of the
+    // assignment mode (team / employee / group / by branch). The other two
+    // dropdowns are hidden in the UI today (see `assign-to-tab.tsx`) but the
+    // fields are kept so stored records and `utils.ts` don't need reshaping.
+    work_type_group: z.string().optional(),
     service_resource: z.string().optional(),
     service_territory: z.string().optional(),
+    // The people this shift is worked by — individual employees (by id,
+    // against the `employees` directory) and/or whole teams (by id, against
+    // `features/teams`, whose members resolve to employees). These are what
+    // the Schedule Rotation screen reads to auto-derive who rotates through a
+    // schedule's shifts (see `features/schedule-rotation`), so unlike the
+    // freeform picks above they now actually drive downstream behaviour.
+    employee_ids: z.array(z.string()).default([]),
+    team_ids: z.array(z.string()).default([]),
   })
   .superRefine((val, ctx) => {
     if (val.category === 'custom' && !val.custom_category?.trim()) {
