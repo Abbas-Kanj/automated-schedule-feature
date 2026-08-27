@@ -5,6 +5,7 @@ import {
   Clock,
   Command,
   GalleryVerticalEnd,
+  RotateCw,
   ShoppingCart,
   Timer,
   Users,
@@ -59,6 +60,7 @@ export const sidebarData: SidebarData = {
               items: [
                 { title: 'General schedule', url: '/schedules' },
                 { title: 'Flexible schedule', url: '/schedules' },
+                { title: 'Schedule rotation', url: '/schedule-rotation' },
               ],
             },
             {
@@ -70,6 +72,11 @@ export const sidebarData: SidebarData = {
               ],
             },
           ],
+        },
+        {
+          title: 'Schedule Rotation',
+          url: '/schedule-rotation',
+          icon: RotateCw,
         },
         {
           title: 'Employee Management',
