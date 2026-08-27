@@ -2,57 +2,55 @@ import { useState } from 'react'
 import { type Table } from '@tanstack/react-table'
 import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
-import { sleep } from '@/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { type PublicHoliday } from '../data/schema'
+import { usePublicHolidaysStore } from '../stores/public-holidays-store'
 
 const CONFIRM_WORD = 'DELETE'
 
-type Props<TData> = {
+type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  table: Table<TData>
+  table: Table<PublicHoliday>
 }
 
-export function OfficialHolidaysMultiDeleteDialog<TData>({
+export function PublicHolidaysMultiDeleteDialog({
   open,
   onOpenChange,
   table,
-}: Props<TData>) {
+}: Props) {
   const [value, setValue] = useState('')
+  const deleteHolidays = usePublicHolidaysStore((s) => s.deleteHolidays)
   const selectedRows = table.getFilteredSelectedRowModel().rows
+  const count = selectedRows.length
+
   const handleDelete = () => {
     if (value.trim() !== CONFIRM_WORD) return
+    deleteHolidays(selectedRows.map((row) => row.original.id))
+    table.resetRowSelection()
+    setValue('')
     onOpenChange(false)
-    toast.promise(sleep(1000), {
-      loading: 'Deleting official holidays...',
-      success: () => {
-        setValue('')
-        table.resetRowSelection()
-        return `Deleted ${selectedRows.length} official holiday${selectedRows.length === 1 ? '' : 's'}`
-      },
-      error: 'Error deleting official holidays',
-    })
+    toast.success(`Deleted ${count} public holiday${count === 1 ? '' : 's'}.`)
   }
 
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
-      form='official-holidays-multi-delete-form'
+      form='public-holidays-multi-delete-form'
       disabled={value.trim() !== CONFIRM_WORD}
       title={
         <span className='text-destructive'>
           <AlertTriangle className='me-1 inline-block' size={18} />
-          Delete {selectedRows.length} official holiday
-          {selectedRows.length === 1 ? '' : 's'}
+          Delete {count} public holiday{count === 1 ? '' : 's'}
         </span>
       }
       desc={
         <form
-          id='official-holidays-multi-delete-form'
+          id='public-holidays-multi-delete-form'
           onSubmit={(event) => {
             event.preventDefault()
             handleDelete()

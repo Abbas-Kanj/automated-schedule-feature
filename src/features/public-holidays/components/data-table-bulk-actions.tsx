@@ -8,17 +8,19 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { DataTableBulkActions as BulkActionsToolbar } from '@/components/data-table'
-import { OfficialHolidaysMultiDeleteDialog } from './official-holidays-multi-delete-dialog'
+import { type PublicHoliday } from '../data/schema'
+import { PublicHolidaysMultiDeleteDialog } from './public-holidays-multi-delete-dialog'
 
-export function DataTableBulkActions<TData>({
+export function DataTableBulkActions({
   table,
 }: {
-  table: Table<TData>
+  table: Table<PublicHoliday>
 }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
   return (
     <>
-      <BulkActionsToolbar table={table} entityName='official holiday'>
+      <BulkActionsToolbar table={table} entityName='public holiday'>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -26,15 +28,15 @@ export function DataTableBulkActions<TData>({
               size='icon'
               className='size-8'
               onClick={() => setShowDeleteConfirm(true)}
-              aria-label='Delete selected official holidays'
+              aria-label='Delete selected public holidays'
             >
               <Trash2 />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Delete selected official holidays</TooltipContent>
+          <TooltipContent>Delete selected public holidays</TooltipContent>
         </Tooltip>
       </BulkActionsToolbar>
-      <OfficialHolidaysMultiDeleteDialog
+      <PublicHolidaysMultiDeleteDialog
         table={table}
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}

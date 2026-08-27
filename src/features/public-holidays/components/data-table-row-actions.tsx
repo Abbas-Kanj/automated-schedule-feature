@@ -6,19 +6,27 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { type OfficialHoliday } from '../data/schema'
-import { useOfficialHolidays } from './official-holidays-provider'
+import { type PublicHoliday } from '../data/schema'
+import { usePublicHolidays } from './public-holidays-provider'
 
-export function DataTableRowActions({ row }: { row: Row<OfficialHoliday> }) {
-  const { setOpen, setCurrentRow } = useOfficialHolidays()
+type DataTableRowActionsProps = {
+  row: Row<PublicHoliday>
+}
+
+export function DataTableRowActions({ row }: DataTableRowActionsProps) {
+  const holiday = row.original
+  const { setOpen, setCurrentRow } = usePublicHolidays()
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant='ghost' className='flex h-8 w-8 p-0'>
+        <Button
+          variant='ghost'
+          className='flex h-8 w-8 p-0 data-[state=open]:bg-muted'
+        >
           <DotsHorizontalIcon className='h-4 w-4' />
           <span className='sr-only'>Open menu</span>
         </Button>
@@ -26,7 +34,7 @@ export function DataTableRowActions({ row }: { row: Row<OfficialHoliday> }) {
       <DropdownMenuContent align='end' className='w-40'>
         <DropdownMenuItem
           onClick={() => {
-            setCurrentRow(row.original)
+            setCurrentRow(holiday)
             setOpen('edit')
           }}
         >
@@ -35,11 +43,9 @@ export function DataTableRowActions({ row }: { row: Row<OfficialHoliday> }) {
             <Pencil size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem
-          className='text-red-500!'
           onClick={() => {
-            setCurrentRow(row.original)
+            setCurrentRow(holiday)
             setOpen('delete')
           }}
         >

@@ -61,6 +61,7 @@ export const sidebarData: SidebarData = {
                 { title: 'General schedule', url: '/schedules' },
                 { title: 'Flexible schedule', url: '/schedules' },
                 { title: 'Schedule rotation', url: '/schedule-rotation' },
+                { title: 'Schedule templates', url: '/schedule-templates' },
               ],
             },
             {
@@ -89,8 +90,8 @@ export const sidebarData: SidebarData = {
           icon: UsersRound,
         },
         {
-          title: 'Holidays',
-          url: '/official-holidays',
+          title: 'Public holidays',
+          url: '/public-holidays',
           icon: CalendarDays,
         },
         {
