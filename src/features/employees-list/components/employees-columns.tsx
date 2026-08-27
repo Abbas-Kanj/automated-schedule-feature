@@ -1,46 +1,42 @@
 import { type ColumnDef } from '@tanstack/react-table'
-import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/data-table'
-import { type Employee } from '../../employees/data/schema'
+import { type Employee } from '@/features/employees/data/schema'
+import { getEmployeeFullName } from '@/features/employees/utils'
 import { DataTableRowActions } from './data-table-row-actions'
 
 export const employeesColumns: ColumnDef<Employee>[] = [
   {
-    accessorKey: 'punch_code',
+    id: 'name',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Punch code' />
+      <DataTableColumnHeader column={column} title='Name' />
     ),
+    accessorFn: (row) => getEmployeeFullName(row),
+    meta: { className: 'ps-1 w-1/4', tdClassName: 'ps-4 max-w-0' },
     cell: ({ row }) => (
-      <p className='max-w-36 ps-3'>{row.getValue('punch_code')}</p>
+      <div className='min-w-0'>
+        <p className='truncate font-medium'>
+          {getEmployeeFullName(row.original)}
+        </p>
+        {row.original.punch_code && (
+          <p className='truncate text-xs text-muted-foreground'>
+            {row.original.punch_code}
+          </p>
+        )}
+      </div>
     ),
-    meta: {
-      className: cn(
-        'drop-shadow-[0_1px_2px_rgb(0_0_0_/_0.1)] dark:drop-shadow-[0_1px_2px_rgb(255_255_255_/_0.1)]',
-        'inset-s-6 ps-0.5 max-md:sticky @4xl/content:table-cell @4xl/content:drop-shadow-none'
-      ),
-    },
-    enableHiding: false,
-  },
-
-  {
-    id: 'firstname',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Firstname' />
-    ),
-    cell: ({ row }) => {
-      return <span className='max-w-36'>{row.original.firstname}</span>
-    },
-    meta: { className: 'w-36' },
   },
   {
-    id: 'lastname',
+    id: 'position',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Lastname' />
+      <DataTableColumnHeader column={column} title='Position' />
     ),
-    cell: ({ row }) => {
-      return <span className='max-w-36'>{row.original.lastname}</span>
-    },
-    meta: { className: 'w-36' },
+    accessorFn: (row) => row.position.label,
+    cell: ({ row }) => (
+      <Badge variant='outline' className='whitespace-nowrap'>
+        {row.original.position.label}
+      </Badge>
+    ),
   },
   {
     accessorKey: 'schedule',
@@ -48,20 +44,23 @@ export const employeesColumns: ColumnDef<Employee>[] = [
       <DataTableColumnHeader column={column} title='Schedule' />
     ),
     cell: ({ row }) => (
-      <div className='w-fit ps-2 text-nowrap'>{row.getValue('schedule')}</div>
+      <span className='text-sm whitespace-nowrap'>{row.original.schedule}</span>
     ),
   },
   {
-    accessorKey: 'organization_unit',
+    id: 'organization_unit',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='OU' />
+      <DataTableColumnHeader column={column} title='Organization unit' />
     ),
-    cell: ({ row }) => <div>{row.original.organization_unit.value}</div>,
-    enableSorting: false,
+    accessorFn: (row) => row.organization_unit.label,
+    cell: ({ row }) => (
+      <Badge variant='secondary' className='whitespace-nowrap'>
+        {row.original.organization_unit.label}
+      </Badge>
+    ),
   },
-
   {
     id: 'actions',
-    cell: DataTableRowActions,
+    cell: ({ row }) => <DataTableRowActions row={row} />,
   },
 ]

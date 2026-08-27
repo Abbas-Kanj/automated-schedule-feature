@@ -71,7 +71,7 @@ export const sidebarData: SidebarData = {
           ],
         },
         {
-          title: 'Employees',
+          title: 'Employee Management',
           url: '/employees-list',
           icon: Users,
         },

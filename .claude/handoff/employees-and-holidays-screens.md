@@ -1,8 +1,15 @@
-# Handoff: employees / employees-list / official-holidays screens
+# Handoff: employees / employees-list screens
 
 Three screens pulled over from the sibling checkout
 `../schedule-feature` (same GitHub owner, different repo, branch
 `mahmoud-main`) on 2026-08-22.
+
+> **The `official-holidays` third of this file is superseded (2026-08-26).**
+> That feature was deleted and replaced by `public-holidays`, ported from
+> the same sibling repo's `mahmoud-branch`. Anything below about
+> `official-holidays` is history, not current state — see
+> `public-holidays-and-schedule-templates.md`. The `employees` /
+> `employees-list` halves are still accurate.
 
 ## Where things stand
 
@@ -20,27 +27,34 @@ Three screens pulled over from the sibling checkout
 |---|---|---|
 | `employees` | `/employees` | Add/edit form, sidebar tabs Personal Info / Schedule / Position. Only Personal Info is built out — `position.tsx` and `schedule.tsx` are the source's one-line placeholders. |
 | `employees-list` | `/employees-list` | Table over the 10 seeded records in `employees/data/data.json`. Row menu → `/employees?action=edit&employeeId=…`. |
-| `official-holidays` | `/official-holidays` | Per-year holiday records, "Open year" seeding from `createPredefinedHolidays()`, add/edit/delete + bulk delete, faceted Rigid filter, URL-synced paging. |
+| ~~`official-holidays`~~ | ~~`/official-holidays`~~ | **Deleted 2026-08-26**, replaced by `public-holidays`. |
 
 ## Flags — decide before building on these
 
-- **No persistence, and no zustand.** All three keep state in React
-  (`useState` + a context provider), unlike `schedules` / `shifts` /
-  `shift-policies`, which persist to `localStorage` through a zustand
-  store and re-validate against their zod schema on load. A holiday you
-  add or a year you open is gone on reload, and the employee form's
-  submit only calls `showSubmittedData` — there is no employees store at
-  all. Converting them to the store pattern used elsewhere is the obvious
-  next step if these are meant to be more than a UI demo.
-- **Both tables hand-roll their markup instead of using the shared
-  `components/data-table/data-table.tsx`.** That is deliberate for
-  `official-holidays`: the shared `DataTable` has no row selection and no
-  faceted filters, which that screen needs for bulk delete and the Rigid
-  filter. `employees-list` could plausibly move onto the shared shell —
-  it uses neither — but its columns have no `name` column, so the shared
-  default `globalFilterFn` (a contains-match on `name`) would need a
-  custom one passed in. Either extend the shared `DataTable` with
-  selection + filters and move both over, or leave them; don't half-do it.
+- **No persistence, and no zustand** — now true of `employees` and
+  `employees-list` only. Both keep state in React (`useState` + a context
+  provider), unlike `schedules` / `shifts` / `shift-policies` /
+  `public-holidays` / `schedule-templates`, which persist to
+  `localStorage` through a zustand store and re-validate against their zod
+  schema on load. The employee form's submit only calls
+  `showSubmittedData` — there is no employees store at all. Converting
+  them to the store pattern used everywhere else is the obvious next step
+  if these are meant to be more than a UI demo.
+  *(The holidays half of this flag was resolved on 2026-08-26 — the
+  replacement screen has a store.)*
+- **`employees-list` still hand-rolls its table markup instead of using
+  the shared `components/data-table/data-table.tsx`.** The original
+  reasoning here — that the shared `DataTable` had no row selection and no
+  faceted filters — **no longer holds**: it gained `searchKey`, `filters`
+  and a `bulkActions` render prop on 2026-08-26, and `public-holidays`
+  now uses all three.
+  **This is the "don't half-do it" case that flag warned about, and it is
+  currently half-done:** the shared shell was extended and the holidays
+  screen moved onto it, but `employees-list` was left behind (out of scope
+  that session). Moving it over should now be straightforward — the one
+  remaining wrinkle is unchanged: its columns have no `name` column, so
+  the shared default `globalFilterFn` (a contains-match on `name`) needs a
+  custom one passed in.
 
 ## Adaptations made while porting
 
@@ -76,8 +90,12 @@ type checking).
   (`information_technology`), not its `label`. That's what the source
   does; it looks like a bug but it wasn't mine to decide.
 - `employees-list`'s route has no `validateSearch`, so its
-  `useTableUrlState` paging writes unvalidated search params. Works, but
-  it's the odd one out next to `/official-holidays`.
+  `useTableUrlState` paging writes unvalidated search params. As of
+  2026-08-26 it is also the **only** remaining caller of
+  `useTableUrlState` — `/public-holidays` dropped URL-synced paging when
+  it moved onto the shared `DataTable`. So either give this route a
+  `validateSearch`, or move it onto the shared shell too and retire the
+  hook.
 
 ## No dependency work was needed
 
@@ -92,12 +110,13 @@ unchanged.
 
 ## Pick up here
 
-1. **Click through all three screens.** Highest-risk unverified pieces, in
-   order: the holiday action dialog's multi-date calendar popover (add /
-   remove / uniqueness), "Open year" on a year that isn't the current one,
-   and the `/employees-list` → `/employees?action=edit` round trip.
-2. Decide on persistence (see the first flag above).
-3. Decide whether `employees-list` moves onto the shared `DataTable`
+1. **Click through both remaining screens.** Highest-risk unverified
+   piece: the `/employees-list` → `/employees?action=edit` round trip.
+   *(The holiday-dialog items that used to head this list moved to
+   `public-holidays-and-schedule-templates.md`.)*
+2. Decide on persistence for `employees` / `employees-list` (see the first
+   flag above).
+3. Move `employees-list` onto the shared `DataTable` — the blocker is gone
    (see the second flag).
 4. The Schedule and Position tabs on `/employees` are empty placeholders —
    they render literal `"Schedule"` / `"position"` text.
