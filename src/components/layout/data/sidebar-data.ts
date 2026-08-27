@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Timer,
   Users,
+  UsersRound,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -74,6 +75,11 @@ export const sidebarData: SidebarData = {
           title: 'Employee Management',
           url: '/employees-list',
           icon: Users,
+        },
+        {
+          title: 'Team Management',
+          url: '/teams',
+          icon: UsersRound,
         },
         {
           title: 'Holidays',
