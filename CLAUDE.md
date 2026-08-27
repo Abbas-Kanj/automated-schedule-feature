@@ -321,27 +321,65 @@ a genuine missing-import that `tsc -b` caught.
   3 failed (the 3 are `--environment=node` artifacts, not real). Still
   **uncommitted** and **not browser-verified**.
 
+## Session state (2026-08-27)
+
+- **Committed and pushed everything that had piled up uncommitted** — the
+  working tree at session start held the full 2026-08-26 batches above
+  *plus* two features neither session state nor any handoff file had ever
+  recorded: a **Team Management** screen (`/teams`) and shift-form
+  **Assign-to Employees/Teams pickers** (`employee_ids`/`team_ids` on the
+  shift schema), both already built, just never surfaced. No new feature
+  code was written this session — the work was reading every diff to
+  recover the real dependency order, then landing it as 9 commits instead
+  of one undifferentiated dump:
+  `e99abb4` (employees form + `employees-list` DataTable migration, a
+  dependency of teams) → `d808701` (teams) → `c8c333c` + `ca6ad08` (shifts
+  assign-to, depends on teams+employees) → `783b18b` (shift-policies
+  holiday-work rule, independent) → `7ae79da` (Schedule Rotation, depends
+  on all of the above) → `d054452` (public-holidays + schedule-templates)
+  → `3752211` (this file) → `525da2d` (routeTree regen). Pushed to `main`.
+  New handoff: `.claude/handoff/teams-and-shift-assignment.md`.
+- `npm run build` clean; **full suite ran in real browser mode** (no
+  workaround needed) — **174 passed / 3 failed**, the 3 being the
+  pre-existing unowned `search-provider.test.tsx` failures. This
+  supersedes the partial `--environment=node` numbers recorded in the two
+  sessions above, which were working around a vitest port-bind error
+  (`EACCES ::1:63315`) that did **not** reproduce this session — see the
+  affected handoff files for detail; treat that workaround as a fallback,
+  not the default, until/unless it recurs.
+- `eslint` re-checked: still 11 errors / 3 warnings, same 5 files as the
+  2026-08-26 handoff recorded — confirmed stable, not drifting.
+- Updated the four handoff files this session's commits touched
+  (`employees-and-holidays-screens.md`, `shift-policies.md`,
+  `schedule-rotation-screen.md`, `public-holidays-and-schedule-templates.md`)
+  to strike resolved blockers and correct now-stale "uncommitted" /
+  vitest-gotcha claims. `schedule-form-ui-polish.md` untouched — out of
+  scope.
+- **Still not browser-verified** — this session organized and verified
+  the build/test pipeline only, no browser tooling was used.
+
 ## Pick up here next session
 
-1. **Click through the six screens that have never been opened in a
+1. **Click through the seven screens that have never been opened in a
    browser here**: `/schedule-rotation` (four seeded rotations —
    **clear `localStorage` keys `schedules` + `shifts` first**, or the
    cached copies shadow the new seed), `/public-holidays` and
    `/schedule-templates` (**clear keys `public-holidays` +
-   `schedule-templates` too**), plus `/employees` and `/employees-list`.
+   `schedule-templates` too**), `/teams`, plus `/employees` and
+   `/employees-list` (both reworked 2026-08-27 — flat form, shared
+   `DataTable` — still unverified either way). Also click through the
+   shift form's Assign-to tab: its Employees/Teams multi-selects are new
+   and drive the Schedule Rotation roster, so a bug there is invisible
+   until that screen is checked too.
 2. **Click through the schedule form** — the `ToggleButton` conversions in
    the weekday / month-day / cycle-length / calendar grids shipped without
    a browser check (see `.claude/handoff/shift-policies.md`).
-3. **Move `employees-list` onto the shared `DataTable`.** The reason it was
-   left hand-rolled (no row selection, no faceted filters) went away on
-   2026-08-26 when `DataTable` gained `searchKey` / `filters` /
-   `bulkActions` — but only `public-holidays` was moved over, so the
-   "extend it and move both, don't half-do it" note in
-   `.claude/handoff/employees-and-holidays-screens.md` is currently
-   half-done. Its columns have no `name` column, so pass a custom
-   `globalFilterFn`. Related: `employees-list` is now the **only** caller
-   of `hooks/use-table-url-state` — either give its route a
-   `validateSearch` or retire the hook with it.
+3. **Teams and the shift Assign-to employees/teams pickers were never
+   documented anywhere** — built in an earlier, unrecorded session and
+   only surfaced (then committed, `d808701` + `c8c333c`) on 2026-08-27
+   when picking up a large batch of uncommitted work. See
+   `.claude/handoff/teams-and-shift-assignment.md` for what's actually
+   there.
 4. Decide on the repo-wide Prettier normalization — still open, and still
    its own commit if it happens (running `prettier --write` on an
    untouched HEAD file reorders unrelated Tailwind classes).

@@ -102,6 +102,12 @@ Design constraints that shaped these (worth knowing before editing them):
 
 ## Status
 
+- **Committed and pushed to `main`** on 2026-08-27, as `7ae79da` (the
+  screen + seed data) — part of a 9-commit session that also organized and
+  shipped every other feature that had piled up uncommitted (teams,
+  employees refactor, shifts assign-to, shift-policies holiday-work rule,
+  public-holidays, schedule-templates). No code changed in that session,
+  only commit organization.
 - `npm run build` **clean**.
 - Seed data **validated against the real schemas**: every record parses
   `z.array(shiftSchema)` / `z.array(scheduleSchema)`, and `buildRotation` was run
@@ -110,17 +116,26 @@ Design constraints that shaped these (worth knowing before editing them):
   by month; line crews' block walks forward one position per week). This was done
   with a **throwaway test file that was deleted afterwards** — see Open calls,
   it's arguably worth making permanent.
-- Targeted tests pass: `schedules/utils.test.ts`, `schedule-rotation/utils.test.ts`,
-  `shift-policies/*` — **44 passed**.
-- **The full suite was NOT run this session** — see the vitest gotcha below.
-- **Still NOT browser-verified.** No browser tooling connected in either the
-  08-25 or 08-26 session.
+- **Full suite now runs clean on this machine**: `npm run test` (real
+  browser mode, no workaround needed) — 174 passed / 3 failed, the 3 being
+  the pre-existing unowned `search-provider.test.tsx` failures. The vitest
+  EACCES port-bind issue described below did **not** reproduce on
+  2026-08-27 — see that section, left in place as a workaround in case it
+  comes back rather than deleted outright.
+- **Still NOT browser-verified.** No browser tooling connected in the
+  08-25, 08-26, or 08-27 sessions.
 
-## ⚠️ Environment gotchas hit this session
+## ⚠️ Environment gotchas hit in earlier sessions
 
-### Vitest browser mode fails on this machine
+### Vitest browser mode fails on this machine — did NOT reproduce 2026-08-27
 
-`npx vitest run` dies before any test with:
+`npx vitest run` / `npm run test` ran clean in real browser mode on
+2026-08-27 (174 passed / 3 failed, see Status). Whatever was holding the
+port in the 08-25/08-26 sessions wasn't happening this time — treat the
+workaround below as a fallback to reach for if the error comes back, not
+as the current state of this machine.
+
+Previously, `npx vitest run` died before any test with:
 
 ```
 Error: listen EACCES: permission denied ::1:63315
@@ -172,13 +187,8 @@ localStorage.removeItem('schedules'); localStorage.removeItem('shifts'); locatio
    pre-existing repo-wide Tailwind class-sorting drift (`text-muted-foreground`
    ordering, 4 spots), untouched deliberately so the rename diff stays clean.
    Part of the still-open repo-wide Prettier normalization call in CLAUDE.md.
-5. **`eslint` currently reports 11 errors / 3 warnings** (`multi-select/index.tsx`,
-   `pattern-builder.tsx`, `schedule-form.tsx`, `policy-rules-field.tsx`,
-   `time-24-input.tsx` — mostly `react-hooks/set-state-in-effect`). **None are in
-   files this session touched**, but the 08-25 handoff recorded "eslint clean",
-   so something changed — worth a look before anyone treats lint as a gate.
-
-## Not committed
-
-All changes are uncommitted (this batch sits on top of the other uncommitted
-work already in the tree — employees/teams/holidays etc.).
+5. **`eslint` still reports 11 errors / 3 warnings**, same 5 files, unchanged
+   as of 2026-08-27 — re-checked during the commit-organizing session and the
+   count/locations are identical. None are in files any session touched for
+   this feature. Still worth a look before anyone treats lint as a gate, but
+   confirmed stable rather than actively drifting.

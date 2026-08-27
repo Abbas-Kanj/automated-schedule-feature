@@ -82,22 +82,31 @@ tables bypassing the shared `DataTable`.
 
 ## State
 
+- **Committed and pushed to `main`** on 2026-08-27, as `d054452` — part of
+  a 9-commit session that organized and shipped every feature that had
+  piled up uncommitted. No code changed in that session, only commit
+  organization.
 - `npm run build` **clean**; route tree regenerated (both routes present,
   no `official-holidays` refs anywhere in `src/`).
 - `npx eslint` **clean** on all new files + the `DataTable` change.
-- Tests: **60 passed / 3 failed**. The 3 (`cookies.test.ts` ×2,
-  `auth-store.test.ts` ×1) plus 2 collection errors
-  (`time-format.test.ts`, `use-table-url-state.test.ts`) are artifacts of
-  the `--environment=node` workaround below — they need
-  `document.cookie` / `localStorage` / the vitest browser context. Not
-  related to this work.
-- **NOT browser-verified** — same vitest/browser tooling gap as the
-  previous two sessions.
+- **Full suite now runs clean, in real browser mode**: 174 passed / 3
+  failed (the 3 are the pre-existing unowned `search-provider.test.tsx`
+  failures) — supersedes the 60/3 `--environment=node` partial run below,
+  which was constrained by a vitest port-bind issue that did not
+  reproduce on 2026-08-27 (see the next section).
+- **NOT browser-verified** — still true, no browser tooling connected in
+  any session for this feature yet.
 
 ## Gotchas for next session
 
-- **Vitest browser mode still can't bind on this machine**
-  (`EACCES ::1:63315`). Non-DOM files only:
+- **Vitest browser mode port-bind issue did NOT reproduce on 2026-08-27.**
+  Previously `npx vitest run` / `npm run test` failed to bind with
+  `EACCES ::1:63315` on this machine, forcing the `--environment=node`
+  workaround below (hence the 60/3 figure and the `cookies.test.ts` /
+  `auth-store.test.ts` / collection-error artifacts it produced — those
+  needed `document.cookie` / `localStorage` / the real browser context and
+  don't reflect a real failure). On 2026-08-27 the full suite just ran.
+  Try the real command first; fall back to this only if it recurs:
   `npx vitest run --browser.enabled=false --environment=node <explicit file paths>`
   — note *paths*, not globs; bare positional args are substring filters and
   a glob matches nothing.
