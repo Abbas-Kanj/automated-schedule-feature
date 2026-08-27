@@ -27,12 +27,15 @@ import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authen
 import { Route as AuthenticatedEmployeesListRouteRouteImport } from './routes/_authenticated/employees-list/route'
 import { Route as AuthenticatedEmployeesRouteRouteImport } from './routes/_authenticated/employees/route'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
+import { Route as AuthenticatedTeamsIndexRouteImport } from './routes/_authenticated/teams/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedShiftsIndexRouteImport } from './routes/_authenticated/shifts/index'
 import { Route as AuthenticatedShiftPoliciesIndexRouteImport } from './routes/_authenticated/shift-policies/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedSchedulesIndexRouteImport } from './routes/_authenticated/schedules/index'
-import { Route as AuthenticatedOfficialHolidaysIndexRouteImport } from './routes/_authenticated/official-holidays/index'
+import { Route as AuthenticatedScheduleTemplatesIndexRouteImport } from './routes/_authenticated/schedule-templates/index'
+import { Route as AuthenticatedScheduleRotationIndexRouteImport } from './routes/_authenticated/schedule-rotation/index'
+import { Route as AuthenticatedPublicHolidaysIndexRouteImport } from './routes/_authenticated/public-holidays/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
@@ -139,6 +142,11 @@ const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTeamsIndexRoute = AuthenticatedTeamsIndexRouteImport.update({
+  id: '/teams/',
+  path: '/teams/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
@@ -168,10 +176,22 @@ const AuthenticatedSchedulesIndexRoute =
     path: '/schedules/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedOfficialHolidaysIndexRoute =
-  AuthenticatedOfficialHolidaysIndexRouteImport.update({
-    id: '/official-holidays/',
-    path: '/official-holidays/',
+const AuthenticatedScheduleTemplatesIndexRoute =
+  AuthenticatedScheduleTemplatesIndexRouteImport.update({
+    id: '/schedule-templates/',
+    path: '/schedule-templates/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedScheduleRotationIndexRoute =
+  AuthenticatedScheduleRotationIndexRouteImport.update({
+    id: '/schedule-rotation/',
+    path: '/schedule-rotation/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPublicHolidaysIndexRoute =
+  AuthenticatedPublicHolidaysIndexRouteImport.update({
+    id: '/public-holidays/',
+    path: '/public-holidays/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedHelpCenterIndexRoute =
@@ -287,12 +307,15 @@ export interface FileRoutesByFullPath {
   '/apps/': typeof AuthenticatedAppsIndexRoute
   '/chats/': typeof AuthenticatedChatsIndexRoute
   '/help-center/': typeof AuthenticatedHelpCenterIndexRoute
-  '/official-holidays/': typeof AuthenticatedOfficialHolidaysIndexRoute
+  '/public-holidays/': typeof AuthenticatedPublicHolidaysIndexRoute
+  '/schedule-rotation/': typeof AuthenticatedScheduleRotationIndexRoute
+  '/schedule-templates/': typeof AuthenticatedScheduleTemplatesIndexRoute
   '/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/shift-policies/': typeof AuthenticatedShiftPoliciesIndexRoute
   '/shifts/': typeof AuthenticatedShiftsIndexRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/teams/': typeof AuthenticatedTeamsIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/schedules/$scheduleId/': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/schedules/new/': typeof AuthenticatedSchedulesNewIndexRoute
@@ -324,12 +347,15 @@ export interface FileRoutesByTo {
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
-  '/official-holidays': typeof AuthenticatedOfficialHolidaysIndexRoute
+  '/public-holidays': typeof AuthenticatedPublicHolidaysIndexRoute
+  '/schedule-rotation': typeof AuthenticatedScheduleRotationIndexRoute
+  '/schedule-templates': typeof AuthenticatedScheduleTemplatesIndexRoute
   '/schedules': typeof AuthenticatedSchedulesIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/shift-policies': typeof AuthenticatedShiftPoliciesIndexRoute
   '/shifts': typeof AuthenticatedShiftsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
+  '/teams': typeof AuthenticatedTeamsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/schedules/new': typeof AuthenticatedSchedulesNewIndexRoute
@@ -366,12 +392,15 @@ export interface FileRoutesById {
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
-  '/_authenticated/official-holidays/': typeof AuthenticatedOfficialHolidaysIndexRoute
+  '/_authenticated/public-holidays/': typeof AuthenticatedPublicHolidaysIndexRoute
+  '/_authenticated/schedule-rotation/': typeof AuthenticatedScheduleRotationIndexRoute
+  '/_authenticated/schedule-templates/': typeof AuthenticatedScheduleTemplatesIndexRoute
   '/_authenticated/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/shift-policies/': typeof AuthenticatedShiftPoliciesIndexRoute
   '/_authenticated/shifts/': typeof AuthenticatedShiftsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/_authenticated/teams/': typeof AuthenticatedTeamsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/schedules/$scheduleId/': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/_authenticated/schedules/new/': typeof AuthenticatedSchedulesNewIndexRoute
@@ -406,12 +435,15 @@ export interface FileRouteTypes {
     | '/apps/'
     | '/chats/'
     | '/help-center/'
-    | '/official-holidays/'
+    | '/public-holidays/'
+    | '/schedule-rotation/'
+    | '/schedule-templates/'
     | '/schedules/'
     | '/settings/'
     | '/shift-policies/'
     | '/shifts/'
     | '/tasks/'
+    | '/teams/'
     | '/users/'
     | '/schedules/$scheduleId/'
     | '/schedules/new/'
@@ -443,12 +475,15 @@ export interface FileRouteTypes {
     | '/apps'
     | '/chats'
     | '/help-center'
-    | '/official-holidays'
+    | '/public-holidays'
+    | '/schedule-rotation'
+    | '/schedule-templates'
     | '/schedules'
     | '/settings'
     | '/shift-policies'
     | '/shifts'
     | '/tasks'
+    | '/teams'
     | '/users'
     | '/schedules/$scheduleId'
     | '/schedules/new'
@@ -484,12 +519,15 @@ export interface FileRouteTypes {
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/help-center/'
-    | '/_authenticated/official-holidays/'
+    | '/_authenticated/public-holidays/'
+    | '/_authenticated/schedule-rotation/'
+    | '/_authenticated/schedule-templates/'
     | '/_authenticated/schedules/'
     | '/_authenticated/settings/'
     | '/_authenticated/shift-policies/'
     | '/_authenticated/shifts/'
     | '/_authenticated/tasks/'
+    | '/_authenticated/teams/'
     | '/_authenticated/users/'
     | '/_authenticated/schedules/$scheduleId/'
     | '/_authenticated/schedules/new/'
@@ -639,6 +677,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUsersIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/teams/': {
+      id: '/_authenticated/teams/'
+      path: '/teams'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof AuthenticatedTeamsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/tasks/': {
       id: '/_authenticated/tasks/'
       path: '/tasks'
@@ -674,11 +719,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSchedulesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/official-holidays/': {
-      id: '/_authenticated/official-holidays/'
-      path: '/official-holidays'
-      fullPath: '/official-holidays/'
-      preLoaderRoute: typeof AuthenticatedOfficialHolidaysIndexRouteImport
+    '/_authenticated/schedule-templates/': {
+      id: '/_authenticated/schedule-templates/'
+      path: '/schedule-templates'
+      fullPath: '/schedule-templates/'
+      preLoaderRoute: typeof AuthenticatedScheduleTemplatesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/schedule-rotation/': {
+      id: '/_authenticated/schedule-rotation/'
+      path: '/schedule-rotation'
+      fullPath: '/schedule-rotation/'
+      preLoaderRoute: typeof AuthenticatedScheduleRotationIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/public-holidays/': {
+      id: '/_authenticated/public-holidays/'
+      path: '/public-holidays'
+      fullPath: '/public-holidays/'
+      preLoaderRoute: typeof AuthenticatedPublicHolidaysIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/help-center/': {
@@ -821,11 +880,14 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
-  AuthenticatedOfficialHolidaysIndexRoute: typeof AuthenticatedOfficialHolidaysIndexRoute
+  AuthenticatedPublicHolidaysIndexRoute: typeof AuthenticatedPublicHolidaysIndexRoute
+  AuthenticatedScheduleRotationIndexRoute: typeof AuthenticatedScheduleRotationIndexRoute
+  AuthenticatedScheduleTemplatesIndexRoute: typeof AuthenticatedScheduleTemplatesIndexRoute
   AuthenticatedSchedulesIndexRoute: typeof AuthenticatedSchedulesIndexRoute
   AuthenticatedShiftPoliciesIndexRoute: typeof AuthenticatedShiftPoliciesIndexRoute
   AuthenticatedShiftsIndexRoute: typeof AuthenticatedShiftsIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
+  AuthenticatedTeamsIndexRoute: typeof AuthenticatedTeamsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedSchedulesScheduleIdIndexRoute: typeof AuthenticatedSchedulesScheduleIdIndexRoute
   AuthenticatedSchedulesNewIndexRoute: typeof AuthenticatedSchedulesNewIndexRoute
@@ -842,12 +904,16 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
-  AuthenticatedOfficialHolidaysIndexRoute:
-    AuthenticatedOfficialHolidaysIndexRoute,
+  AuthenticatedPublicHolidaysIndexRoute: AuthenticatedPublicHolidaysIndexRoute,
+  AuthenticatedScheduleRotationIndexRoute:
+    AuthenticatedScheduleRotationIndexRoute,
+  AuthenticatedScheduleTemplatesIndexRoute:
+    AuthenticatedScheduleTemplatesIndexRoute,
   AuthenticatedSchedulesIndexRoute: AuthenticatedSchedulesIndexRoute,
   AuthenticatedShiftPoliciesIndexRoute: AuthenticatedShiftPoliciesIndexRoute,
   AuthenticatedShiftsIndexRoute: AuthenticatedShiftsIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
+  AuthenticatedTeamsIndexRoute: AuthenticatedTeamsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedSchedulesScheduleIdIndexRoute:
     AuthenticatedSchedulesScheduleIdIndexRoute,
