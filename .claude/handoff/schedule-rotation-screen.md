@@ -1,7 +1,7 @@
 # Schedule Rotation screen
 
 Screen at `/schedule-rotation` showing a rotate schedule's shift rotation across
-its employees, weekly or monthly — the "Weekly Shift Rotation" mock the user
+its crew, weekly or monthly — the "Weekly Shift Rotation" mock the user
 supplied.
 
 > **Renamed 2026-08-26**: the screen was called **Shift Rotation** through
@@ -23,148 +23,177 @@ supplied.
 - **Cycle legend** — decodes the sequence letters (`M = Morning`, …, `O = Off`).
 - **Table** — Employee Name · Current Schedule Sequence · Assigned Shift This
   Week/Month. The sequence is the cycle rotated so the employee's current
-  position is first and emphasized (Alice `M A N O`, Bob `A N O M`).
+  position is first and emphasized (Amir `M A N O`, Bilal `A N O M`).
 
-## Model (per the user's answers)
+## Model
 
-- **Employees are auto-derived from the shifts**, not stored on the schedule.
-  Each shift's **Assign to** tab now has real **Employees** + **Teams** pickers
-  (was only the freeform "Work type group"). The roster = union of every
-  employee assigned to a pattern shift (teams resolved to members, deduped).
-- **Stagger by starting shift**: an employee's `offset` is the first cycle
-  position whose shift they're on. So Morning-assigned people start on Morning,
-  Afternoon-assigned start on Afternoon, etc. **Corollary**: two pattern
-  positions holding the *same* shift produce only *one* offset — a 7-position
-  block pattern built from 2 shifts runs as **2 crews, not 7** (see Production
-  Line Rotation below).
+> **Reworked 2026-08-29.** The roster used to be *inferred* from the shifts.
+> It is now *declared* on the schedule. See "The 2026-08-29 rework" below for
+> what changed and why; everything in this section describes the current
+> behaviour.
+
+- **The crew is stored on the schedule's pattern.** Each entry of
+  `pattern[]` carries `employee_ids` / `team_ids` (see
+  `rotatePatternEntrySchema`), set on the schedule form's own **"Assign to"**
+  step. `getRotationRoster` reads these and **nothing else** — a position's
+  shift is consulted only for its name, letter and badge colour.
+- **A position's pick is that crew's starting slot.** Someone assigned to the
+  Morning position starts the cycle on Morning. An **off position is
+  assignable like any other**, which is how "this crew starts on a rest day"
+  gets expressed — it has no shift of its own to carry a pick.
 - **One step per period**: `assignedIndex = (offset + periodIndex) mod
-  cycleLength`. `periodIndex` = whole weeks/months between the viewed period and
-  the `start_date` period. Off positions have no starters but everyone rotates
-  through them. The Weekly/Monthly toggle only changes *what one step means* —
-  it is independent of `cycle_length`.
+  cycleLength`, where `offset` is the position the crew was assigned to and
+  `periodIndex` is whole weeks/months between the viewed period and the
+  `start_date` period. Off positions are ordinary cycle members — everyone
+  rotates through them. The Weekly/Monthly toggle only changes *what one step
+  means*; it is independent of `cycle_length`.
+- **`cycleLength === pattern.length`**, regardless of `cycle_type`. This
+  screen never reads `cycle_length.days` or `shift_repeat`.
+- **Shifts keep their own "Assign to" tab**, and their `employee_ids` /
+  `team_ids` are kept as sample data. They say who *may* work a shift; they no
+  longer decide who holds which slot of a rotation.
 
 Core logic is pure in `src/features/schedule-rotation/utils.ts`
 (`buildRotation`, `getRotationPositions`, `getRotationRoster`, `getAssignedIndex`,
-period helpers), unit-tested in `utils.test.ts`.
+period helpers), unit-tested in `utils.test.ts` and locked against the real
+seeds in `scenario.test.ts`.
 
-## Files
+## The 2026-08-29 rework — assignment moved onto the schedule
 
-- `src/features/schedule-rotation/` — `utils.ts`, `utils.test.ts`, `data.ts`
-  (period options + soft badge color map), `index.tsx`, `components/`
-  (`schedule-rotation-table.tsx`, `shift-badge.tsx`).
-- `src/routes/_authenticated/schedule-rotation/index.tsx` (+ regenerated
-  `routeTree.gen.ts`).
-- `src/components/layout/data/sidebar-data.ts` — **two** entries point at this
-  route: a top-level **Schedule Rotation** button (`RotateCw` icon, sits between
-  Time Track and Employee Management) added 2026-08-26, plus the original
-  **Time Track → Schedules → Schedule rotation** leaf. The duplication is
-  deliberate-for-now, not an oversight — see Open calls.
-- **Shift schema change**: `shifts/data/schema.ts` added
-  `employee_ids: string[]` + `team_ids: string[]` (both `.default([])`).
-  Threaded through `defaults.ts`, `normalizeShiftFormValues` (cleared when
-  Assign-to is off), `assign-to-tab.tsx`, and the `makeShift` fixture in
-  `schedules/utils.test.ts`.
+**The problem.** `getRotationRoster` used to merge each position's *shift*
+assignments and give each person the index of the first position they appeared
+on. That only worked while every shift happened to carry exactly one person:
 
-## Seed data — four rotations, four different shapes
+- A shift pointing at a **team** dropped every member onto the same position —
+  four people all on Morning, nobody anywhere else.
+- An **off position has no shift**, so it could not name anyone. A
+  `pattern[].employee_ids` field had been bolted on as a special case just for
+  the rest slot.
 
-Expanded 2026-08-26 from one rotation to four, deliberately covering different
-cases of the rotate model. All in `schedules/data/schedules.ts` +
-`shifts/data/shifts.ts`.
+So the cycle had to be guessed out of data that was never meant to answer "who
+starts where".
 
-| Schedule | Cycle | Case it covers |
-|---|---|---|
-| Store Floor Rotation | 4 days — `M A N O` | One shift per position, 3 shifts + off |
-| Production Line Rotation | 7 days — `D D D N N O O` | **Block pattern** (a shift holds consecutive positions) → 2 crews from 2 shifts; `cycle_length.unit: 'weekly'` |
-| Support Desk Rotation | 9 cards — `E E E L L L N N O` | **`custom_shifts`** ("Custom alternate") driven by `shift_repeat` intervals; also `temporary_schedule` + `end_type: 'on_date'` |
-| On-Call Duty Rotation | 4 months — `P B E O` | Built for the **Monthly** tab (one tier per calendar month); `end_type: 'after_occurrences'` |
+**The change.**
 
-Supporting shifts added to `shifts.ts` (8 new, all `shift_type: 'rotate'`):
+- New **"Assign to" step** in the schedule form, rotate only, sitting between
+  **Pattern** and **Start & End** —
+  `schedule-form/schedule-assign-to-fields.tsx`. One row per cycle position,
+  each with Employees + Teams multi-selects, built from the same `MultiSelect`
+  the shift form's own Assign-to tab uses.
+- `getRotationRoster` now reads `pos.employeeIds` / `pos.teamIds` only.
+- `pattern[].employee_ids` / `team_ids` stop being an off-slot special case and
+  become the whole roster. **No schema restriction was added** — an unassigned
+  position stays valid and the step never blocks "Next".
+- `pattern-builder.tsx`'s `custom_shifts` rebuild now carries crew across by
+  position. Without it, stepping back to Pattern and changing an interval
+  silently emptied the roster.
+- The Summary step gained an "Assign to" section; the rotation screen's
+  "no employees" empty state now points at the schedule's step rather than the
+  shift's tab.
 
-- **Day Line / Night Line** — 12h, exercise `full_day_hours`/`half_day_hours`.
-  Night Line uses `seed-team-engineering` + one individual.
-- **Early / Late / Night Desk** — 24×5. Added a local `weekdaysOnly()` helper in
-  `shifts.ts` (Mon–Fri variant of `buildDefaultDays`) so Sat/Sun are disabled.
-- **Primary / Backup / Escalation On-Call** — `category: 'oncall'`,
-  `time_slot_type: 'overtime'`.
+**Deliberately not done:** the step is rotate-only (fixed/flexible have no
+pattern to attach crew to, and a schedule-wide roster field would need a schema
+change with no consumer), and there is no `assign_to_enabled` toggle at
+schedule level.
+
+## Seed data — two scenarios
+
+Rewritten 2026-08-29. Both are the same shape at different sizes: **one cycle
+position per shift plus a rest slot, and one crew per position**, so every crew
+covers every shift and exactly one is off at a time.
+
+| Schedule | Crew | Cycle | Pattern type |
+|---|---|---|---|
+| **Shift Rotation** | Team A — Amir, Bilal, Carla, Dana | 4 — `M A N O` | Rotate pattern (`pattern_shifts`) |
+| **Desk Alternation** | Team B — Elias, Farah, Ghassan | 3 — `E L O` | Custom alternate (`custom_shifts`) |
+
+Supporting data:
+
+- **7 employees** in `employees/data/data.json` (`emp-a`…`emp-g`).
+- **2 teams** in `teams/data/teams.ts` — `team-a` (4), `team-b` (3). Teams group
+  people and populate the step's Teams picker; they do not themselves decide
+  who works when.
+- **5 shifts** in `shifts/data/shifts.ts` — Morning 06:00–14:00, Afternoon
+  14:00–22:00, Night 22:00–06:00 (`overnight`), Early 07:00–15:00, Late
+  15:00–23:00.
 
 Design constraints that shaped these (worth knowing before editing them):
 
 - **Cycle letters must be unique per rotation.** The sequence chip is
   `shift.name[0].toUpperCase()`, so two shifts in the same pattern starting with
-  the same letter collide. That's why the line shifts are "Day Line"/"Night Line"
-  and not "Plant Day"/"Plant Night".
-- **`custom_shifts` pattern length must equal the sum of `shift_repeat`
-  intervals**, and no shift may be assigned more cards than its own interval.
-  Support Desk uses 3+3+3 = 9 cards but assigns Night only 2, leaving the ninth
-  card free as the rest day.
-- All 10 seeded employees land in ≥1 rotation; 2 of the 4 resolve members
-  through a team rather than direct ids.
+  the same letter collide. That's why the desk shifts are "Early"/"Late".
+- **`custom_shifts` pattern length equals the sum of `shift_repeat`
+  intervals**, and no shift may hold *more* cards than its own interval —
+  fewer is fine. Desk Alternation needs 3 cards from 2 shifts, so Early carries
+  an interval of 2 while the pattern spends one, leaving card 3 free as the rest
+  slot. Change an interval and the card count changes with it.
+- **Crew count should equal position count.** Fewer and a position starts
+  empty; more and the extras never enter the cycle. Nothing enforces this — it
+  is asserted in `scenario.test.ts`, not in the schema.
 
-## Status
+## Status (2026-08-29)
 
-- **Committed and pushed to `main`** on 2026-08-27, as `7ae79da` (the
-  screen + seed data) — part of a 9-commit session that also organized and
-  shipped every other feature that had piled up uncommitted (teams,
-  employees refactor, shifts assign-to, shift-policies holiday-work rule,
-  public-holidays, schedule-templates). No code changed in that session,
-  only commit organization.
 - `npm run build` **clean**.
-- Seed data **validated against the real schemas**: every record parses
-  `z.array(shiftSchema)` / `z.array(scheduleSchema)`, and `buildRotation` was run
-  across consecutive periods for all four schedules to confirm the sequences
-  advance correctly (on-call crews step Primary → Backup → Escalation → Off month
-  by month; line crews' block walks forward one position per week). This was done
-  with a **throwaway test file that was deleted afterwards** — see Open calls,
-  it's arguably worth making permanent.
-- **Full suite now runs clean on this machine**: `npm run test` (real
-  browser mode, no workaround needed) — 174 passed / 3 failed, the 3 being
-  the pre-existing unowned `search-provider.test.tsx` failures. The vitest
-  EACCES port-bind issue described below did **not** reproduce on
-  2026-08-27 — see that section, left in place as a workaround in case it
-  comes back rather than deleted outright.
-- **Still NOT browser-verified.** No browser tooling connected in the
-  08-25, 08-26, or 08-27 sessions.
+- `npm run test` — **192 passed / 3 failed**, the 3 being the pre-existing
+  unowned `search-provider.test.tsx` failures.
+- `npx eslint` on every touched file — **0 errors**; 3 warnings, all
+  pre-existing (two `exhaustive-deps` in `pattern-builder.tsx`, one
+  `incompatible-library` in `schedule-form.tsx`).
+- **Automated coverage of the new step**: `schedule-assign-to-fields.test.tsx`
+  renders it in real Chromium — one row per position including Off, seeded crew
+  resolved to full names, and a typed pick on the **off** position landing in
+  `pattern.3.employee_ids`.
+- `scenario.test.ts` locks both rotations week by week, and asserts the roster
+  is unchanged when every shift's `employee_ids`/`team_ids` are stripped —
+  i.e. proves the schedule is the only source.
+- **Still NOT browser-verified by hand.** No browser tooling was connected in
+  the 08-25 → 08-29 sessions. The component test covers the new step's
+  mechanics but not the wizard flow around it (stepping Pattern → Assign to →
+  Start & End, or the read-only view).
+- Prettier: the files this session created or rewrote are clean.
+  `schedule-form.tsx`, `pattern-builder.tsx` and `schedule-rotation/index.tsx`
+  still fail `prettier --check`, but **already failed at HEAD** — that's the
+  repo-wide drift CLAUDE.md tracks as an open call, left alone deliberately so
+  this diff stays readable.
 
-## ⚠️ Environment gotchas hit in earlier sessions
+## ⚠️ Environment gotchas
 
-### Vitest browser mode fails on this machine — did NOT reproduce 2026-08-27
+### `react-select` needs `resolve.dedupe` under vitest browser mode
 
-`npx vitest run` / `npm run test` ran clean in real browser mode on
-2026-08-27 (174 passed / 3 failed, see Status). Whatever was holding the
-port in the 08-25/08-26 sessions wasn't happening this time — treat the
-workaround below as a fallback to reach for if the error comes back, not
-as the current state of this machine.
+Added to `vite.config.ts` this session:
 
-Previously, `npx vitest run` died before any test with:
-
+```ts
+resolve: {
+  dedupe: ['react', 'react-dom'],
+  alias: { ... },
+}
 ```
-Error: listen EACCES: permission denied ::1:63315
-```
 
-That's the browser-mode server failing to bind (a Windows excluded-port-range
-problem, **not** the Claude sandbox — it reproduces with the sandbox disabled).
-Workaround for non-DOM test files only:
+Without it, `react-select` resolves a second React instance inside vitest's
+optimized deps and every `MultiSelect` throws
+`Cannot read properties of null (reading 'useState')` on mount — so **any**
+component test touching a MultiSelect fails until this is present. The full
+suite and the production build are both unaffected by the addition.
+
+### Seed changes no longer need localStorage hand-clearing
+
+`src/lib/seed-store.ts` stamps `"<key>:seed"` with `SEED_VERSION` next to each
+persisted store. Bumping that constant drops every cached blob and re-seeds
+from the bundled defaults. **Bump it whenever you edit a `features/*/data/*.ts`
+seed** — currently `'2026-08-29-schedule-assign-to'`. The old advice
+(`localStorage.removeItem('schedules')` etc.) is obsolete.
+
+### Vitest browser mode — an old failure that has not recurred
+
+`npx vitest run` died before any test with
+`Error: listen EACCES: permission denied ::1:63315` in the 08-25/08-26 sessions
+(a Windows excluded-port-range problem, **not** the Claude sandbox). It has not
+reproduced since — 08-27 and 08-29 both ran the full suite in real browser
+mode. Fallback if it returns, for non-DOM test files only:
 
 ```
 npx vitest run --browser.enabled=false --environment=node <files>
 ```
-
-Add `--disableConsoleIntercept` if you want `console.log` output through. This
-does **not** work for `.tsx` tests that need a DOM, so the full suite (and the
-174/3 figure the previous session recorded) could not be reproduced here.
-
-### localStorage shadows the new seed
-
-`shifts` and `schedules` stores persist to `localStorage` and re-use the cached
-copy over the seed (the footgun CLAUDE.md already calls out). A browser that has
-run this app before **won't** see the three new rotations or the eight new
-shifts. To see them:
-
-```js
-localStorage.removeItem('schedules'); localStorage.removeItem('shifts'); location.reload()
-```
-
-`teams` and `employees` seeds are unchanged, so they don't need clearing.
 
 ## Open calls / follow-ups
 
@@ -174,21 +203,20 @@ localStorage.removeItem('schedules'); localStorage.removeItem('shifts'); locatio
    leaf.
 2. **Latent display bug in `pattern-builder.tsx` (~line 266)**: the week-count
    readout divides `cycle_length.days` by a hardcoded `6`, but
-   `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is **7** — which is what actually
-   gets written into `days` when the unit is picked. A 7-day weekly cycle
-   currently renders as `round(7/6)` = "1 week", correct by luck. Seeds were
-   matched to the constant (7), not the display. **Not fixed** — out of scope
-   when found.
-3. **The seed-validation check is worth keeping as a real test.** The stores
-   silently fall back to the seed when a persisted blob fails to parse, so an
-   invalid seed is easy to ship unnoticed. Nothing in the suite currently parses
-   `defaultShifts`/`defaultSchedules`.
-4. **`src/features/schedule-rotation/index.tsx` fails `prettier --check`** —
-   pre-existing repo-wide Tailwind class-sorting drift (`text-muted-foreground`
-   ordering, 4 spots), untouched deliberately so the rename diff stays clean.
-   Part of the still-open repo-wide Prettier normalization call in CLAUDE.md.
-5. **`eslint` still reports 11 errors / 3 warnings**, same 5 files, unchanged
-   as of 2026-08-27 — re-checked during the commit-organizing session and the
-   count/locations are identical. None are in files any session touched for
-   this feature. Still worth a look before anyone treats lint as a gate, but
-   confirmed stable rather than actively drifting.
+   `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is **7**. A 7-day weekly cycle
+   renders as `round(7/6)` = "1 week", correct by luck. **Not fixed** — out of
+   scope when found, and still is.
+3. **Nothing stops an under- or over-staffed rotation.** Crew count vs. position
+   count is a convention asserted in tests, not a schema rule — this was a
+   deliberate call ("without adding restrictions"). If it should be enforced
+   later, note the schema cannot see the shifts store, so the rule can only ever
+   look at the pattern.
+4. **`shift_repeat` and the rotation screen disagree about a card's length.**
+   `schedules/utils.ts#expandRotatePatternDays` expands a `weekly`-frequency
+   card into 7 real days for the calendar preview; `getRotationPositions` treats
+   every card as exactly one cycle position. Desk Alternation uses `daily`
+   cards, so it doesn't bite today.
+5. **The shift Assign-to tab is now decorative for rotations.** Kept
+   deliberately ("leave the assign to data in the shift for later use"), but
+   `/shifts` will show assignments that don't drive anything — worth a label or
+   a hint there eventually.
