@@ -1,24 +1,13 @@
 import { z } from 'zod'
 import { create } from 'zustand'
+import { readSeeded, writeSeeded } from '@/lib/seed-store'
 import { type Team, teamSchema } from '../data/schema'
 import { defaultTeams } from '../data/teams'
 
 const STORAGE_KEY = 'teams'
 
-function readStoredTeams(): Team[] {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return defaultTeams
-
-  try {
-    const result = z.array(teamSchema).safeParse(JSON.parse(raw))
-    return result.success ? result.data : defaultTeams
-  } catch {
-    return defaultTeams
-  }
-}
-
 function persist(teams: Team[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(teams))
+  writeSeeded(STORAGE_KEY, teams)
 }
 
 interface TeamsState {
@@ -28,10 +17,7 @@ interface TeamsState {
   deleteTeam: (id: string) => void
 }
 
-const initialTeams = readStoredTeams()
-if (!localStorage.getItem(STORAGE_KEY)) {
-  persist(initialTeams)
-}
+const initialTeams = readSeeded(STORAGE_KEY, z.array(teamSchema), defaultTeams)
 
 export const useTeamsStore = create<TeamsState>()((set) => ({
   teams: initialTeams,

@@ -1,26 +1,15 @@
 import { z } from 'zod'
 import { create } from 'zustand'
-import { defaultShifts } from '../data/shifts'
-import { type Shift, shiftSchema } from '../data/schema'
 import { generateId } from '@/lib/id'
+import { readSeeded, writeSeeded } from '@/lib/seed-store'
+import { type Shift, shiftSchema } from '../data/schema'
+import { defaultShifts } from '../data/shifts'
 import { deriveShortCode } from '../utils'
 
 const STORAGE_KEY = 'shifts'
 
-function readStoredShifts(): Shift[] {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return defaultShifts
-
-  try {
-    const result = z.array(shiftSchema).safeParse(JSON.parse(raw))
-    return result.success ? result.data : defaultShifts
-  } catch {
-    return defaultShifts
-  }
-}
-
 function persist(shifts: Shift[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(shifts))
+  writeSeeded(STORAGE_KEY, shifts)
 }
 
 interface ShiftsState {
@@ -31,10 +20,11 @@ interface ShiftsState {
   cloneShift: (id: string) => void
 }
 
-const initialShifts = readStoredShifts()
-if (!localStorage.getItem(STORAGE_KEY)) {
-  persist(initialShifts)
-}
+const initialShifts = readSeeded(
+  STORAGE_KEY,
+  z.array(shiftSchema),
+  defaultShifts
+)
 
 export const useShiftsStore = create<ShiftsState>()((set) => ({
   shifts: initialShifts,

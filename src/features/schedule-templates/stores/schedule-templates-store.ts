@@ -1,24 +1,13 @@
 import { z } from 'zod'
 import { create } from 'zustand'
+import { readSeeded, writeSeeded } from '@/lib/seed-store'
 import { defaultScheduleTemplates } from '../data/schedule-templates'
 import { type ScheduleTemplate, scheduleTemplateSchema } from '../data/schema'
 
 const STORAGE_KEY = 'schedule-templates'
 
-function readStoredTemplates(): ScheduleTemplate[] {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return defaultScheduleTemplates
-
-  try {
-    const result = z.array(scheduleTemplateSchema).safeParse(JSON.parse(raw))
-    return result.success ? result.data : defaultScheduleTemplates
-  } catch {
-    return defaultScheduleTemplates
-  }
-}
-
 function persist(templates: ScheduleTemplate[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(templates))
+  writeSeeded(STORAGE_KEY, templates)
 }
 
 interface ScheduleTemplatesState {
@@ -28,10 +17,11 @@ interface ScheduleTemplatesState {
   deleteTemplate: (id: string) => void
 }
 
-const initialTemplates = readStoredTemplates()
-if (!localStorage.getItem(STORAGE_KEY)) {
-  persist(initialTemplates)
-}
+const initialTemplates = readSeeded(
+  STORAGE_KEY,
+  z.array(scheduleTemplateSchema),
+  defaultScheduleTemplates
+)
 
 export const useScheduleTemplatesStore = create<ScheduleTemplatesState>()(
   (set) => ({

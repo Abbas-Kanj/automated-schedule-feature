@@ -1,9 +1,7 @@
 import { z } from 'zod'
 import { create } from 'zustand'
-import {
-  createFixedHolidays,
-  createSeedHolidays,
-} from '../data/public-holidays'
+import { readSeeded, writeSeeded } from '@/lib/seed-store'
+import { createFixedHolidays } from '../data/public-holidays'
 import { type PublicHoliday, publicHolidaySchema } from '../data/schema'
 
 const STORAGE_KEY = 'public-holidays'
@@ -24,27 +22,16 @@ const storedSchema = z.object({
 
 type StoredState = z.infer<typeof storedSchema>
 
+// Nothing seeded: no year is open, so the screen starts on its empty state
+// and "Open year" is the only way in — which is the real feature path
+// (`openYear` pre-fills that year's fixed-date holidays) rather than a
+// pre-baked sample set.
 function defaultState(): StoredState {
-  return {
-    holidays: createSeedHolidays(CURRENT_YEAR),
-    open_years: [CURRENT_YEAR],
-  }
-}
-
-function readStoredState(): StoredState {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return defaultState()
-
-  try {
-    const result = storedSchema.safeParse(JSON.parse(raw))
-    return result.success ? result.data : defaultState()
-  } catch {
-    return defaultState()
-  }
+  return { holidays: [], open_years: [] }
 }
 
 function persist(state: StoredState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  writeSeeded(STORAGE_KEY, state)
 }
 
 interface PublicHolidaysState extends StoredState {
@@ -54,10 +41,7 @@ interface PublicHolidaysState extends StoredState {
   openYear: (year: number) => void
 }
 
-const initialState = readStoredState()
-if (!localStorage.getItem(STORAGE_KEY)) {
-  persist(initialState)
-}
+const initialState = readSeeded(STORAGE_KEY, storedSchema, defaultState())
 
 export const usePublicHolidaysStore = create<PublicHolidaysState>()((set) => ({
   ...initialState,

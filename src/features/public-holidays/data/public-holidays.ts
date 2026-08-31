@@ -12,16 +12,6 @@ const FIXED_DEFINITIONS = [
   ['Christmas Day', 12, 25],
 ] as const
 
-// Lunar holidays drift ~11 days earlier each Gregorian year, so these are
-// seed values for the demo rather than anything computable. Multi-day ones
-// carry a day count.
-const MOVABLE_DEFINITIONS = [
-  ['Eid Al-Fitr', 3, 20, 3],
-  ['Eid Al-Adha', 5, 27, 3],
-  ['Islamic New Year', 6, 17, 1],
-  ['Ashoura', 6, 26, 1],
-] as const
-
 function toDate(year: number, month: number, day: number) {
   const pad = (value: number) => String(value).padStart(2, '0')
   return new Date(`${year}-${pad(month)}-${pad(day)}T00:00:00`)
@@ -41,22 +31,4 @@ export function createFixedHolidays(year: number): PublicHoliday[] {
     holiday_dates: [toDate(year, month, day)],
     fixed: true,
   }))
-}
-
-// The starting dataset for the year the app opens on: the fixed holidays
-// plus the movable ones, so the Fixed filter has both values to show.
-export function createSeedHolidays(year: number): PublicHoliday[] {
-  const fixed = createFixedHolidays(year)
-  const movable = MOVABLE_DEFINITIONS.map(
-    ([name, month, day, days], index) => ({
-      id: makeId(year, fixed.length + index),
-      name,
-      year,
-      holiday_dates: Array.from({ length: days }, (_, offset) =>
-        toDate(year, month, day + offset)
-      ),
-      fixed: false,
-    })
-  )
-  return [...fixed, ...movable]
 }

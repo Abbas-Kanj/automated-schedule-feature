@@ -1,24 +1,13 @@
 import { z } from 'zod'
 import { create } from 'zustand'
+import { readSeeded, writeSeeded } from '@/lib/seed-store'
 import { defaultShiftPolicies } from '../data/policies'
 import { type ShiftPolicy, shiftPolicySchema } from '../data/schema'
 
 const STORAGE_KEY = 'shift-policies'
 
-function readStoredPolicies(): ShiftPolicy[] {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return defaultShiftPolicies
-
-  try {
-    const result = z.array(shiftPolicySchema).safeParse(JSON.parse(raw))
-    return result.success ? result.data : defaultShiftPolicies
-  } catch {
-    return defaultShiftPolicies
-  }
-}
-
 function persist(policies: ShiftPolicy[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(policies))
+  writeSeeded(STORAGE_KEY, policies)
 }
 
 interface PoliciesState {
@@ -28,10 +17,11 @@ interface PoliciesState {
   deletePolicy: (id: string) => void
 }
 
-const initialPolicies = readStoredPolicies()
-if (!localStorage.getItem(STORAGE_KEY)) {
-  persist(initialPolicies)
-}
+const initialPolicies = readSeeded(
+  STORAGE_KEY,
+  z.array(shiftPolicySchema),
+  defaultShiftPolicies
+)
 
 export const usePoliciesStore = create<PoliciesState>()((set) => ({
   policies: initialPolicies,
