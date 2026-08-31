@@ -11,7 +11,7 @@ import { type ZodType } from 'zod'
 // that has already opened the app — the fix used to be hand-clearing every
 // affected localStorage key, which is easy to forget and looks exactly like
 // the seed edit not working.
-export const SEED_VERSION = '2026-08-29-seed-versioning'
+export const SEED_VERSION = '2026-08-29-schedule-assign-to'
 
 function seedStampKey(key: string): string {
   return `${key}:seed`

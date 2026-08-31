@@ -229,6 +229,16 @@ const rotatePatternEntrySchema = z.object({
   position: z.number().min(1),
   shift_id: z.string().optional(),
   is_off: z.boolean(),
+  // The crew that starts the cycle on this position, set on the schedule
+  // form's own "Assign to" step (see
+  // `schedule-form/schedule-assign-to-fields.tsx`). This is the entire
+  // rotation roster — `features/schedule-rotation/utils.ts#getRotationRoster`
+  // reads these and nothing else, so a position's shift is only consulted
+  // for its name/colour. An `is_off` position is assignable like any other,
+  // which is the only way to say "this person starts the cycle on a day off".
+  // Both stay optional: a position nobody has been put on yet omits them.
+  employee_ids: z.array(z.string()).optional(),
+  team_ids: z.array(z.string()).optional(),
 })
 
 // "Custom shifts" mode: each selected shift gets its own repeat config —
@@ -293,7 +303,10 @@ const shiftRepeatSchema = z.object({
   date_specific_1: z.number().min(1).max(28).optional(),
   date_specific_2: z.number().min(1).max(28).optional(),
   // monthly_mode === 'day_position'
-  day_position_rules: z.array(shiftRepeatDayPositionRuleSchema).max(1).optional(),
+  day_position_rules: z
+    .array(shiftRepeatDayPositionRuleSchema)
+    .max(1)
+    .optional(),
 })
 
 const rotateFieldsSchema = z.object({

@@ -123,15 +123,35 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       )
     if (alreadyMatches) return
 
+    // The crew picked on the "Assign to" step belongs to the slot, not to
+    // whichever shift currently sits in it — so carry it across a rebuild by
+    // position. Same reasoning as the drag-reorder below, which deliberately
+    // makes crew travel with its card; dropping it here would silently empty
+    // the roster whenever someone stepped back and changed an interval.
+    const crewAt = (i: number) => ({
+      employee_ids: current[i]?.employee_ids,
+      team_ids: current[i]?.team_ids,
+    })
+
     const next: RotatePatternEntry[] = []
     let position = 1
     for (const r of shiftRepeat) {
       for (let i = 0; i < r.interval; i++, position++) {
-        next.push({ position, is_off: false, shift_id: r.shift_id })
+        next.push({
+          position,
+          is_off: false,
+          shift_id: r.shift_id,
+          ...crewAt(position - 1),
+        })
       }
     }
     while (position <= totalPatternLength) {
-      next.push({ position, is_off: true, shift_id: undefined })
+      next.push({
+        position,
+        is_off: true,
+        shift_id: undefined,
+        ...crewAt(position - 1),
+      })
       position++
     }
     replace(next)
@@ -491,9 +511,15 @@ function usePatternReorder() {
       if (from == null || !to || from === to.index) return
 
       const pattern = getValues('pattern') as RotatePatternEntry[]
+      // Everything a card *is*, minus its `position` — that's the slot the
+      // card sits in, so it stays with the index rather than travelling.
+      // The direct roster picks travel: they belong to the crew on that
+      // card, not to the day of the cycle it currently occupies.
       const content = pattern.map((p) => ({
         is_off: p.is_off,
         shift_id: p.shift_id,
+        employee_ids: p.employee_ids,
+        team_ids: p.team_ids,
       }))
       const [moved] = content.splice(from, 1)
       let insertAt = to.side === 'after' ? to.index + 1 : to.index
@@ -508,6 +534,14 @@ function usePatternReorder() {
           shouldDirty: true,
         })
         setValue(`pattern.${i}.is_off`, c.is_off, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+        setValue(`pattern.${i}.employee_ids`, c.employee_ids, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+        setValue(`pattern.${i}.team_ids`, c.team_ids, {
           shouldValidate: true,
           shouldDirty: true,
         })

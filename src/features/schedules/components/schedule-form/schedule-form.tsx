@@ -32,6 +32,7 @@ import {
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
 import { PatternBuilder } from './pattern-builder'
+import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 import { ScheduleBasicsFields } from './schedule-basics-fields'
 import { ScheduleStartEndFields } from './schedule-start-end-fields'
 import { ScheduleSummary } from './schedule-summary'
@@ -56,7 +57,10 @@ function getSteps(
     ]
   }
 
-  // rotate gets its own pattern step (cycle/pattern config) PLUS the same
+  // rotate gets its own pattern step (cycle/pattern config), then the
+  // "Assign to" step that names the crew on each position of the pattern it
+  // just built — that pairing is the whole roster the Schedule Rotation
+  // screen reads (see `schedule-assign-to-fields.tsx`). PLUS the same
   // shared "Start & End" step as fixed/flexible (start date + end
   // frequency) — see `schedule-start-end-fields.tsx`.
   if (regularType === 'rotate') {
@@ -64,6 +68,7 @@ function getSteps(
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'pattern', label: 'Pattern' },
+      { id: 'assign-to', label: 'Assign to' },
       { id: 'end-settings', label: 'Start & End' },
       { id: 'summary', label: 'Summary' },
     ]
@@ -178,6 +183,12 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   }
   if (stepId === 'pattern') {
     return ['cycle_type', 'cycle_length', 'pattern', 'shift_repeat']
+  }
+  // Crew picks are optional — an unassigned position stays valid, so this
+  // step never blocks "Next". It still re-validates `pattern` so anything
+  // wrong carried over from the previous step surfaces here too.
+  if (stepId === 'assign-to') {
+    return ['pattern']
   }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
@@ -404,6 +415,12 @@ export function ScheduleForm({
               parentType === 'regular' &&
               regularType === 'rotate' && (
                 <PatternBuilder disabled={disabled} />
+              )}
+
+            {(disabled || currentStepId === 'assign-to') &&
+              parentType === 'regular' &&
+              regularType === 'rotate' && (
+                <ScheduleAssignToFields disabled={disabled} />
               )}
 
             {(disabled || currentStepId === 'end-settings') &&

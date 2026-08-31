@@ -79,11 +79,15 @@ const night = makeShift({
   team_ids: ['team-night'],
 })
 
+// These three keep their own "Assign to" picks (Alice on Morning, Bob on
+// Afternoon, the Night Crew team on Night) purely so the tests below can
+// show the roster no longer reads them.
 const shifts = [morning, afternoon, night]
 const employees = [
   makeEmployee('e-alice', 'Alice'),
   makeEmployee('e-bob', 'Bob'),
   makeEmployee('e-charlie', 'Charlie'),
+  makeEmployee('e-dana', 'Dana'),
 ]
 const teams: Team[] = [
   { id: 'team-night', name: 'Night Crew', employee_ids: ['e-charlie'] },
@@ -100,11 +104,29 @@ const schedule: RotateSchedule = {
   temporary_schedule: false,
   cycle_type: 'pattern_shifts',
   cycle_length: { unit: 'custom_days', days: 4 },
+  // The whole roster, stated on the schedule rather than inferred from the
+  // shifts: one crew per position, including the day off (which has no
+  // shift to carry a pick in the first place).
   pattern: [
-    { position: 1, shift_id: 'shift-morning', is_off: false },
-    { position: 2, shift_id: 'shift-afternoon', is_off: false },
-    { position: 3, shift_id: 'shift-night', is_off: false },
-    { position: 4, is_off: true },
+    {
+      position: 1,
+      shift_id: 'shift-morning',
+      is_off: false,
+      employee_ids: ['e-alice'],
+    },
+    {
+      position: 2,
+      shift_id: 'shift-afternoon',
+      is_off: false,
+      employee_ids: ['e-bob'],
+    },
+    {
+      position: 3,
+      shift_id: 'shift-night',
+      is_off: false,
+      team_ids: ['team-night'],
+    },
+    { position: 4, is_off: true, employee_ids: ['e-dana'] },
   ],
   shift_repeat: [],
   start_date: '2026-08-17',
@@ -131,13 +153,50 @@ describe('getRotationPositions', () => {
 })
 
 describe('getRotationRoster', () => {
-  it('derives employees from shifts (incl. teams), offset by first position', () => {
+  it('derives employees from the pattern (incl. teams), offset by position', () => {
     const positions = getRotationPositions(schedule, shifts)
     const roster = getRotationRoster(positions, employees, teams)
     expect(roster.map((r) => [r.employeeId, r.offset])).toEqual([
       ['e-alice', 0],
       ['e-bob', 1],
       ['e-charlie', 2], // resolved from the team on the Night position
+      ['e-dana', 3], // on the off position
+    ])
+  })
+
+  it("ignores crew assigned to a position's shift", () => {
+    // Same shifts, all still naming Alice/Bob/the Night Crew in their own
+    // "Assign to" tab — but nothing on the pattern, so nobody rotates.
+    const positions = getRotationPositions(
+      {
+        ...schedule,
+        pattern: schedule.pattern.map(({ position, shift_id, is_off }) => ({
+          position,
+          shift_id,
+          is_off,
+        })),
+      },
+      shifts
+    )
+    expect(getRotationRoster(positions, employees, teams)).toEqual([])
+  })
+
+  it('ignores a direct pick that no longer matches an employee', () => {
+    const positions = getRotationPositions(
+      {
+        ...schedule,
+        pattern: [
+          ...schedule.pattern.slice(0, 3),
+          { position: 4, is_off: true, employee_ids: ['e-ghost'] },
+        ],
+      },
+      shifts
+    )
+    const roster = getRotationRoster(positions, employees, teams)
+    expect(roster.map((r) => r.employeeId)).toEqual([
+      'e-alice',
+      'e-bob',
+      'e-charlie',
     ])
   })
 })
@@ -167,6 +226,7 @@ describe('buildRotation', () => {
     expect(byName['Alice M Test'].assigned.label).toBe('Morning')
     expect(byName['Bob M Test'].assigned.label).toBe('Afternoon')
     expect(byName['Charlie M Test'].assigned.label).toBe('Night')
+    expect(byName['Dana M Test'].assigned.label).toBe('Off')
     // Sequence starts at the employee's current position (Alice: M A N O).
     expect(byName['Alice M Test'].sequence.map((p) => p.letter)).toEqual([
       'M',
@@ -196,6 +256,7 @@ describe('buildRotation', () => {
     expect(byName['Alice M Test'].assigned.label).toBe('Afternoon')
     expect(byName['Bob M Test'].assigned.label).toBe('Night')
     expect(byName['Charlie M Test'].assigned.label).toBe('Off')
+    expect(byName['Dana M Test'].assigned.label).toBe('Morning')
   })
 
   it('advances one position per month in monthly mode', () => {

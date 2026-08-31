@@ -1,188 +1,170 @@
 [
   {
-    "id": "3d1b4e98-318f-4b6e-85dd-1c418f449b31",
-    "firstname": "Omar",
-    "middlename": "Hassan",
-    "lastname": "Khalil",
-    "phonenumber": "+9613792603",
-    "dob": "1988-04-12",
-    "sex": { "value": "male", "label": "Male" },
-    "email": "omar.khalil@example.com",
-    "address": "Beirut, Lebanon",
-    "punch_code": "EMP-1001",
-    "schedule": "Monday-Friday, 08:00-16:00",
-    "position": { "value": "software_engineer", "label": "Software Engineer" },
-    "organization_unit": {
-      "value": "information_technology",
-      "label": "Information Technology"
-    }
-  },
-  {
-    "id": "117ae1f3-8401-4e28-b576-3b12dbbfb40b",
-    "firstname": "Maya",
+    "id": "emp-a",
+    "firstname": "Amir",
     "middlename": "Nabil",
     "lastname": "Haddad",
-    "phonenumber": "+9613792603",
-    "dob": "1992-09-23",
-    "sex": { "value": "female", "label": "Female" },
-    "email": "maya.haddad@example.com",
+    "phonenumber": "+9613792601",
+    "dob": "1990-03-04",
+    "sex": {
+      "value": "male",
+      "label": "Male"
+    },
+    "email": "amir.haddad@example.com",
+    "address": "Beirut, Lebanon",
+    "punch_code": "EMP-1001",
+    "schedule": "Shift Rotation",
+    "position": {
+      "value": "floor_agent",
+      "label": "Floor Agent"
+    },
+    "organization_unit": {
+      "value": "operations",
+      "label": "Operations"
+    }
+  },
+  {
+    "id": "emp-b",
+    "firstname": "Bilal",
+    "middlename": "Samir",
+    "lastname": "Khoury",
+    "phonenumber": "+9613792602",
+    "dob": "1993-07-19",
+    "sex": {
+      "value": "male",
+      "label": "Male"
+    },
+    "email": "bilal.khoury@example.com",
     "address": "Jounieh, Lebanon",
     "punch_code": "EMP-1002",
-    "schedule": "Monday-Friday, 08:00-16:00",
-    "position": { "value": "hr_specialist", "label": "HR Specialist" },
+    "schedule": "Shift Rotation",
+    "position": {
+      "value": "floor_agent",
+      "label": "Floor Agent"
+    },
     "organization_unit": {
-      "value": "human_resources",
-      "label": "Human Resources"
+      "value": "operations",
+      "label": "Operations"
     }
   },
   {
-    "id": "a8ed04e0-57a0-4775-98fe-68363a20d778",
-    "firstname": "Karim",
-    "middlename": "Ali",
+    "id": "emp-c",
+    "firstname": "Carla",
+    "middlename": "Rita",
     "lastname": "Mansour",
     "phonenumber": "+9613792603",
-    "dob": "1985-01-17",
-    "sex": { "value": "male", "label": "Male" },
-    "email": "karim.mansour@example.com",
-    "address": "Baabda, Lebanon",
+    "dob": "1991-11-28",
+    "sex": {
+      "value": "female",
+      "label": "Female"
+    },
+    "email": "carla.mansour@example.com",
+    "address": "Tripoli, Lebanon",
     "punch_code": "EMP-1003",
-    "schedule": "Monday-Friday, 07:30-15:30",
-    "position": { "value": "accountant", "label": "Accountant" },
-    "organization_unit": { "value": "finance", "label": "Finance" }
+    "schedule": "Shift Rotation",
+    "position": {
+      "value": "floor_agent",
+      "label": "Floor Agent"
+    },
+    "organization_unit": {
+      "value": "operations",
+      "label": "Operations"
+    }
   },
   {
-    "id": "ed8ebd87-f86e-42da-a96f-39e47d63586f",
-    "firstname": "Rana",
-    "middlename": "Samir",
-    "lastname": "Nassar",
-    "phonenumber": "+9613792603",
-    "dob": "1990-06-05",
-    "sex": { "value": "female", "label": "Female" },
-    "email": "rana.nassar@example.com",
+    "id": "emp-d",
+    "firstname": "Dana",
+    "middlename": "Leila",
+    "lastname": "Salameh",
+    "phonenumber": "+9613792604",
+    "dob": "1995-01-09",
+    "sex": {
+      "value": "female",
+      "label": "Female"
+    },
+    "email": "dana.salameh@example.com",
     "address": "Zahle, Lebanon",
     "punch_code": "EMP-1004",
-    "schedule": "Monday-Friday, 08:00-16:00",
-    "position": { "value": "quality_officer", "label": "Quality Officer" },
+    "schedule": "Shift Rotation",
+    "position": {
+      "value": "floor_agent",
+      "label": "Floor Agent"
+    },
     "organization_unit": {
-      "value": "quality_assurance",
-      "label": "Quality Assurance"
+      "value": "operations",
+      "label": "Operations"
     }
   },
   {
-    "id": "c94327ba-7176-4f18-83a0-554a55d3e77a",
-    "firstname": "Tarek",
-    "middlename": "Fadi",
-    "lastname": "Saad",
-    "phonenumber": "+9613792603",
-    "dob": "1983-11-29",
-    "sex": { "value": "male", "label": "Male" },
-    "email": "tarek.saad@example.com",
-    "address": "Tripoli, Lebanon",
-    "punch_code": "EMP-1005",
-    "schedule": "Monday-Saturday, 09:00-17:00",
-    "position": {
-      "value": "operations_manager",
-      "label": "Operations Manager"
+    "id": "emp-e",
+    "firstname": "Elias",
+    "middlename": "Nadim",
+    "lastname": "Rizk",
+    "phonenumber": "+9613792605",
+    "dob": "1992-05-22",
+    "sex": {
+      "value": "male",
+      "label": "Male"
     },
-    "organization_unit": { "value": "operations", "label": "Operations" }
+    "email": "elias.rizk@example.com",
+    "address": "Byblos, Lebanon",
+    "punch_code": "EMP-1005",
+    "schedule": "Desk Alternation",
+    "position": {
+      "value": "desk_agent",
+      "label": "Desk Agent"
+    },
+    "organization_unit": {
+      "value": "operations",
+      "label": "Operations"
+    }
   },
   {
-    "id": "2db94570-8ca9-443e-b79c-0d021f615531",
-    "firstname": "Layla",
-    "middlename": "Walid",
-    "lastname": "Farah",
-    "phonenumber": "+9613792603",
-    "dob": "1995-03-14",
-    "sex": { "value": "female", "label": "Female" },
-    "email": "layla.farah@example.com",
+    "id": "emp-f",
+    "firstname": "Farah",
+    "middlename": "Maya",
+    "lastname": "Aoun",
+    "phonenumber": "+9613792606",
+    "dob": "1994-09-13",
+    "sex": {
+      "value": "female",
+      "label": "Female"
+    },
+    "email": "farah.aoun@example.com",
     "address": "Sidon, Lebanon",
     "punch_code": "EMP-1006",
-    "schedule": "Monday-Friday, 08:30-16:30",
+    "schedule": "Desk Alternation",
     "position": {
-      "value": "administrative_assistant",
-      "label": "Administrative Assistant"
+      "value": "desk_agent",
+      "label": "Desk Agent"
     },
     "organization_unit": {
-      "value": "general_administration",
-      "label": "General Administration"
+      "value": "operations",
+      "label": "Operations"
     }
   },
   {
-    "id": "75307a12-2ae4-4883-b9a1-47972fba1339",
-    "firstname": "Joseph",
-    "middlename": "Elias",
-    "lastname": "Khoury",
-    "phonenumber": "+9613792603",
-    "dob": "1987-08-08",
-    "sex": { "value": "male", "label": "Male" },
-    "email": "joseph.khoury@example.com",
-    "address": "Byblos, Lebanon",
+    "id": "emp-g",
+    "firstname": "Ghassan",
+    "middlename": "Elie",
+    "lastname": "Nassar",
+    "phonenumber": "+9613792607",
+    "dob": "1989-12-02",
+    "sex": {
+      "value": "male",
+      "label": "Male"
+    },
+    "email": "ghassan.nassar@example.com",
+    "address": "Baabda, Lebanon",
     "punch_code": "EMP-1007",
-    "schedule": "Monday-Friday, 08:00-16:00",
+    "schedule": "Desk Alternation",
     "position": {
-      "value": "laboratory_technician",
-      "label": "Laboratory Technician"
+      "value": "desk_agent",
+      "label": "Desk Agent"
     },
     "organization_unit": {
-      "value": "laboratory_services",
-      "label": "Laboratory Services"
+      "value": "operations",
+      "label": "Operations"
     }
-  },
-  {
-    "id": "76c769eb-150c-4853-981d-594046fcce7e",
-    "firstname": "Nour",
-    "middlename": "Ahmad",
-    "lastname": "Hamdan",
-    "phonenumber": "+9613792603",
-    "dob": "1997-12-02",
-    "sex": { "value": "female", "label": "Female" },
-    "email": "nour.hamdan@example.com",
-    "address": "Aley, Lebanon",
-    "punch_code": "EMP-1008",
-    "schedule": "Monday-Friday, 09:00-17:00",
-    "position": {
-      "value": "customer_support_officer",
-      "label": "Customer Support Officer"
-    },
-    "organization_unit": {
-      "value": "customer_support",
-      "label": "Customer Support"
-    }
-  },
-  {
-    "id": "34f817aa-fb2a-49f7-802e-b06d4485887b",
-    "firstname": "Hadi",
-    "middlename": "Mahmoud",
-    "lastname": "Saleh",
-    "phonenumber": "+9613792603",
-    "dob": "1991-05-19",
-    "sex": { "value": "male", "label": "Male" },
-    "email": "hadi.saleh@example.com",
-    "address": "Nabatieh, Lebanon",
-    "punch_code": "EMP-1009",
-    "schedule": "Monday-Friday, 07:00-15:00",
-    "position": {
-      "value": "maintenance_supervisor",
-      "label": "Maintenance Supervisor"
-    },
-    "organization_unit": { "value": "facilities", "label": "Facilities" }
-  },
-  {
-    "id": "b90f80a8-f01e-4c03-a9ef-1bc5c963436c",
-    "firstname": "Sara",
-    "middlename": "Georges",
-    "lastname": "Abi Saab",
-    "phonenumber": "+9613792603",
-    "dob": "1989-10-26",
-    "sex": { "value": "female", "label": "Female" },
-    "email": "sara.abisaab@example.com",
-    "address": "Metn, Lebanon",
-    "punch_code": "EMP-1010",
-    "schedule": "Monday-Friday, 08:00-16:00",
-    "position": {
-      "value": "procurement_officer",
-      "label": "Procurement Officer"
-    },
-    "organization_unit": { "value": "procurement", "label": "Procurement" }
   }
 ]

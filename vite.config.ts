@@ -22,6 +22,10 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
+    // react-select pulls its own React instance under vitest's browser mode
+    // otherwise, which makes its hooks throw on mount (see
+    // `schedule-assign-to-fields.test.tsx`).
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
     },

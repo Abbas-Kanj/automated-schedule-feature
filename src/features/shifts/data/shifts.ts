@@ -1,23 +1,19 @@
-import employeeData from '@/features/employees/data/data.json'
 import { buildDefaultDays } from '../utils'
-import { type DayTimeEntry, type Shift, type TimeRangeEntry } from './schema'
+import { type Shift } from './schema'
 
-// Mon–Fri variant of `buildDefaultDays` — the support-desk shifts run
-// 24x5, so Saturday and Sunday are off rather than carrying hours.
-function weekdaysOnly(
-  time: Pick<TimeRangeEntry, 'from_time' | 'to_time' | 'overnight'>
-): DayTimeEntry[] {
-  return buildDefaultDays(time).map((day) =>
-    day.day === 'sat' || day.day === 'sun' ? { ...day, enabled: false } : day
-  )
-}
-
-// Seed assignments reference real seeded employees by index (not raw uuids)
-// so they stay in sync if the sample directory changes — same approach the
-// seed teams use (see `features/teams/data/teams.ts`). These are what the
-// Schedule Rotation screen reads to build its roster.
-const empIds = employeeData.map((employee) => employee.id)
-
+// The shifts behind the two seeded rotations (see
+// `features/schedules/data/schedules.ts`): Morning / Afternoon / Night for
+// Team A's four-position cycle, and Early / Late for Team B's three-position
+// one. Deliberately a small set — this checkout carries two end-to-end
+// rotation scenarios rather than a broad sample.
+//
+// `employee_ids`/`team_ids` here say who *may* work a shift. They are no
+// longer what builds a rotation: who holds which slot of a cycle is set on
+// the schedule, in its own "Assign to" step (see
+// `features/schedule-rotation/utils.ts#getRotationRoster`, which reads the
+// schedule's pattern and nothing else). The picks below are kept as sample
+// data for that tab — changing them will not move anyone on the Schedule
+// Rotation screen.
 export const defaultShifts: Shift[] = [
   {
     id: 'shift-morning',
@@ -25,7 +21,7 @@ export const defaultShifts: Shift[] = [
     short_code: 'MORN',
     badge_color: 'amber',
     icon: 'sunrise',
-    shift_type: 'fixed',
+    shift_type: 'rotate',
     category: 'morning',
     timezone_mode: 'local',
     hours_mode: 'same',
@@ -34,15 +30,15 @@ export const defaultShifts: Shift[] = [
       to_time: '14:00',
       overnight: false,
     }),
-    description: 'Early shift covering store opening.',
+    description: 'Early shift — opens the floor.',
     is_active: true,
-    policy_ids: ['policy-late-arrival'],
+    policy_ids: [],
     status: 'confirmed',
     time_slot_type: 'regular',
     repeat_enabled: false,
     repeat: {},
     assign_to_enabled: true,
-    employee_ids: [empIds[0], empIds[1]].filter(Boolean) as string[],
+    employee_ids: ['emp-a'],
     team_ids: [],
     break_enabled: false,
     breaks: [],
@@ -53,7 +49,7 @@ export const defaultShifts: Shift[] = [
     short_code: 'AFT',
     badge_color: 'sky',
     icon: 'sun',
-    shift_type: 'fixed',
+    shift_type: 'rotate',
     category: 'afternoon',
     timezone_mode: 'local',
     hours_mode: 'same',
@@ -62,15 +58,15 @@ export const defaultShifts: Shift[] = [
       to_time: '22:00',
       overnight: false,
     }),
-    description: 'Mid-day shift covering peak hours.',
+    description: 'Mid-day shift — covers peak hours.',
     is_active: true,
-    policy_ids: ['policy-late-arrival'],
-    status: 'published',
+    policy_ids: [],
+    status: 'confirmed',
     time_slot_type: 'regular',
     repeat_enabled: false,
     repeat: {},
     assign_to_enabled: true,
-    employee_ids: [empIds[2], empIds[3]].filter(Boolean) as string[],
+    employee_ids: ['emp-b'],
     team_ids: [],
     break_enabled: false,
     breaks: [],
@@ -81,267 +77,83 @@ export const defaultShifts: Shift[] = [
     short_code: 'NIGHT',
     badge_color: 'indigo',
     icon: 'moon',
-    shift_type: 'fixed',
+    shift_type: 'rotate',
     category: 'night',
     timezone_mode: 'local',
     hours_mode: 'same',
+    // Wraps past midnight, so the range is flagged `overnight` rather than
+    // failing the "end after start" check (see `shiftFieldsSchema`).
     days: buildDefaultDays({
       from_time: '22:00',
       to_time: '06:00',
       overnight: true,
     }),
-    description: 'Overnight shift covering store closing.',
+    description: 'Overnight shift — closes the floor.',
     is_active: true,
-    policy_ids: ['policy-weekend-overtime', 'policy-missed-punch'],
+    policy_ids: [],
     status: 'confirmed',
     time_slot_type: 'regular',
     repeat_enabled: false,
     repeat: {},
     assign_to_enabled: true,
-    // One individual plus a whole team, so the rotation roster exercises
-    // team-member resolution too (see `features/teams/data/teams.ts`).
-    employee_ids: [empIds[5]].filter(Boolean) as string[],
-    team_ids: ['seed-team-operations'],
-    break_enabled: false,
-    breaks: [],
-  },
-  // --- Production line: two 12-hour crews, no third shift. Feeds the
-  // "Production Line Rotation" schedule's D D N N O O block pattern, so a
-  // crew works two days, then two nights, then gets two days off. ---
-  {
-    id: 'shift-line-day',
-    name: 'Day Line',
-    short_code: 'DAYL',
-    badge_color: 'orange',
-    icon: 'sun',
-    shift_type: 'rotate',
-    category: 'regular',
-    timezone_mode: 'local',
-    hours_mode: 'same',
-    days: buildDefaultDays({
-      from_time: '07:00',
-      to_time: '19:00',
-      overnight: false,
-    }),
-    full_day_hours: 12,
-    half_day_hours: 6,
-    description: 'Twelve-hour day crew on the production line.',
-    is_active: true,
-    policy_ids: ['policy-late-arrival'],
-    status: 'confirmed',
-    time_slot_type: 'regular',
-    repeat_enabled: false,
-    repeat: {},
-    assign_to_enabled: true,
-    employee_ids: [empIds[8], empIds[3]].filter(Boolean) as string[],
+    employee_ids: ['emp-c'],
     team_ids: [],
     break_enabled: false,
     breaks: [],
   },
   {
-    id: 'shift-line-night',
-    name: 'Night Line',
-    short_code: 'NGTL',
-    badge_color: 'violet',
-    icon: 'moon',
-    shift_type: 'rotate',
-    category: 'night',
-    timezone_mode: 'local',
-    hours_mode: 'same',
-    days: buildDefaultDays({
-      from_time: '19:00',
-      to_time: '07:00',
-      overnight: true,
-    }),
-    full_day_hours: 12,
-    half_day_hours: 6,
-    description: 'Twelve-hour night crew on the production line.',
-    is_active: true,
-    policy_ids: ['policy-weekend-overtime', 'policy-missed-punch'],
-    status: 'confirmed',
-    time_slot_type: 'regular',
-    repeat_enabled: false,
-    repeat: {},
-    assign_to_enabled: true,
-    // A whole team plus one individual — the second place the rotation
-    // roster has to resolve team members (see `shift-night` above).
-    employee_ids: [empIds[9]].filter(Boolean) as string[],
-    team_ids: ['seed-team-engineering'],
-    break_enabled: false,
-    breaks: [],
-  },
-
-  // --- Support desk: 24x5 coverage, three shifts, weekends closed. Feeds
-  // the "Support Desk Rotation" schedule (Custom alternate mode). ---
-  {
-    id: 'shift-desk-early',
-    name: 'Early Desk',
+    id: 'shift-early',
+    name: 'Early',
     short_code: 'EARLY',
-    badge_color: 'lime',
-    icon: 'sunrise',
+    badge_color: 'emerald',
+    icon: 'coffee',
     shift_type: 'rotate',
     category: 'morning',
     timezone_mode: 'local',
     hours_mode: 'same',
-    days: weekdaysOnly({
+    days: buildDefaultDays({
       from_time: '07:00',
       to_time: '15:00',
       overnight: false,
     }),
-    description: 'Opens the desk and clears the overnight ticket queue.',
+    description: 'Desk cover from open until mid-afternoon.',
     is_active: true,
-    policy_ids: ['policy-late-arrival'],
-    status: 'published',
+    policy_ids: [],
+    status: 'confirmed',
     time_slot_type: 'regular',
     repeat_enabled: false,
     repeat: {},
     assign_to_enabled: true,
-    employee_ids: [empIds[7], empIds[1]].filter(Boolean) as string[],
-    team_ids: [],
+    employee_ids: [],
+    team_ids: ['team-b'],
     break_enabled: false,
     breaks: [],
   },
   {
-    id: 'shift-desk-late',
-    name: 'Late Desk',
+    id: 'shift-late',
+    name: 'Late',
     short_code: 'LATE',
-    badge_color: 'cyan',
+    badge_color: 'violet',
     icon: 'sunset',
     shift_type: 'rotate',
     category: 'afternoon',
     timezone_mode: 'local',
     hours_mode: 'same',
-    days: weekdaysOnly({
+    days: buildDefaultDays({
       from_time: '15:00',
       to_time: '23:00',
       overnight: false,
     }),
-    description: 'Covers the afternoon peak through to close of business.',
-    is_active: true,
-    policy_ids: ['policy-late-arrival'],
-    status: 'published',
-    time_slot_type: 'regular',
-    repeat_enabled: false,
-    repeat: {},
-    assign_to_enabled: true,
-    employee_ids: [empIds[9], empIds[2]].filter(Boolean) as string[],
-    team_ids: [],
-    break_enabled: false,
-    breaks: [],
-  },
-  {
-    id: 'shift-desk-night',
-    name: 'Night Desk',
-    short_code: 'NGTD',
-    badge_color: 'purple',
-    icon: 'moon',
-    shift_type: 'rotate',
-    category: 'night',
-    timezone_mode: 'local',
-    hours_mode: 'same',
-    days: weekdaysOnly({
-      from_time: '23:00',
-      to_time: '07:00',
-      overnight: true,
-    }),
-    description: 'Overnight skeleton cover for priority tickets only.',
-    is_active: true,
-    policy_ids: ['policy-missed-punch'],
-    status: 'confirmed',
-    time_slot_type: 'regular',
-    repeat_enabled: false,
-    repeat: {},
-    assign_to_enabled: true,
-    employee_ids: [empIds[5], empIds[0]].filter(Boolean) as string[],
-    team_ids: [],
-    break_enabled: false,
-    breaks: [],
-  },
-
-  // --- On-call tiers: same duty window, different escalation level. Feeds
-  // the "On-Call Duty Rotation" schedule, whose cycle is meant to be read a
-  // month at a time (Primary this month, Backup the next, and so on). ---
-  {
-    id: 'shift-oncall-primary',
-    name: 'Primary On-Call',
-    short_code: 'PRIM',
-    badge_color: 'rose',
-    icon: 'zap',
-    shift_type: 'rotate',
-    category: 'oncall',
-    timezone_mode: 'local',
-    hours_mode: 'same',
-    days: buildDefaultDays({
-      from_time: '08:00',
-      to_time: '20:00',
-      overnight: false,
-    }),
-    description: 'First responder for the month — takes the page directly.',
-    is_active: true,
-    policy_ids: ['policy-missed-punch'],
-    status: 'confirmed',
-    time_slot_type: 'overtime',
-    repeat_enabled: false,
-    repeat: {},
-    assign_to_enabled: true,
-    employee_ids: [empIds[4], empIds[7]].filter(Boolean) as string[],
-    team_ids: [],
-    break_enabled: false,
-    breaks: [],
-  },
-  {
-    id: 'shift-oncall-backup',
-    name: 'Backup On-Call',
-    short_code: 'BACK',
-    badge_color: 'teal',
-    icon: 'shield',
-    shift_type: 'rotate',
-    category: 'oncall',
-    timezone_mode: 'local',
-    hours_mode: 'same',
-    days: buildDefaultDays({
-      from_time: '08:00',
-      to_time: '20:00',
-      overnight: false,
-    }),
-    description: 'Picks up anything the primary misses or hands off.',
+    description: 'Desk cover from mid-afternoon until close.',
     is_active: true,
     policy_ids: [],
     status: 'confirmed',
-    time_slot_type: 'overtime',
+    time_slot_type: 'regular',
     repeat_enabled: false,
     repeat: {},
     assign_to_enabled: true,
-    employee_ids: [empIds[3], empIds[2]].filter(Boolean) as string[],
-    team_ids: [],
-    break_enabled: false,
-    breaks: [],
-  },
-  {
-    id: 'shift-oncall-escalation',
-    name: 'Escalation On-Call',
-    short_code: 'ESCAL',
-    badge_color: 'red',
-    icon: 'star',
-    shift_type: 'rotate',
-    category: 'oncall',
-    timezone_mode: 'local',
-    hours_mode: 'same',
-    days: buildDefaultDays({
-      from_time: '20:00',
-      to_time: '08:00',
-      overnight: true,
-    }),
-    description: 'Overnight escalation tier for anything still unresolved.',
-    is_active: true,
-    policy_ids: ['policy-weekend-overtime'],
-    status: 'published',
-    time_slot_type: 'overtime',
-    repeat_enabled: false,
-    repeat: {},
-    assign_to_enabled: true,
-    employee_ids: [empIds[8], empIds[5]].filter(Boolean) as string[],
-    team_ids: [],
+    employee_ids: [],
+    team_ids: ['team-b'],
     break_enabled: false,
     breaks: [],
   },

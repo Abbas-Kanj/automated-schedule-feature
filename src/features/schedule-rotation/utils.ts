@@ -12,7 +12,10 @@ import {
 } from 'date-fns'
 import { type Employee } from '@/features/employees/data/schema'
 import { getEmployeeFullName } from '@/features/employees/utils'
-import { type RegularSchedule, type Schedule } from '@/features/schedules/data/schema'
+import {
+  type RegularSchedule,
+  type Schedule,
+} from '@/features/schedules/data/schema'
 import { type Shift, type ShiftBadgeColor } from '@/features/shifts/data/schema'
 import { type Team } from '@/features/teams/data/schema'
 
@@ -20,7 +23,9 @@ import { type Team } from '@/features/teams/data/schema'
 // they're the only kind this screen operates on (see the schedule dropdown).
 export type RotateSchedule = Extract<RegularSchedule, { type: 'rotate' }>
 
-export function isRotateSchedule(schedule: Schedule): schedule is RotateSchedule {
+export function isRotateSchedule(
+  schedule: Schedule
+): schedule is RotateSchedule {
   return schedule.parent_type === 'regular' && schedule.type === 'rotate'
 }
 
@@ -40,6 +45,12 @@ export type RotationPosition = {
   letter: string
   label: string
   badgeColor?: ShiftBadgeColor
+  // The crew working this position, from the schedule's own "Assign to" step
+  // (see `rotatePatternEntrySchema` and
+  // `schedule-form/schedule-assign-to-fields.tsx`). This is the whole roster
+  // — the position's shift is only read for its name, letter and colour.
+  employeeIds: string[]
+  teamIds: string[]
 }
 
 export type RotationRow = {
@@ -90,14 +101,23 @@ export function getRotationPositions(
           : (shift!.name.trim().charAt(0) || '?').toUpperCase(),
         label: isOff ? 'Off' : shift!.name,
         badgeColor: isOff ? undefined : shift!.badge_color,
+        employeeIds: entry.employee_ids ?? [],
+        teamIds: entry.team_ids ?? [],
       }
     })
 }
 
-// The roster is auto-derived from the shifts in the pattern: every employee
-// assigned to a pattern shift (directly, or via a team), deduped. An
-// employee's offset is the first cycle position whose shift they're on — so
-// people assigned to the Morning shift start the cycle on Morning, etc.
+// The roster is the schedule's own crew: every employee a cycle position is
+// assigned (directly, or through a team), deduped. An employee's offset is
+// the first cycle position they appear on — their stagger into the cycle.
+//
+// This reads the pattern and nothing else. A position's shift still carries
+// its own "Assign to" picks (see `features/shifts`), but those say who may
+// work that shift in general, not who holds which slot of this rotation.
+// Inferring the cycle from them broke down as soon as a shift named a whole
+// team — every member landed on the same position — and an off position has
+// no shift to name anyone at all. A rotation's crew is set on the schedule
+// now, in the form's own "Assign to" step.
 export function getRotationRoster(
   positions: RotationPosition[],
   employees: Employee[],
@@ -109,12 +129,11 @@ export function getRotationRoster(
   )
   const offsetByEmployee = new Map<string, number>()
 
+  const resolveTeams = (teamIds: string[]) =>
+    teamIds.flatMap((id) => teamById.get(id)?.employee_ids ?? [])
+
   positions.forEach((pos) => {
-    if (pos.isOff || !pos.shift) return
-    const memberIds = [
-      ...pos.shift.employee_ids,
-      ...pos.shift.team_ids.flatMap((id) => teamById.get(id)?.employee_ids ?? []),
-    ]
+    const memberIds = [...pos.employeeIds, ...resolveTeams(pos.teamIds)]
     memberIds.forEach((employeeId) => {
       if (!offsetByEmployee.has(employeeId) && employeeById.has(employeeId)) {
         offsetByEmployee.set(employeeId, pos.index)

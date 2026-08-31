@@ -3,6 +3,8 @@ import { type Control, useWatch } from 'react-hook-form'
 import { useTimeFormat } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useEmployeesStore } from '@/features/employees/stores/employees-store'
+import { getEmployeeFullName } from '@/features/employees/utils'
 import { ShiftDaysTable } from '@/features/shifts/components/shift-days-table'
 import {
   SHIFT_BADGE_COLOR_OPTIONS,
@@ -10,12 +12,14 @@ import {
 } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
+import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import {
   CYCLE_TYPE_OPTIONS,
   MONTHS,
   REGULAR_TYPE_OPTIONS,
   SCHEDULE_TYPES,
 } from '../../data/data'
+import { type RotatePatternEntry } from '../../data/schema'
 import { calculateHours, formatTimes } from '../../utils'
 import { ScheduleCalendarPreview } from './schedule-calendar-preview'
 
@@ -254,6 +258,49 @@ function ShiftsSummary({ values }: { values: any }) {
   )
 }
 
+// Rotate only: who starts the cycle on each position, as picked on the
+// "Assign to" step. This is the rotation's whole roster (see
+// `features/schedule-rotation/utils.ts#getRotationRoster`), so it's worth
+// reading back before submit — a position left empty simply has nobody
+// starting there.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function AssignToSummary({ values }: { values: any }) {
+  const shifts = useShiftsStore((s) => s.shifts)
+  const employees = useEmployeesStore((s) => s.employees)
+  const teams = useTeamsStore((s) => s.teams)
+  const pattern = (values.pattern ?? []) as RotatePatternEntry[]
+
+  const employeeName = (id: string) => {
+    const employee = employees.find((e) => e.id === id)
+    return employee ? getEmployeeFullName(employee) : id
+  }
+  const teamName = (id: string) => teams.find((t) => t.id === id)?.name ?? id
+
+  return (
+    <SummarySection title='Assign to'>
+      {pattern.length === 0 && (
+        <p className='text-sm text-muted-foreground'>No pattern to assign</p>
+      )}
+      {pattern.map((entry, i) => {
+        const shift = entry.is_off
+          ? undefined
+          : shifts.find((s) => s.id === entry.shift_id)
+        const crew = [
+          ...(entry.employee_ids ?? []).map(employeeName),
+          ...(entry.team_ids ?? []).map(teamName),
+        ]
+        return (
+          <SummaryRow
+            key={entry.position ?? i}
+            label={`${i + 1}. ${shift?.name ?? 'Off'}`}
+            value={crew.join(', ')}
+          />
+        )
+      })}
+    </SummarySection>
+  )
+}
+
 type ScheduleSummaryProps = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: Control<any>
@@ -271,6 +318,7 @@ export function ScheduleSummary({ control }: ScheduleSummaryProps) {
       {values.parent_type === 'regular' && (
         <>
           <ShiftsSummary values={values} />
+          {values.type === 'rotate' && <AssignToSummary values={values} />}
           <SummarySection title='Calendar preview'>
             <ScheduleCalendarPreview values={values} />
           </SummarySection>

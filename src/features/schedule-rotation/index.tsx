@@ -194,7 +194,7 @@ export function ScheduleRotation() {
               <EmptyState
                 icon={<Users className='size-8' />}
                 title='No employees on this rotation'
-                description='Assign employees or teams to this schedule’s shifts (each shift’s “Assign to” tab) to build the rotation roster.'
+                description='Open this schedule and use its “Assign to” step to put employees or teams on each position of the cycle.'
               />
             ) : (
               <ScheduleRotationTable
