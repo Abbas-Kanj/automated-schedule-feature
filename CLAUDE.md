@@ -92,17 +92,18 @@ directory.
   fix is `--scope user`. Applies to any `winget install` from an automated
   context, not just `gh`.
 
-- **The `handoff-before-clear` skill describes machinery that is NOT
-  installed on this machine** (verified 2026-08-21). The skill documents a
-  global `/handoff` command plus a `SessionStart`/`matcher: "clear"`
-  staleness-warning hook. In reality: `~\.claude\commands\` **does not
-  exist at all** (so there is no `/handoff` command), there is no
-  `~\.claude\hooks\handoff-stale-on-clear.py`, and the `SessionStart`
-  hook actually wired in `~\.claude\settings.json` is
-  `bridge-session-start.py` with **no `matcher`**. Net effect: **nothing
-  warns you** if you `/clear` with a stale handoff file — do the handoff
-  update manually before clearing. Either install the two missing pieces or
-  correct the skill; don't trust its "Mechanism" section as-is.
+- **The `handoff-before-clear` skill is now half-installed** (re-verified
+  2026-09-02; the 2026-08-21 note said neither half existed).
+  - `~\.claude\commands\handoff.md` **does exist** (dated 2026-08-27), so
+    **`/handoff` works**. The older claim that `~\.claude\commands\` was
+    missing entirely is obsolete — it was created six days after that check.
+  - The safety net is **still not built**: there is no
+    `~\.claude\hooks\handoff-stale-on-clear.py`, and the only
+    `SessionStart` hook in `~\.claude\settings.json` is
+    `bridge-session-start.py` with **no `matcher`**.
+  - Net effect: run `/handoff` yourself before `/clear` — **nothing warns
+    you** if you skip it. Neither piece can trigger `/clear`; that stays a
+    manual second step either way.
 
 ## Working conventions
 
@@ -358,19 +359,122 @@ a genuine missing-import that `tsc -b` caught.
 - **Still not browser-verified** — this session organized and verified
   the build/test pipeline only, no browser tooling was used.
 
+## Session state (2026-09-02)
+
+- **Rotate schedules now suggest their own crew assignment.** New pure
+  module `src/features/schedules/rotation-suggestion.ts` picks each crew's
+  starting position by searching for the offsets that flatten coverage
+  (exhaustive under 100k combinations, seeded local search above), then
+  grades the result. The form's "Assign to" step gained a crew pool +
+  "Suggest assignment" button and a live coverage grid; a 14-preset library
+  (`data/rotation-presets.ts`) covers the named systems — 2-2-3 Panama,
+  Pitman, DuPont, Southern Swing, Metropolitan, 4-4, 5-2 and the rest.
+  → `.claude/handoff/rotation-suggestion.md`
+- **Two model additions, both backward-compatible.** `RotationPeriodType`
+  gained **`daily`**, so a day-based pattern advances one card per day
+  (without it a 14-card 2-2-3 described a 14-*week* cycle). And
+  `pattern[].crew_shift_id` optionally pins a crew to one shift, which is
+  the only way a shared pattern can express fixed-shift crews — over one
+  cycle every crew otherwise visits every card. Unset = exactly the old
+  behaviour.
+- **Watch out for the "understaffed" trap** if this area is touched again:
+  "fewer crews than cycle days" is *not* understaffing, and coding it that
+  way flags a textbook 4-crew Panama roster as broken. Warning severity is
+  decided by **fixability** (would reassigning help?), not by outcome —
+  an office 5-2 leaves two days empty by design. Regression test named for it.
+- **The step's UI was reworked after first review.** Suggesting is now the
+  default path and hand-assignment sits behind an "Assign manually" toggle,
+  laid out as one card per cycle day mirroring the Pattern step — shift
+  shown as a *disabled* field, crew as the live dropdown, and only one crew
+  kind (Teams **or** Employees) offered at a time.
+- **The coverage panel's warning list is computed but no longer rendered.**
+  It emitted one near-identical line per shift without naming which shift,
+  so a 2-crew roster produced three near-identical paragraphs. `warnings`
+  stays in `analyzeRotation`'s API and tests — **rewrite the messages
+  before ever re-displaying them.**
+- **New vitest gotcha: `optimizeDeps.include`.** A dep discovered *mid-run*
+  (here `@radix-ui/react-switch`) makes vitest reload and briefly resolve a
+  second React — `Invalid hook call`, but only against a cold
+  `node_modules/.vite`, and with the same signature as the `resolve.dedupe`
+  issue already documented. Anything a component test mounts that
+  `src/main.tsx` does not reach belongs in that list.
+- Third seed added, `sched-panama-223`; **`SEED_VERSION` bumped** to
+  `'2026-09-02-rotation-suggestion'`.
+- `npm run build` clean; `npm run test` **224 passed / 3 failed** (the same
+  unowned `search-provider.test.tsx` three); `eslint` **0 errors** / 3
+  pre-existing warnings across the touched features. **Still not
+  browser-verified — no browser tooling in the session — and uncommitted.
+  The day-card grid is the newest markup and the least verified.**
+
+## Session state (2026-09-03)
+
+- **Three corrections to the rotate "Assign to" step**, all reported from a
+  real screenshot of a 5-2 pattern run by two crews. No new feature work.
+  1. **The suggestion was trading away a whole day of coverage.**
+     `scoreOffsets` weighted per-shift smoothness ×2 against on-duty
+     variance, so `{1,2}` (coverage `[2,2,2,1,0,1,2]` — *nobody in* on day
+     5) beat `{0,3}` (`[2,2,1,1,2,1,1]`) on cost, 8.86 vs 10.86. A day
+     nobody works is now priced above everything else the score can reach
+     (`emptyDayPenalty`, a computed bound rather than a magic constant).
+     **This does not undo the "understaffed" rule** from 09-02: an
+     unfillable gap is paid for equally by every candidate, so a constant
+     cannot change which is smallest. Both halves have named tests.
+  2. **"Next" now accepts the step.** Pressing *Suggest* always wrote
+     straight into `pattern[]` (verified by driving the whole wizard in
+     Chromium, not assumed) — but picking a pool and *not* pressing it, or
+     changing the pool afterwards, advanced with a roster that did not
+     match the selection. `commitPendingSuggestion` closes both, and skips
+     manual mode entirely so hand-placed crew is never re-searched.
+  3. **The Summary was under-reporting the roster** — it listed stored
+     positions, so two crews on a seven-card week read as five dashes. It
+     now repeats the step's coverage grid and lists only the positions
+     someone starts on. Forced a shared `rotation-crews.ts`, which keeps
+     `rotation-suggestion.ts` schema-free.
+- **Pre-existing bug found by a new test:** flipping Teams ⇄ Employees with
+  the manual grid open copied employee ids into `team_ids` — RHF
+  re-registers a controller under a changed `name` while it still holds the
+  old value. Fixed with `key={crewField}`. **Any `FormField` whose `name`
+  comes from state needs that key.**
+- **The `optimizeDeps` gotcha recurred exactly as the handoff predicted**,
+  the first time a test mounted the whole `ScheduleForm`;
+  `@radix-ui/react-popover` added to the list.
+- `npm run build` clean; `npm run test` **229 passed / 3 failed** (the same
+  unowned `search-provider.test.tsx` three); eslint clean on every touched
+  file. **Still uncommitted — now two sessions' worth — and still not
+  browser-verified by hand.**
+  → `.claude/handoff/rotation-suggestion.md`
+
 ## Pick up here next session
 
+0. **Browser-verify the rotation suggestion** — newest work, and the only
+   item here with a written click-list. Schedule form → Rotate → pick 2
+   shifts → **Pattern** → preset "2-2-3 Panama" → **Assign to** → pool of
+   4 → *Suggest*: the "On duty" row should read `2` under all 14 columns.
+   Then flip **Assign manually** on — 14 day cards, each with a *greyed*
+   shift field above a live crew dropdown, one crew kind only — and move a
+   crew by hand: the On-duty row must react immediately, which is what
+   proves the panel reads live form state rather than the last suggestion.
+   Then **Next → Next → Summary**: the coverage grid there must match the
+   one on the step. Then `/schedule-rotation` → *Plant Coverage (2-2-3)* →
+   **Daily** tab.
+   **Two pieces of markup have never been seen** — the day-card grid's
+   column layout, and the Summary's 09-03 grid + starting-position list.
+   Add one pass on the 09-03 fixes: a **5-2 preset with 2 crews** must show
+   **no red `0`** in the On-duty row, and toggling Teams ⇄ Employees with
+   the manual grid open must not put employee names in a team field. Full
+   list in `.claude/handoff/rotation-suggestion.md`.
 1. **Click through the seven screens that have never been opened in a
-   browser here**: `/schedule-rotation` (four seeded rotations —
-   **clear `localStorage` keys `schedules` + `shifts` first**, or the
-   cached copies shadow the new seed), `/public-holidays` and
-   `/schedule-templates` (**clear keys `public-holidays` +
-   `schedule-templates` too**), `/teams`, plus `/employees` and
-   `/employees-list` (both reworked 2026-08-27 — flat form, shared
-   `DataTable` — still unverified either way). Also click through the
-   shift form's Assign-to tab: its Employees/Teams multi-selects are new
-   and drive the Schedule Rotation roster, so a bug there is invisible
-   until that screen is checked too.
+   browser here**: `/schedule-rotation` (**three** seeded rotations),
+   `/public-holidays` and `/schedule-templates`, `/teams`, plus
+   `/employees` and `/employees-list` (both reworked 2026-08-27 — flat
+   form, shared `DataTable` — still unverified either way).
+   *(The "clear `localStorage` keys first" advice that used to live here is
+   obsolete — `src/lib/seed-store.ts`'s `SEED_VERSION` stamp re-seeds on
+   its own. Bump it when editing a seed.)*
+   Also click through the shift form's Assign-to tab. Note it no longer
+   drives the Schedule Rotation roster — that moved onto the schedule on
+   2026-08-29 — so it is sample data only; worth a look, but a bug there
+   is now cosmetic rather than load-bearing.
 2. **Click through the schedule form** — the `ToggleButton` conversions in
    the weekday / month-day / cycle-length / calendar grids shipped without
    a browser check (see `.claude/handoff/shift-policies.md`).

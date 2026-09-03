@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useMemo } from 'react'
 import { type Control, useWatch } from 'react-hook-form'
 import { useTimeFormat } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,10 @@ import {
   SCHEDULE_TYPES,
 } from '../../data/data'
 import { type RotatePatternEntry } from '../../data/schema'
+import { assignmentsFromPattern, patternToSlots } from '../../rotation-crews'
+import { analyzeRotation } from '../../rotation-suggestion'
 import { calculateHours, formatTimes } from '../../utils'
+import { RotationCoveragePanel } from './rotation-coverage-panel'
 import { ScheduleCalendarPreview } from './schedule-calendar-preview'
 
 function SummarySection({
@@ -258,45 +261,106 @@ function ShiftsSummary({ values }: { values: any }) {
   )
 }
 
-// Rotate only: who starts the cycle on each position, as picked on the
-// "Assign to" step. This is the rotation's whole roster (see
-// `features/schedule-rotation/utils.ts#getRotationRoster`), so it's worth
-// reading back before submit — a position left empty simply has nobody
-// starting there.
+// Rotate only: the roster, read back the way the "Assign to" step showed it.
+//
+// The stored form of that roster is one crew sitting on one pattern position
+// (see `features/schedule-rotation/utils.ts#getRotationRoster`) — a *starting*
+// position, since every crew then walks the whole cycle. Listing only that
+// under-reports the roster badly: two crews on a seven-card week read as five
+// empty days, which looks like the assignment was lost rather than staggered.
+// So the same coverage grid the step ends on is repeated here, and the
+// positions below it are labelled as the starting points they are.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AssignToSummary({ values }: { values: any }) {
   const shifts = useShiftsStore((s) => s.shifts)
   const employees = useEmployeesStore((s) => s.employees)
   const teams = useTeamsStore((s) => s.teams)
-  const pattern = (values.pattern ?? []) as RotatePatternEntry[]
+  const pattern = useMemo(
+    () => (values.pattern ?? []) as RotatePatternEntry[],
+    [values.pattern]
+  )
 
-  const employeeName = (id: string) => {
-    const employee = employees.find((e) => e.id === id)
-    return employee ? getEmployeeFullName(employee) : id
-  }
-  const teamName = (id: string) => teams.find((t) => t.id === id)?.name ?? id
+  const employeeLabels = useMemo(
+    () =>
+      new Map(
+        employees
+          .filter((employee) => employee.id)
+          .map((employee) => [
+            employee.id as string,
+            getEmployeeFullName(employee),
+          ])
+      ),
+    [employees]
+  )
+
+  const slots = useMemo(() => patternToSlots(pattern), [pattern])
+  const assignments = useMemo(
+    () => assignmentsFromPattern(pattern, teams, employeeLabels),
+    [pattern, teams, employeeLabels]
+  )
+  const analysis = useMemo(
+    () => analyzeRotation(slots, assignments),
+    [slots, assignments]
+  )
+
+  // Positions nobody starts on carry no information once the grid above has
+  // shown the whole rotation — and in any rotation with fewer crews than cards
+  // most positions are empty by definition.
+  const startingPositions = pattern.flatMap((entry, i) => {
+    const crew = [
+      ...(entry.team_ids ?? []).map(
+        (id) => teams.find((t) => t.id === id)?.name ?? id
+      ),
+      ...(entry.employee_ids ?? []).map((id) => employeeLabels.get(id) ?? id),
+    ]
+    if (crew.length === 0) return []
+    const shift = entry.is_off
+      ? undefined
+      : shifts.find((s) => s.id === entry.shift_id)
+    // A pinned crew ignores the cards' own shifts, so saying who starts where
+    // without saying that would misdescribe the roster.
+    const pinnedShift = entry.crew_shift_id
+      ? shifts.find((s) => s.id === entry.crew_shift_id)
+      : undefined
+    return [
+      {
+        key: entry.position ?? i,
+        label: `${i + 1}. ${shift?.name ?? 'Off'}`,
+        value: pinnedShift
+          ? `${crew.join(', ')} — always ${pinnedShift.name}`
+          : crew.join(', '),
+      },
+    ]
+  })
 
   return (
     <SummarySection title='Assign to'>
       {pattern.length === 0 && (
         <p className='text-sm text-muted-foreground'>No pattern to assign</p>
       )}
-      {pattern.map((entry, i) => {
-        const shift = entry.is_off
-          ? undefined
-          : shifts.find((s) => s.id === entry.shift_id)
-        const crew = [
-          ...(entry.employee_ids ?? []).map(employeeName),
-          ...(entry.team_ids ?? []).map(teamName),
-        ]
-        return (
-          <SummaryRow
-            key={entry.position ?? i}
-            label={`${i + 1}. ${shift?.name ?? 'Off'}`}
-            value={crew.join(', ')}
+      {pattern.length > 0 && assignments.length === 0 && (
+        <p className='text-sm text-muted-foreground'>
+          Nobody is on this rotation yet
+        </p>
+      )}
+      {assignments.length > 0 && (
+        <>
+          <RotationCoveragePanel
+            slots={slots}
+            assignments={assignments}
+            analysis={analysis}
+            shifts={shifts}
           />
-        )
-      })}
+          <p className='text-xs text-muted-foreground'>
+            Each crew starts on the position listed below and moves one card
+            further along the cycle at every step, so the rest days travel with
+            it rather than falling on the same days for everyone.
+          </p>
+          {startingPositions.map((row) => (
+            <SummaryRow key={row.key} label={row.label} value={row.value} />
+          ))}
+        </>
+      )}
     </SummarySection>
   )
 }

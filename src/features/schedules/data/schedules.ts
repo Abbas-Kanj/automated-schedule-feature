@@ -107,4 +107,77 @@ export const defaultSchedules: Schedule[] = [
     start_date: '2026-08-31',
     end_settings: { end_type: 'never' },
   },
+  // The third rotation is a different animal from the two above, and is here
+  // because it is the shape most real 24/7 rosters actually take.
+  //
+  // Read it on the **Daily** tab — one card is one day, not one week. The
+  // pattern is a pure rest mask (2 on, 2 off, 3 on, 2 off, 2 on, 3 off) and
+  // every crew runs the same one; what staggers them is where each starts.
+  // Four crews on a fourteen-day mask with seven working cards puts exactly
+  // two people on duty every single day, with no day heavier than another.
+  //
+  // What the cards cannot say, and `crew_shift_id` can: two of these crews are
+  // permanently on mornings and two permanently on nights. Over one cycle every
+  // crew visits every card, so a shared pattern alone would rotate everyone
+  // through both — fine for some rosters, wrong for this one.
+  //
+  // The starting positions are not arbitrary. The four crews pair up
+  // differently on different days (0 with 10, 0 with 3, 3 with 7, 7 with 10),
+  // so mornings and nights are only both covered if the pins alternate around
+  // that cycle — hence 0 and 7 on mornings, 3 and 10 on nights. Move one crew
+  // and a day loses its night cover; the "Assign to" step's coverage grid shows
+  // it immediately.
+  {
+    id: 'sched-panama-223',
+    name: 'Plant Coverage (2-2-3)',
+    description:
+      'Fourteen-day 2-2-3 mask, four crews, two on mornings and two on nights around the clock.',
+    parent_type: 'regular',
+    type: 'rotate',
+    shift_ids: ['shift-morning', 'shift-night'],
+    temporary_schedule: false,
+    cycle_type: 'pattern_shifts',
+    cycle_length: { unit: 'custom_days', days: 14 },
+    pattern: [
+      {
+        position: 1,
+        shift_id: 'shift-morning',
+        is_off: false,
+        employee_ids: ['emp-a'],
+        crew_shift_id: 'shift-morning',
+      },
+      { position: 2, shift_id: 'shift-morning', is_off: false },
+      { position: 3, is_off: true },
+      {
+        position: 4,
+        is_off: true,
+        employee_ids: ['emp-b'],
+        crew_shift_id: 'shift-night',
+      },
+      { position: 5, shift_id: 'shift-morning', is_off: false },
+      { position: 6, shift_id: 'shift-morning', is_off: false },
+      { position: 7, shift_id: 'shift-morning', is_off: false },
+      {
+        position: 8,
+        is_off: true,
+        employee_ids: ['emp-c'],
+        crew_shift_id: 'shift-morning',
+      },
+      { position: 9, is_off: true },
+      { position: 10, shift_id: 'shift-morning', is_off: false },
+      {
+        position: 11,
+        shift_id: 'shift-morning',
+        is_off: false,
+        employee_ids: ['emp-d'],
+        crew_shift_id: 'shift-night',
+      },
+      { position: 12, is_off: true },
+      { position: 13, is_off: true },
+      { position: 14, is_off: true },
+    ],
+    shift_repeat: [],
+    start_date: '2026-08-31',
+    end_settings: { end_type: 'never' },
+  },
 ]

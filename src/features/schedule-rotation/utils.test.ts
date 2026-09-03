@@ -1,3 +1,4 @@
+import { addDays } from 'date-fns'
 import { describe, expect, it } from 'vitest'
 import { type Employee } from '@/features/employees/data/schema'
 import { type Shift } from '@/features/shifts/data/schema'
@@ -7,6 +8,7 @@ import {
   type RotateSchedule,
   buildRotation,
   getAssignedIndex,
+  getPeriodIndex,
   getRotationPositions,
   getRotationRoster,
 } from './utils'
@@ -271,5 +273,60 @@ describe('buildRotation', () => {
     expect(rotation.periodIndex).toBe(2)
     const alice = rotation.rows.find((r) => r.fullName === 'Alice M Test')!
     expect(alice.assigned.label).toBe('Night') // (0 + 2) % 4
+  })
+})
+
+// The daily step is what makes a day-based pattern (2-2-3, 4-on-4-off, DuPont)
+// mean what it says. Read through the weekly step the same cards would
+// describe a cycle seven times longer.
+describe('daily period type', () => {
+  it('advances exactly one position per calendar day', () => {
+    const start = new Date(2026, 7, 17)
+    const labels = [0, 1, 2, 3, 4].map((dayOffset) => {
+      const rotation = buildRotation(
+        schedule,
+        shifts,
+        employees,
+        teams,
+        addDays(start, dayOffset),
+        'daily'
+      )
+      expect(rotation.periodIndex).toBe(dayOffset)
+      return rotation.rows.find((r) => r.fullName === 'Alice M Test')!.assigned
+        .label
+    })
+
+    // Alice starts on Morning and walks the four-card cycle a day at a time,
+    // wrapping on the fifth day.
+    expect(labels).toEqual(['Morning', 'Afternoon', 'Night', 'Off', 'Morning'])
+  })
+
+  it('composes into the plain modulo the pattern describes', () => {
+    // `(daysSinceStart + offset) mod cycleLength` — the same arithmetic the
+    // period helpers arrive at, spelled out here so a change to either side
+    // has to break this deliberately.
+    const cycleLength = 4
+    for (const days of [-9, -1, 0, 1, 13]) {
+      for (const offset of [0, 1, 2, 3]) {
+        const viewDate = addDays(new Date(2026, 7, 17), days)
+        const periodIndex = getPeriodIndex(schedule, viewDate, 'daily')
+        expect(periodIndex).toBe(days)
+        expect(getAssignedIndex(offset, periodIndex, cycleLength)).toBe(
+          ((days + offset) % cycleLength + cycleLength) % cycleLength
+        )
+      }
+    }
+  })
+
+  it('labels a single day rather than a range', () => {
+    const rotation = buildRotation(
+      schedule,
+      shifts,
+      employees,
+      teams,
+      new Date(2026, 7, 19),
+      'daily'
+    )
+    expect(rotation.rangeLabel).toBe('Wed, Aug 19, 2026')
   })
 })

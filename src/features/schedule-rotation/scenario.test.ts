@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { addWeeks, parse } from 'date-fns'
+import { addDays, addWeeks, parse } from 'date-fns'
 import { describe, expect, it } from 'vitest'
 import employeeData from '@/features/employees/data/data.json'
 import { type Employee, EmployeeSchema } from '@/features/employees/data/schema'
@@ -70,7 +70,7 @@ describe('seed data', () => {
     )
   })
 
-  it('seeds exactly the two scenarios', () => {
+  it('seeds exactly the three scenarios', () => {
     expect(employees).toHaveLength(7)
     expect(defaultShifts.map((s) => s.name)).toEqual([
       'Morning',
@@ -79,7 +79,7 @@ describe('seed data', () => {
       'Early',
       'Late',
     ])
-    expect(defaultSchedules).toHaveLength(2)
+    expect(defaultSchedules).toHaveLength(3)
     expect(defaultTeams.map((t) => [t.name, t.employee_ids.length])).toEqual([
       ['Team A', 4],
       ['Team B', 3],
@@ -216,5 +216,91 @@ describe('Desk Alternation — Team B, two shifts and a rest slot', () => {
       const assignments = Object.values(gridForWeek(alternation, week))
       expect([...assignments].sort()).toEqual(['Early', 'Late', 'Off'])
     }
+  })
+})
+
+// The third seeded scenario is a different shape from the two above and is
+// read on the **Daily** tab: a pure rest mask where one card is one day, with
+// crews pinned to a shift rather than rotating through the pattern's own.
+const panama = rotateSchedule('Plant Coverage (2-2-3)')
+
+// Who is on what on the day `offsetDays` after the schedule's own start.
+function gridForDay(
+  schedule: RotateSchedule,
+  offsetDays: number
+): Record<string, string> {
+  const built = buildRotation(
+    schedule,
+    defaultShifts,
+    employees,
+    defaultTeams,
+    addDays(startOf(schedule), offsetDays),
+    'daily'
+  )
+  expect(built.periodIndex).toBe(offsetDays)
+  return Object.fromEntries(
+    built.rows.map((row) => [row.employee.firstname, row.assigned.label])
+  )
+}
+
+describe('Plant Coverage (2-2-3) — daily, four crews, pinned shifts', () => {
+  it('parses against the real schema', () => {
+    expect(scheduleSchema.safeParse(panama).success).toBe(true)
+  })
+
+  it('runs a fourteen-day cycle, one card per day', () => {
+    expect(panama.pattern).toHaveLength(14)
+    expect(panama.cycle_length.days).toBe(14)
+  })
+
+  it('puts exactly two crews on duty every day of the cycle', () => {
+    for (let day = 0; day < 14; day++) {
+      const working = Object.values(gridForDay(panama, day)).filter(
+        (label) => label !== 'Off'
+      )
+      expect(working, `day ${day}`).toHaveLength(2)
+    }
+  })
+
+  it('covers mornings and nights on every single day', () => {
+    // The point of the pinned starting positions: the crews pair up
+    // differently from day to day, so both shifts are only ever covered
+    // because the pins alternate around the cycle those pairings form.
+    for (let day = 0; day < 14; day++) {
+      const working = Object.values(gridForDay(panama, day)).filter(
+        (label) => label !== 'Off'
+      )
+      expect([...working].sort(), `day ${day}`).toEqual(['Morning', 'Night'])
+    }
+  })
+
+  it('keeps each crew on its own shift for the whole cycle', () => {
+    const seen: Record<string, Set<string>> = {}
+    for (let day = 0; day < 14; day++) {
+      Object.entries(gridForDay(panama, day)).forEach(([name, label]) => {
+        if (label === 'Off') return
+        seen[name] = seen[name] ?? new Set()
+        seen[name].add(label)
+      })
+    }
+    expect(seen.Amir).toEqual(new Set(['Morning']))
+    expect(seen.Carla).toEqual(new Set(['Morning']))
+    expect(seen.Bilal).toEqual(new Set(['Night']))
+    expect(seen.Dana).toEqual(new Set(['Night']))
+  })
+
+  it('gives every crew the same amount of work across the cycle', () => {
+    const workedDays: Record<string, number> = {}
+    for (let day = 0; day < 14; day++) {
+      Object.entries(gridForDay(panama, day)).forEach(([name, label]) => {
+        workedDays[name] = (workedDays[name] ?? 0) + (label === 'Off' ? 0 : 1)
+      })
+    }
+    // Seven working cards in the mask, and every crew traverses all of them.
+    expect(Object.values(workedDays)).toEqual([7, 7, 7, 7])
+  })
+
+  it('wraps back to the starting grid on day fifteen', () => {
+    expect(gridForDay(panama, 14)).toEqual(gridForDay(panama, 0))
   })
 })

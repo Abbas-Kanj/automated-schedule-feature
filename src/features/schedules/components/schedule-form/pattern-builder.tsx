@@ -18,6 +18,15 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { RecurrenceFrequencyFields } from '@/components/recurrence-frequency-fields'
 import { RepeatMonthlyFields } from '@/components/repeat-monthly-fields'
 import { SelectDropdown } from '@/components/select-dropdown'
@@ -35,6 +44,11 @@ import {
   SHIFT_REPEAT_MONTHLY_MODE_OPTIONS,
   SHIFT_REPEAT_WEEKDAY_OPTIONS,
 } from '../../data/data'
+import {
+  ROTATION_PRESETS,
+  ROTATION_PRESET_GROUPS,
+  getRotationPreset,
+} from '../../data/rotation-presets'
 import { type RotatePatternEntry, type ShiftRepeat } from '../../data/schema'
 import { DirectionPreview } from './direction-preview'
 
@@ -157,6 +171,43 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     replace(next)
   }, [isCustomShifts, totalPatternLength, shiftRepeat, replace, getValues])
 
+  // Drops a ready-made roster in place of hand-setting every card. Writes
+  // `cycle_length` first and then the cards, which also keeps the
+  // `pattern_shifts` sync effect above quiet: by the time it runs, `days`
+  // already equals the new pattern length, so it early-returns instead of
+  // truncating what was just written.
+  //
+  // `unit: 'custom_days'` is deliberate — a 14- or 28-day cycle is not a whole
+  // number of the week/month units, and storing it as one would round it.
+  function applyPreset(presetId: string) {
+    const preset = getRotationPreset(presetId)
+    if (!preset || shiftIds.length === 0) return
+
+    const cards = preset.buildCards(shiftIds.length)
+    const current =
+      (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
+
+    setValue(
+      'cycle_length',
+      { unit: 'custom_days', days: cards.length },
+      { shouldDirty: true }
+    )
+
+    // Crew is carried across by position, same as the `custom_shifts` rebuild
+    // and the drag-reorder below — it belongs to the slot, not to whichever
+    // shift happens to be sitting in it.
+    replace(
+      cards.map((card, i) => ({
+        position: i + 1,
+        is_off: card === null,
+        shift_id: card === null ? undefined : shiftIds[card % shiftIds.length],
+        employee_ids: current[i]?.employee_ids,
+        team_ids: current[i]?.team_ids,
+        crew_shift_id: current[i]?.crew_shift_id,
+      }))
+    )
+  }
+
   // Every day's dropdown picks from the shifts selected back in the
   // "Shifts" step — no more hand-authored blocks (see `data/schema.ts`).
   const shiftOptions = shiftIds
@@ -191,6 +242,17 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
               </FormItem>
             )}
           />
+
+          {/* Only for `pattern_shifts` — `custom_shifts` derives its own cards
+              from the per-shift repeat rows below, and the rebuild effect
+              would overwrite a preset the moment it ran. */}
+          {!isCustomShifts && (
+            <PatternPresetPicker
+              shiftIds={shiftIds}
+              disabled={disabled}
+              onApply={applyPreset}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -814,5 +876,85 @@ function PatternDayCard({
         />
       </CardContent>
     </Card>
+  )
+}
+
+// Drops a named shift system into the pattern grid in one pick, instead of
+// hand-setting twenty-eight cards and hoping the rest days line up.
+//
+// A preset only names shift *slots* (first selected shift, second, ...), so it
+// is offered once the schedule has selected enough shifts to fill them —
+// Southern Swing needs three, DuPont two, a plain 2-2-3 mask only one.
+function PatternPresetPicker({
+  shiftIds,
+  disabled,
+  onApply,
+}: {
+  shiftIds: string[]
+  disabled?: boolean
+  onApply: (presetId: string) => void
+}) {
+  const [presetId, setPresetId] = useState<string>('')
+
+  return (
+    <FormItem>
+      <FormLabel>Start from a known pattern</FormLabel>
+      <Select
+        value={presetId}
+        onValueChange={(value) => {
+          // Radix re-emits an empty value when a Select is set programmatically
+          // — see the `recurrence-frequency-fields` note and the
+          // `radix-select-bubble-select-wipes-programmatic-value` skill.
+          if (!value) return
+          setPresetId(value)
+          onApply(value)
+        }}
+        disabled={disabled || shiftIds.length === 0}
+      >
+        <SelectTrigger>
+          <SelectValue
+            placeholder={
+              shiftIds.length === 0
+                ? 'Select shifts first'
+                : 'Optional — pick a ready-made roster'
+            }
+          />
+        </SelectTrigger>
+        <SelectContent>
+          {ROTATION_PRESET_GROUPS.map((group) => {
+            const presets = ROTATION_PRESETS.filter((p) => p.group === group)
+            if (presets.length === 0) return null
+            return (
+              <SelectGroup key={group}>
+                <SelectLabel>{group}</SelectLabel>
+                {presets.map((preset) => {
+                  const cards = preset.buildCards(shiftIds.length)
+                  const shortOfShifts = shiftIds.length < preset.minShifts
+                  return (
+                    <SelectItem
+                      key={preset.id}
+                      value={preset.id}
+                      disabled={shortOfShifts}
+                    >
+                      {preset.label} · {cards.length} days
+                      {shortOfShifts
+                        ? ` · needs ${preset.minShifts} shifts`
+                        : ''}
+                    </SelectItem>
+                  )
+                })}
+              </SelectGroup>
+            )
+          })}
+        </SelectContent>
+      </Select>
+      {presetId && (
+        <p className='text-muted-foreground text-xs'>
+          {getRotationPreset(presetId)?.description} Suggested crew size:{' '}
+          {getRotationPreset(presetId)?.suggestedCrews}. Every card stays
+          editable below.
+        </p>
+      )}
+    </FormItem>
   )
 }

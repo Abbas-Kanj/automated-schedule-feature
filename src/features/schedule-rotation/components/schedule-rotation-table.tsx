@@ -50,7 +50,9 @@ export function ScheduleRotationTable({
             <TableHead className='ps-4'>Employee Name</TableHead>
             <TableHead>Current Schedule Sequence</TableHead>
             <TableHead className='pe-4 text-end'>
-              Assigned Shift This {periodType === 'weekly' ? 'Week' : 'Month'}
+              {periodType === 'daily'
+                ? 'Assigned Shift Today'
+                : `Assigned Shift This ${periodType === 'weekly' ? 'Week' : 'Month'}`}
             </TableHead>
           </TableRow>
         </TableHeader>

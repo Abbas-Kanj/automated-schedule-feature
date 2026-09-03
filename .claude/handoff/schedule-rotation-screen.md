@@ -16,8 +16,9 @@ supplied.
 
 - **Schedule dropdown** — lists **rotate schedules only** (`parent_type ==
   'regular' && type == 'rotate'`), the only kind carrying a shift `pattern`.
-- **Weekly / Monthly** toggle (shadcn `Tabs` used as a segmented control — no
-  `TabsContent`, intentional).
+- **Daily / Weekly / Monthly** toggle (shadcn `Tabs` used as a segmented control
+  — no `TabsContent`, intentional). **Daily added 2026-09-02**; it is disabled
+  when one pattern card is not one real calendar day (see the Model section).
 - **Date navigator** — prev / range label / next / **Reset**. Reset returns to
   the schedule's `start_date` period (which is rotation period 0).
 - **Cycle legend** — decodes the sequence letters (`M = Morning`, …, `O = Off`).
@@ -31,6 +32,10 @@ supplied.
 > It is now *declared* on the schedule. See "The 2026-08-29 rework" below for
 > what changed and why; everything in this section describes the current
 > behaviour.
+>
+> **Extended 2026-09-02** with a `daily` step and per-crew fixed shifts. Both
+> are noted inline below; the full account is in
+> `.claude/handoff/rotation-suggestion.md`.
 
 - **The crew is stored on the schedule's pattern.** Each entry of
   `pattern[]` carries `employee_ids` / `team_ids` (see
@@ -43,10 +48,24 @@ supplied.
   gets expressed — it has no shift of its own to carry a pick.
 - **One step per period**: `assignedIndex = (offset + periodIndex) mod
   cycleLength`, where `offset` is the position the crew was assigned to and
-  `periodIndex` is whole weeks/months between the viewed period and the
+  `periodIndex` is whole days/weeks/months between the viewed period and the
   `start_date` period. Off positions are ordinary cycle members — everyone
-  rotates through them. The Weekly/Monthly toggle only changes *what one step
-  means*; it is independent of `cycle_length`.
+  rotates through them. The Daily/Weekly/Monthly toggle only changes *what one
+  step means*; it is independent of `cycle_length`.
+- **`daily` is what a day-based pattern needs** (2-2-3, 4-on-4-off, DuPont):
+  one card advances one calendar day, so the composition is literally
+  `(daysSinceStart + offset) mod patternLength`. Read through the weekly step
+  the same cards would describe a cycle seven times longer. It is **disabled**
+  when `getScheduleCycleLength(schedule) !== pattern.length` — the
+  weekly-`shift_repeat`-card case in open call #4 below, where one card really
+  does span a week.
+- **`pattern[].crew_shift_id` (optional) pins a crew to one shift.** Set, the
+  crew works that shift on every working card instead of the card's own;
+  unset — every schedule written before 2026-09-02 — it rotates as before.
+  It exists because a shared `pattern[]` alone **cannot** express fixed-shift
+  crews: over one cycle every crew visits every card, so "Team A always days,
+  Team B always nights, same rest mask" had no representation at all. Resolved
+  by `applyCrewShift`; an off card stays off.
 - **`cycleLength === pattern.length`**, regardless of `cycle_type`. This
   screen never reads `cycle_length.days` or `shift_repeat`.
 - **Shifts keep their own "Assign to" tab**, and their `employee_ids` /
@@ -55,8 +74,12 @@ supplied.
 
 Core logic is pure in `src/features/schedule-rotation/utils.ts`
 (`buildRotation`, `getRotationPositions`, `getRotationRoster`, `getAssignedIndex`,
-period helpers), unit-tested in `utils.test.ts` and locked against the real
-seeds in `scenario.test.ts`.
+`applyCrewShift`, period helpers), unit-tested in `utils.test.ts` and locked
+against the real seeds in `scenario.test.ts`.
+
+Choosing the offsets in the first place lives elsewhere and is pure too —
+`src/features/schedules/rotation-suggestion.ts`, driven from the form's
+"Assign to" step. This screen only ever *reads* the result.
 
 ## The 2026-08-29 rework — assignment moved onto the schedule
 
@@ -96,16 +119,25 @@ pattern to attach crew to, and a schedule-wide roster field would need a schema
 change with no consumer), and there is no `assign_to_enabled` toggle at
 schedule level.
 
-## Seed data — two scenarios
+## Seed data — three scenarios
 
-Rewritten 2026-08-29. Both are the same shape at different sizes: **one cycle
-position per shift plus a rest slot, and one crew per position**, so every crew
-covers every shift and exactly one is off at a time.
+Rewritten 2026-08-29, third added 2026-09-02. The first two are the same shape
+at different sizes: **one cycle position per shift plus a rest slot, and one
+crew per position**, so every crew covers every shift and exactly one is off at
+a time. The third is deliberately a different animal — a pure rest mask read
+daily, with crews pinned to shifts.
 
-| Schedule | Crew | Cycle | Pattern type |
-|---|---|---|---|
-| **Shift Rotation** | Team A — Amir, Bilal, Carla, Dana | 4 — `M A N O` | Rotate pattern (`pattern_shifts`) |
-| **Desk Alternation** | Team B — Elias, Farah, Ghassan | 3 — `E L O` | Custom alternate (`custom_shifts`) |
+| Schedule | Crew | Cycle | Pattern type | Read on |
+|---|---|---|---|---|
+| **Shift Rotation** | Team A — Amir, Bilal, Carla, Dana | 4 — `M A N O` | Rotate pattern (`pattern_shifts`) | Weekly |
+| **Desk Alternation** | Team B — Elias, Farah, Ghassan | 3 — `E L O` | Custom alternate (`custom_shifts`) | Weekly |
+| **Plant Coverage (2-2-3)** | Amir, Bilal, Carla, Dana as four one-person crews | 14-day 2-2-3 mask | Rotate pattern (`pattern_shifts`) | **Daily** |
+
+Plant Coverage is the fixed-shift case: offsets 0/3/7/10, with 0 and 7 pinned
+to Morning and 3 and 10 to Night. Those pins are load-bearing — the crews pair
+up differently day to day ({0,10}, {0,3}, {3,7}, {7,10}, a 4-cycle), so both
+shifts are covered every day only because the pins alternate around it. Move one
+crew and a day loses its night cover.
 
 Supporting data:
 
@@ -131,7 +163,16 @@ Design constraints that shaped these (worth knowing before editing them):
   empty; more and the extras never enter the cycle. Nothing enforces this — it
   is asserted in `scenario.test.ts`, not in the schema.
 
-## Status (2026-08-29)
+## Status
+
+> **2026-09-02 supersedes the numbers below**: `npm run build` clean;
+> `npm run test` **221 passed / 3 failed** (same three unowned
+> `search-provider.test.tsx` failures); `npx eslint` **0 errors**, 3 warnings,
+> all pre-existing. `scenario.test.ts` now also locks the Plant Coverage seed
+> day by day, and `utils.test.ts` covers the `daily` step. Still **not
+> browser-verified**, and **uncommitted**.
+
+### As of 2026-08-29
 
 - `npm run build` **clean**.
 - `npm run test` — **192 passed / 3 failed**, the 3 being the pre-existing
@@ -175,12 +216,28 @@ optimized deps and every `MultiSelect` throws
 component test touching a MultiSelect fails until this is present. The full
 suite and the production build are both unaffected by the addition.
 
+### …and `optimizeDeps.include` for the same failure on a cold cache
+
+Added 2026-09-02. `dedupe` alone is not enough for a dep vitest discovers
+**partway through a run**: it optimizes, reloads the page, and momentarily
+resolves a second React, throwing `Invalid hook call` — then passes on every
+subsequent run, so it only shows against a cold `node_modules/.vite`.
+
+```ts
+optimizeDeps: { include: ['@radix-ui/react-switch'] },
+```
+
+Same signature as the `dedupe` case above, which makes it easy to wave off as
+already handled. **Anything a component test mounts that is not already reached
+from `src/main.tsx` belongs in that list.** Reproduce with
+`rm -rf node_modules/.vite` before trusting a green run.
+
 ### Seed changes no longer need localStorage hand-clearing
 
 `src/lib/seed-store.ts` stamps `"<key>:seed"` with `SEED_VERSION` next to each
 persisted store. Bumping that constant drops every cached blob and re-seeds
 from the bundled defaults. **Bump it whenever you edit a `features/*/data/*.ts`
-seed** — currently `'2026-08-29-schedule-assign-to'`. The old advice
+seed** — currently `'2026-09-02-rotation-suggestion'`. The old advice
 (`localStorage.removeItem('schedules')` etc.) is obsolete.
 
 ### Vitest browser mode — an old failure that has not recurred
@@ -211,11 +268,23 @@ npx vitest run --browser.enabled=false --environment=node <files>
    deliberate call ("without adding restrictions"). If it should be enforced
    later, note the schema cannot see the shifts store, so the rule can only ever
    look at the pattern.
+   **Partly addressed 2026-09-02**: the "Assign to" step's coverage panel now
+   *reports* this (and much else) without blocking anything. Note the rule it
+   uses is coverage-based, **not** "crews should equal positions" — that
+   assumption flags a correct 4-crew Panama as broken. See
+   `.claude/handoff/rotation-suggestion.md`.
 4. **`shift_repeat` and the rotation screen disagree about a card's length.**
    `schedules/utils.ts#expandRotatePatternDays` expands a `weekly`-frequency
    card into 7 real days for the calendar preview; `getRotationPositions` treats
    every card as exactly one cycle position. Desk Alternation uses `daily`
    cards, so it doesn't bite today.
+   **Guarded, not resolved, 2026-09-02**: the Daily tab is disabled whenever
+   `getScheduleCycleLength(schedule) !== pattern.length`, so the two engines
+   cannot silently contradict each other on screen. They still disagree in
+   principle.
+5. **The cycle legend decodes the *pattern's* letters**, so on a rotation using
+   `crew_shift_id` a pinned crew's row shows its own shift while the legend
+   shows the card's. Not wrong, but worth a look on a mixed rotation.
 5. **The shift Assign-to tab is now decorative for rotations.** Kept
    deliberately ("leave the assign to data in the shift for later use"), but
    `/shifts` will show assignments that don't drive anything — worth a label or

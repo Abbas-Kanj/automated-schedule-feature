@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { type Control, type Resolver, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -226,13 +226,18 @@ export function ScheduleForm({
   // open — locks all step navigation so the user can't jump away from
   // underneath it. See `ShiftPickerField`'s `onDialogOpenChange`.
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
+  // Set by the "Assign to" step while it is mounted, so "Next" can accept the
+  // crew assignment it is showing before moving on — see
+  // `schedule-assign-to-fields.tsx#commitPendingSuggestion`.
+  const assignToCommitRef = useRef<(() => void) | null>(null)
 
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const looseControl = form.control as unknown as Control<any>
   const regularType = useWatch({ control: looseControl, name: 'type' }) as
-    RegularType | undefined
+    | RegularType
+    | undefined
 
   const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
@@ -243,6 +248,10 @@ export function ScheduleForm({
   }
 
   const handleNext = async () => {
+    // Before validating, not after: the commit writes crew into `pattern[]`,
+    // and `trigger` has to see the values the user is actually advancing with.
+    if (currentStepId === 'assign-to') assignToCommitRef.current?.()
+
     const valid = await form.trigger(
       getStepFields(currentStepId, parentType, type)
     )
@@ -420,7 +429,10 @@ export function ScheduleForm({
             {(disabled || currentStepId === 'assign-to') &&
               parentType === 'regular' &&
               regularType === 'rotate' && (
-                <ScheduleAssignToFields disabled={disabled} />
+                <ScheduleAssignToFields
+                  disabled={disabled}
+                  commitRef={assignToCommitRef}
+                />
               )}
 
             {(disabled || currentStepId === 'end-settings') &&

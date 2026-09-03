@@ -24,6 +24,7 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { useSchedulesStore } from '@/features/schedules/stores/schedules-store'
+import { getScheduleCycleLength } from '@/features/schedules/utils'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import { ScheduleRotationTable } from './components/schedule-rotation-table'
@@ -63,8 +64,32 @@ export function ScheduleRotation() {
     schedule ? scheduleStartDate(schedule.start_date) : new Date()
   )
 
+  // Daily stepping only tells the truth while one pattern card really is one
+  // calendar day. A `custom_shifts` card whose shift repeats weekly spans a
+  // real week on the calendar preview (see `expandRotatePatternDays` in
+  // `schedules/utils.ts`) while this screen counts it as a single position —
+  // so rather than have the two quietly disagree, Daily is withheld there.
+  const cardsAreCalendarDays = schedule
+    ? getScheduleCycleLength({
+        type: schedule.type,
+        start_date: schedule.start_date,
+        pattern: schedule.pattern,
+        shift_repeat: schedule.shift_repeat,
+      }) === schedule.pattern.length
+    : true
+
+  const effectivePeriodType: RotationPeriodType =
+    periodType === 'daily' && !cardsAreCalendarDays ? 'weekly' : periodType
+
   const rotation = schedule
-    ? buildRotation(schedule, shifts, employees, teams, viewDate, periodType)
+    ? buildRotation(
+        schedule,
+        shifts,
+        employees,
+        teams,
+        viewDate,
+        effectivePeriodType
+      )
     : null
 
   function selectSchedule(id: string) {
@@ -112,17 +137,30 @@ export function ScheduleRotation() {
             </Select>
 
             <Tabs
-              value={periodType}
+              value={effectivePeriodType}
               onValueChange={(value) =>
                 setPeriodType(value as RotationPeriodType)
               }
             >
               <TabsList>
-                {PERIOD_OPTIONS.map((option) => (
-                  <TabsTrigger key={option.value} value={option.value}>
-                    {option.label}
-                  </TabsTrigger>
-                ))}
+                {PERIOD_OPTIONS.map((option) => {
+                  const unavailable =
+                    option.value === 'daily' && !cardsAreCalendarDays
+                  return (
+                    <TabsTrigger
+                      key={option.value}
+                      value={option.value}
+                      disabled={unavailable}
+                      title={
+                        unavailable
+                          ? 'This schedule has cards that span a whole week, so one card is not one day.'
+                          : undefined
+                      }
+                    >
+                      {option.label}
+                    </TabsTrigger>
+                  )
+                })}
               </TabsList>
             </Tabs>
           </div>
@@ -144,7 +182,7 @@ export function ScheduleRotation() {
                   size='icon'
                   className='size-8'
                   onClick={() =>
-                    setViewDate((d) => shiftPeriod(d, periodType, -1))
+                    setViewDate((d) => shiftPeriod(d, effectivePeriodType, -1))
                   }
                   aria-label='Previous period'
                 >
@@ -159,7 +197,7 @@ export function ScheduleRotation() {
                   size='icon'
                   className='size-8'
                   onClick={() =>
-                    setViewDate((d) => shiftPeriod(d, periodType, 1))
+                    setViewDate((d) => shiftPeriod(d, effectivePeriodType, 1))
                   }
                   aria-label='Next period'
                 >
@@ -199,7 +237,7 @@ export function ScheduleRotation() {
             ) : (
               <ScheduleRotationTable
                 rows={rotation.rows}
-                periodType={periodType}
+                periodType={effectivePeriodType}
               />
             )}
           </div>

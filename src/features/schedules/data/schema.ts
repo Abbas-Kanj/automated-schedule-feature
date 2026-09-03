@@ -239,6 +239,18 @@ const rotatePatternEntrySchema = z.object({
   // Both stay optional: a position nobody has been put on yet omits them.
   employee_ids: z.array(z.string()).optional(),
   team_ids: z.array(z.string()).optional(),
+  // Optional: pins the crew starting here to one shift for the whole
+  // rotation. Left unset (the default, and how every pre-existing schedule
+  // reads) the crew takes whichever shift the card it lands on names, which
+  // is the rotating behaviour this feature has always had.
+  //
+  // It exists because a single shared `pattern` cannot otherwise express
+  // fixed-shift crews: over one cycle every crew visits every card, so
+  // "Team A is always on days, Team B always on nights, both on the same
+  // 2-2-3 rest mask" — an extremely common real roster — has no
+  // representation. With this set, the pattern's cards decide *when* a crew
+  // works and this decides *what* it works, which covers both families.
+  crew_shift_id: z.string().optional(),
 })
 
 // "Custom shifts" mode: each selected shift gets its own repeat config —
@@ -406,6 +418,16 @@ const regularScheduleSchema = z
             code: 'custom',
             message: 'Select a shift or mark as day off',
             path: ['pattern', i, 'shift_id'],
+          })
+        }
+
+        // A crew can only be pinned to a shift this schedule actually
+        // selected — same rule `shift_repeat` follows above.
+        if (p.crew_shift_id && !val.shift_ids.includes(p.crew_shift_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Pinned shift is not one of this schedule’s shifts',
+            path: ['pattern', i, 'crew_shift_id'],
           })
         }
       })

@@ -2,6 +2,7 @@ import { type ShiftBadgeColor } from '@/features/shifts/data/schema'
 import { type RotationPeriodType } from './utils'
 
 export const PERIOD_OPTIONS: { value: RotationPeriodType; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ]
@@ -36,5 +37,4 @@ export const SHIFT_SOFT_BADGE_CLASSES: Record<ShiftBadgeColor, string> = {
 }
 
 // The muted look for an "Off" period — no shift color to draw from.
-export const OFF_BADGE_CLASS =
-  'bg-muted text-muted-foreground dark:bg-muted/50'
+export const OFF_BADGE_CLASS = 'bg-muted text-muted-foreground dark:bg-muted/50'
