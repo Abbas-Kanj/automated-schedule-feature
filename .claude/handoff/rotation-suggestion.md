@@ -1,394 +1,408 @@
-# Rotation suggestion — computing who starts where
+# Rotation suggestion — computing who covers what, when
 
-Built 2026-09-02, corrected 2026-09-03. Turns the rotate schedule's "Assign
-to" step from a hand-filled grid into a **suggestion + grading** step: pick the
-crews, press one button, get starting positions that flatten coverage, and see
-what is wrong with the result either way.
+Built 2026-09-02, corrected 2026-09-03, **reworked 2026-09-06**. Turns the
+rotate schedule's "Assign to" step from a hand-filled grid into a **suggestion
++ grading** step: pick the crews, press one button, get an assignment that
+staffs every selected shift every day, and see what is wrong with the result
+either way.
 
-> **2026-09-03 in one line:** the suggestion was traded away a day of zero
-> coverage for a smoother shift count, "Next" did not take a pool the user had
-> picked but never pressed Suggest on, and the Summary under-reported the
-> roster it did take. All three fixed; details in place below.
+> **2026-09-06 in one line:** the pattern used to decide *which shifts run each
+> day*, which meant an all-Morning 5-2 pattern could never staff Night however
+> many crews you added. The pattern is now a **template** (one crew's journey),
+> `shift_ids` decides what runs, and a new stored **(cycle day × shift) → crews
+> matrix** records who covers it. Details throughout — this file was rewritten,
+> not appended to.
 
 Companion to `.claude/handoff/schedule-rotation-screen.md`, which covers the
 screen those assignments drive.
 
-## The framing that made this small
+## The model (2026-09-06)
 
-The user arrived with pseudo-code (a `pattern` list, a `Map<Team, offset>`, and
-`pattern[(daysSinceStart + offset) % patternLength]`). **Most of it was already
-in the repo**, which is why this landed without reshaping the feature:
+A rotate schedule owns one shared `pattern[]` of cycle cards. **That pattern
+describes one crew's journey** — "Morning, Morning, off, Afternoon…" — and
+nothing more. What has to run each day is the schedule's own `shift_ids`, and
+the rule the feature now exists to keep is: **every selected shift is covered
+on every day of the cycle.**
 
-| Pseudo-code | Already existed as |
+Two numbers place a crew against the template:
+
+| | |
 |---|---|
-| `pattern[]` of shifts / Off | `schedule.pattern[]` — one card per cycle day |
-| `teamOffsets.Get(team)` | the position a crew's `employee_ids`/`team_ids` sit on |
-| `(daysSinceStart + offset) % len` | `getAssignedIndex` — same floor-mod |
-| `GetDateRange` stepping | `getPeriodIndex` + `shiftPeriod` |
+| `dayOffset` | which card it stands on: `pattern[(d + dayOffset) mod L]`. The old offset, unchanged. |
+| `shiftStep` | **new** — how far its journey is *transposed* through the shift list, ordered by start time. |
 
-Three things were genuinely missing, and they were the whole job:
+`shiftStep` is the whole unlock. Without it every crew visits every card, so if
+every card says Morning then Morning is all anybody ever works. With it, two
+crews at steps 0 and 1 cover Morning *and* Night every weekday off one
+all-Morning 5-2 pattern.
 
-1. **Nothing chose the offsets** — a human picked them position by position.
-2. **A step was a week or a month, never a day**, so a 14-card 2-2-3 pattern
-   described a 14-*week* cycle. Fixed by adding `daily` (see the companion file).
-3. **Nothing checked coverage.**
+### What is stored is the resolved matrix, not the placements
+
+`day_coverage` on the rotate branch: a **sparse list of cells**, each
+`{ day, shift_id, employee_ids, team_ids }`, `day` being the 0-based cycle day.
+Only cells somebody is on are stored, so "no cell" and "empty cell" mean the
+same thing everywhere.
+
+The reason it is the matrix and not the two offsets: **the manual grid edits
+single cells freely** (the user's explicit choice — see "Decisions taken"),
+and no pair of offsets can express an arbitrary cell edit. So the offsets now
+live *only inside the search*, as the thing that generates the matrix.
+
+### Decisions taken 2026-09-06, and by whom
+
+All four came from the user directly; none is an inferred default.
+
+| | |
+|---|---|
+| Pattern card | Unchanged — `shift_id` or `is_off`. It is one crew's journey. |
+| Other crews' shifts | Same card, **transposed** by the crew's own shift step. |
+| Shift rotation order | By shift **start time**, earliest first. No new ordering UI. |
+| Short coverage | **Warn, don't block.** Red `0` in the grid + a named warning; Next always advances. |
+| Manual grid | **Day → one row per shift, free cell edit.** |
 
 ## The algorithm — `src/features/schedules/rotation-suggestion.ts`
 
-Pure, no React, no stores. Two entry points:
+Pure, no React, no stores, no schema. Two entry points that meet in the middle:
 
-- `suggestRotationAssignment(slots, crews, options)` — picks offsets, then grades.
-- `analyzeRotation(slots, assignments, options)` — grades an assignment that
-  already exists. The panel calls **this** on live form values, so it validates
-  hand edits and works for someone who never presses Suggest.
+- `suggestRotationCoverage(slots, crews, orderedShiftIds, options)` — searches
+  placements and returns them plus a grade. The caller materialises them into
+  cells.
+- `analyzeDayCoverage(crews, orderedShiftIds, cycleLength, options)` — grades
+  the **matrix**. The panel calls this on live form values, so hand edits are
+  graded honestly rather than being re-derived from offsets that no longer
+  describe them. This split is *required* by free cell editing, not a
+  preference.
 
-**Search.** Cost = a dominating penalty per day nobody works at all (see
-finding 3), then variance of crews-on-duty per cycle day, then (weighted ×2)
-variance of per-shift coverage, plus a tiny even-spacing tie-break. One crew is
-pinned to offset 0 for free — rotating every offset by the same amount rotates
-the coverage array without changing it, killing a whole symmetry class.
-Exhaustive over `C(N−1, M−1)` combinations up to `EXHAUSTIVE_LIMIT = 100_000`
-(DuPont's 28/4 is 2,925), else an even-spacing seed. Both then go through
-`localImprove`, which does **move** and **swap** passes — swaps only matter once
-crews differ from each other (different sizes, or a pinned shift), which is
-exactly why they are there.
+`placementShifts` / `placementsToCoverageCrews` are the shared primitives
+between the two halves.
 
-**Why coverage-driven and not even spacing.** Even spacing is optimal only when
-the rest mask is uniform. DuPont and Southern Swing are not. There is a test
-asserting the search is never worse than even spacing on DuPont.
+**Cost.** A dominating penalty per unstaffed `(day, shift)` cell, then variance
+of per-cell crew counts, then variance of crews-on-duty per day, plus a tiny
+even-spacing tie-break on day offsets. `emptyDayPenalty` from 09-02 is **gone**,
+subsumed: a day with nobody on it has all N shifts uncovered, so it is already
+the most expensive thing on the board.
 
-## Three findings worth not re-deriving
+**Search — and this needed more than the first cut had.** Seeding only
+round-robin shift steps *loses to plain even spacing* on DuPont and DDNNOO,
+because those patterns already spell out their own day/night alternation and
+want every step at 0. Four tests caught it. The search is now multi-start:
+
+1. even-spaced days + **all-zero** steps,
+2. even-spaced days + **round-robin** steps,
+3. a **greedy construction** — place crews one at a time, each into the
+   `(day, step)` that best completes what is already down,
+4. the exhaustive day-offset pass, run once **per step seed**.
+
+Each start is then polished by `localImprove`, and the best result wins.
+`localImprove` has three move types now: relocate a day offset, change a shift
+step, swap two crews' whole placements.
+
+Two free symmetries let crew 0 be pinned to `(0, 0)`: rotating every day offset
+rotates the coverage array without changing it, and rotating every shift step
+cyclically permutes which shift is which — every term of the score is a
+symmetric sum over shifts. `EXHAUSTIVE_LIMIT = 100_000` is now a budget on the
+**total** candidates scored (`combinations × stepSeeds`), so adding the second
+step seed halves how long a cycle stays exhaustive rather than doubling work.
+
+**Duplicate day offsets are now allowed.** The single-offset model forbade them;
+that ruled out two crews sharing a rest rhythm on different shifts, which is a
+perfectly ordinary roster. The score decides instead.
+
+## Findings worth not re-deriving
 
 **1. "Fewer crews than cycle days = understaffed" is wrong, and it fires on
 correct rosters.** The first cut coded that rule and it flagged a textbook
 4-crew Panama (14 cards) as broken. The deeper mistake: **not every roster wants
 24/7 coverage** — an office 5-2 leaves two days empty *by design*.
 
-Severity is now decided by **fixability**, not by outcome:
+Severity is decided by **fixability**, not by outcome:
 
 - `error` — nothing to work with (no pattern, or nobody on it).
-- `warning` — reassigning would genuinely help; press Suggest.
+- `warning` — a different assignment would genuinely help.
 - `info` — a property of the pattern + crew count that no assignment changes.
 
-The structural test is cheap: a shift can be staffed daily only if its target
-(`crew-days ÷ cycle length`) is ≥ 1; a day can be staffed at all only if
-`crews × workCards ≥ cycleLength`. Below either, it is `info` with the remedy
-spelled out ("4 crews would cover every shift every day"). There is a named
+The structural test is now one line: **`crewDays >= cycleLength × shiftCount`**.
+Below it, the grid cannot be filled by anybody, and the warning says so with the
+remedy ("N crews on this pattern would cover every shift every day"). Named
 regression test for the Panama case.
 
 **2. The 28-day day/night flip *is* coverable by 4 crews — a test assumed
 otherwise and the algorithm was right.** Even spacing (0/3/7/10) puts all four
 crews in the same half of the cycle on day one, leaving nights empty. The
-coverage search straddles the halves and staffs both shifts every day. Kept as
-its own test, because it is the clearest demonstration of why the search exists.
+coverage search straddles the halves. Kept as its own test.
 
-**3. Per-shift balance will buy itself a day with the plant shut, if you let
-it (found 2026-09-03).** A 5-2 office week alternating Morning/Afternoon,
-two crews. The search returned offsets `{1, 2}` — coverage
-`[2, 2, 2, 1, 0, 1, 2]`. Day 5 had **nobody on at all**, bought in exchange for
-"exactly one Morning on duty almost every day". `{0, 3}` gives
-`[2, 2, 1, 1, 2, 1, 1]` and no blackout, and scored *worse* (10.86 vs 8.86)
-because `SHIFT_BALANCE_WEIGHT = 2` outweighed a single squared on-duty term.
+**3. Balance will buy itself an empty cell if you let it (found 2026-09-03,
+still true).** A 5-2 week with two crews once came back with a day the plant
+was shut, traded for a smoother shift count. An unstaffed cell is
+**categorically** worse than a lumpy one, so it is priced above everything else
+the score can reach rather than competing with it.
 
-A day nobody works is **categorically** worse than a lumpy one, so it is now
-priced above everything else the score can add up to rather than competing with
-it (`emptyDayPenalty`). The size is a **bound, not a magic number**: both
-squared terms are capped by `crewCount²` (each side of the subtraction lies in
-`[0, crewCount]`), so `cycleLength × (1 + W × shiftCount) × crewCount²` plus the
-spacing tie-break's own ceiling exceeds any reachable total.
+The size is a **bound, not a magic number**: every squared term has both sides
+in `[0, crewCount]`, so `cycleLength × shiftCount × crewCount²` (balance) plus
+`cycleLength × crewCount²` (on-duty) plus the spacing ceiling exceeds any
+reachable total.
 
-This does **not** reintroduce finding 1's trap, and the argument is worth
-keeping: when a gap cannot be filled — one crew on a 5-2 week — *every*
-candidate pays the same number of penalties, and a constant added to every
-candidate cannot change which one is smallest. It only bites when the gap was
-avoidable. Both halves have named tests ("never buys shift balance with a day
-nobody works", "leaves an unavoidable gap alone rather than chasing it").
+**This does not reintroduce finding 1's trap, and the argument is the same
+one**: when cells cannot be filled, *every* candidate pays the same **minimum**
+number of penalties, and a constant added to every candidate cannot change
+which is smallest — while a candidate that leaves *more* cells empty than it had
+to still pays more. Named tests on both halves.
 
-## `crew_shift_id` — the one schema addition
+**4. (2026-09-06) An arithmetic trap in "5-2 with 2 crews".** The
+implementation plan claimed 2 crews on a 5-2 with two shifts should show no red
+`0`. Wrong: 2 × 5 = 10 crew-days for 7 × 2 = 14 cells, so **4 cells must stay
+empty**. The correct claim is that it fills 10 *distinct* cells (never doubling
+up while another sits bare) and reports the rest as `info`. Use **4 crews** for
+a "no red 0" check. Test: "fills as many cells as the crew-days allow".
 
-Optional field on `rotatePatternEntrySchema`. When set, the crew starting at
-that position works **that** shift on every working card instead of the card's
-own. Unset (every pre-existing schedule) = exactly the old rotating behaviour.
+## Shift order — `orderShiftIdsByStart`
 
-It exists because a single shared `pattern[]` **cannot** express fixed-shift
-crews: over one cycle every crew visits every card, so "Team A always days,
-Team B always nights, both on the same 2-2-3 rest mask" — a very common real
-roster — had no representation, and no amount of manual assignment could
-produce it. Validated in the `superRefine` against `shift_ids`.
+Lives in `rotation-crews.ts`. Earliest `from_time` across a shift's enabled
+days, via `lib/time.ts#toMinutes`; ties break on name so the order is stable
+across renders and reloads. A shift with **no enabled day sorts last**, so an
+unconfigured shift does not silently become the head of the rotation. Ids with
+no matching shift are kept, at the end — dropping them would quietly shrink the
+rotation.
 
-Resolved by `applyCrewShift` in `schedule-rotation/utils.ts`; an off card stays
-off (being pinned to days does not mean working through rest cards).
+## Removed 2026-09-06 — `crew_shift_id`, and the crew fields on a pattern card
+
+`rotatePatternEntrySchema` lost `employee_ids`, `team_ids` **and**
+`crew_shift_id`. All three are superseded by `day_coverage`:
+
+- the crew arrays because the roster is the matrix now;
+- `crew_shift_id` (the "Always Night" pin) because the matrix expresses pinning
+  directly — it was only ever a workaround for a roster the offset model could
+  not represent.
+
+`applyCrewShift` in `schedule-rotation/utils.ts` went with it.
+
+This also killed the pre-existing drag bug where `usePatternReorder` moved a
+card's crew but *not* its `crew_shift_id`, leaving a pin behind on the old
+index.
+
+**No migration.** Removed keys are stripped by the non-strict zod object, so a
+saved rotate schedule still loads — with an empty roster, re-suggestable in one
+click. This is a no-backend demo app with version-stamped seeds; the project has
+precedent (`policy_type`, `official-holidays`).
 
 **Known boundary that remains:** crews still cannot have *different rest
-patterns* from one another — one shared mask, one offset each. That matches the
-user's own pseudo-code, so it was not treated as a gap.
+patterns* from one another. One shared mask, one `(dayOffset, shiftStep)` each.
+Matches the user's own pseudo-code, so not treated as a gap.
 
 ## Presets — `src/features/schedules/data/rotation-presets.ts`
 
-14 systems in three groups (Office & simple / Continuous coverage / Named
-systems): 5-2, 4-3, 6-2, 4-2, 3-3, 4-4, DDNNOO, Metropolitan, one-card-per-shift,
-2-2-3 Continental (Panama), Pitman, 2-2-3 with 28-day day/night flip, DuPont,
-Southern Swing.
-
-A preset is only a card list — each entry an **index into the schedule's own
-`shift_ids`**, or `null` for rest. That one shape covers both single-shift masks
-and multi-shift systems, and the user's 28-day flip becomes plain data with no
-`28DayBlock` branch anywhere.
+**Unchanged by the rework**, which is a small vindication of the shape: a preset
+is only a card list, each entry an **index into the schedule's own `shift_ids`**
+or `null` for rest. 14 systems in three groups (Office & simple / Continuous
+coverage / Named systems).
 
 Rendered in `PatternBuilder`'s "Create pattern" card, **`pattern_shifts` only** —
-`custom_shifts` rebuilds its cards from `shift_repeat` and would clobber a preset.
+`custom_shifts` rebuilds from `shift_repeat` and would clobber a preset.
 Applying one writes `cycle_length` as `{ unit: 'custom_days', days: N }` first,
-then `replace()`s the cards, carrying crew across by position (same `crewAt`
-convention as the `custom_shifts` rebuild and the drag-reorder).
+then `replace()`s the cards. It no longer carries crew across by position
+(`crewAt` deleted) — there is no crew on a card any more.
 
 > `custom_days` is deliberate: 14 and 28 are not whole week/month units, and it
 > also sidesteps the hardcoded-`6` week readout (open call #2 in the companion
 > file, still unfixed — this path just never reaches it).
 
-There is a test asserting **every preset at its own `suggestedCrews` stays flat
-within one crew** — the broadest guard that the search generalises.
+Test asserting **every preset at its own `suggestedCrews` stays flat within one
+crew** — the broadest guard that the search generalises.
 
 ## The "Assign to" step — `schedule-assign-to-fields.tsx`
 
-Two cards. **Suggesting is the default path; hand-assignment is an escape
-hatch behind a toggle**, which is the shape the UI was revised into late in the
-session — the earlier layout put every position's pickers on screen at once and
-buried the suggestion in them.
+Two cards. **Suggesting is the default path; hand-assignment is an escape hatch
+behind a toggle.**
 
 **Card 1 — "Who is on this rotation"**
 
-- Teams/Employees `ToggleButton` pair, then one `MultiSelect` for that kind,
-  then "Suggest assignment".
-- The pool is **local state, not a form field**: the union of what is already
-  assigned *is* the pool, so it round-trips a saved schedule with no schema
-  change. The component unmounts when the wizard leaves the step
-  (`schedule-form.tsx` gates on `currentStepId === 'assign-to'`), so returning
-  re-derives it from the pattern — desired behaviour, not an accident.
-- **Coverage panel** (`rotation-coverage-panel.tsx`) — crew × cycle-day grid
-  plus an "On duty" footer row, fed by `analyzeRotation` on live form values.
+- Teams/Employees `ToggleButton` pair, one `MultiSelect`, then "Suggest
+  assignment".
+- The pool is **local state, not a form field**: the union of what is assigned
+  *is* the pool (now derived from `day_coverage` via `crewKeysFromDayCoverage`),
+  so it round-trips a saved schedule with no schema change. The component
+  unmounts when the wizard leaves the step, so returning re-derives it.
+- Suggest does **one whole-field `setValue('day_coverage', …)`**, which makes
+  the old "leftover crew silently double-books" bug structurally impossible
+  rather than guarded against.
+- **Coverage panel** below it — see next section.
 
 **Card 2 — "Assign manually"**, gated by a `Switch`, off by default.
 
-- One `Card` per cycle day in a `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4`,
-  deliberately mirroring the Pattern step's own day cards so the two screens
-  read as the same grid.
-- The shift is a **disabled** `SelectDropdown` — same control as the pattern
-  step, greyed. The pattern owns the shift; this step only decides who works it.
-- The live dropdown is the crew, and it offers **only the kind picked above**,
-  never Employees *and* Teams side by side.
-- The `crew_shift_id` pin appears only on cards that already have a crew and
-  only when there is more than one shift to pin to, so most cards stay two
-  controls tall.
+- One `Card` per cycle day, and inside it **one row per selected shift**, each
+  with its own crew `MultiSelect`. An unstaffed shift is a visibly empty field.
+- **Free cell edit**: putting a crew on a cell moves nothing else. That is the
+  whole reason the matrix is stored.
+- Written straight through `setValue`, **not** a `FormField` per cell — the
+  stored array is sparse, so a cell has no stable index to register a controller
+  against, and clearing one would renumber every field name after it. Emptying a
+  picker drops the cell entirely.
+- Only the crew kind picked above is offered, never both.
+- A 28-day × 3-shift cycle is 84 pickers. Acceptable: manual mode is opt-in.
 
-Suggest writes **every** position, not just the ones receiving someone —
-otherwise a crew left over from a previous run silently double-books.
+`getStepFields` returns `['pattern', 'day_coverage']` — well-formedness only.
+**Nothing here blocks Next**, by decision: whether a hole is fixable depends on
+the crew count, not the data.
 
-`getStepFields` still returns `['pattern']`, so nothing here blocks Next —
-consistent with the deliberate "no new restrictions" call.
+### "Next" accepts the step (2026-09-03, still true)
 
-### "Next" accepts the step (added 2026-09-03)
+`commitPendingSuggestion` compares the pool against the crews actually on the
+matrix and re-runs the suggestion only when they differ, so straight after
+pressing the button it is a no-op. It covers the two half-taken paths: picking a
+pool and never pressing Suggest, and changing the pool after pressing it.
+**Manual mode is skipped entirely** — re-running the search over hand-placed
+crew would destroy the exact work the toggle exists to allow.
 
-Pressing the button already wrote straight into `pattern[]`, so the assignment
-always survived Next — verified by driving the whole wizard in real Chromium
-(`schedule-form.test.tsx`), not assumed. What did **not** survive was a
-suggestion the user never asked for explicitly:
-
-- pick a pool, never press **Suggest assignment**, press Next → advanced with
-  the old (or empty) roster, and nothing downstream said so;
-- press Suggest, *then* add a crew to the pool, press Next → the added crew was
-  silently dropped.
-
-`commitPendingSuggestion` now runs when the step is left. It compares the pool
-against the crews actually on the pattern and re-runs the suggestion only when
-they differ, so straight after pressing the button it is a no-op. **Manual mode
-is skipped entirely** — that toggle is the escape hatch for rosters the search
-cannot express, so re-running the search over hand-placed crew would destroy
-the exact work it exists to allow.
-
-Plumbed as a `commitRef` the step fills in from an effect with **no dependency
-list** (the callback closes over live pool state, so the form needs a fresh one
-after every render), called from `handleNext` **before** `form.trigger` so
-validation sees the crew being advanced with. Fires on **Next only**, not on
-the vertical-tab rail — jumping backward should not silently rewrite the
-pattern. Revisit if that asymmetry ever confuses anyone.
+Plumbed as a `commitRef` filled from an effect with **no dependency list** (the
+callback closes over live pool state), called from `handleNext` **before**
+`form.trigger`. Fires on **Next only**, not the vertical-tab rail.
 
 ### ⚠️ Flipping Teams/Employees used to copy ids into the wrong field
 
-Found 2026-09-03 by the manual-mode test, pre-existing. With the manual grid
-**open**, toggling the crew kind changed the `FormField`'s `name` from
-`pattern.N.employee_ids` to `pattern.N.team_ids`; react-hook-form re-registers
-the controller under the new name **while it still holds the old one's value**,
-so `team_ids` ended up holding employee ids (`team_ids: ['emp-a']`). Those
-resolve to no team, so the coverage grid looked empty while the schedule saved
-garbage.
+Found 2026-09-03. Toggling the crew kind changed a `FormField`'s `name` while
+react-hook-form still held the old field's value, so `team_ids` ended up holding
+employee ids. **Any control whose field is computed from state needs a `key`.**
+Carried onto the new cell pickers as `key={crewKind}`.
 
-Fixed with `key={crewField}` on that `FormField` — remounting reads the new
-field instead of re-registering with the stale value. **Any `FormField` whose
-`name` is computed from state needs this.**
+### The warning list is now rendered (changed 2026-09-06)
 
-### The warning list is computed but not rendered
+The 09-03 note said warnings were computed but not displayed, because they
+emitted one near-identical line per shift **without naming which shift**, and
+told the next session to *rewrite the messages before re-displaying them*.
 
-`analyzeRotation` still returns `warnings`, and they are still exported and
-tested — the **panel just does not display them**. Two rounds of feedback got
-there: first the leading severity icons came off, then the prose list went
-entirely.
+**That rewrite is done.** Warnings name the shift (`shiftLabels` option on
+`analyzeDayCoverage`), list the affected days, and are rendered under the grid
+with severity styling. They have to be visible now: an unstaffed shift is not a
+validation error by decision, so the panel is the only place it is reported.
 
-The reason is worth keeping: the list emitted **one near-identical line per
-shift** ("One shift sits unstaffed on 4 days of the cycle…") without ever
-naming *which* shift, so a two-crew roster produced three nearly identical
-paragraphs and read as a wall of complaints about a correct pattern. The grid
-already carries the same signal — a thin day shows as `1` in the On-duty row
-with a visible `·` gap in some crew's row.
+`overstaffed` was dropped — it meant nothing under a free matrix. A new
+**`crew-double-booked`** warning was added: free cell editing makes "one crew on
+two shifts the same day" one click away, and it is silent everywhere else.
 
-**If these are ever surfaced again, rewrite the messages first** (name the
-shift, collapse the per-shift repetition into one line). Do not just re-render
-the list as-is.
+### The coverage panel — `rotation-coverage-panel.tsx`
 
-## The Summary read-back (rewritten 2026-09-03)
+Rewritten. **Two grids**, because they answer different questions:
 
-`AssignToSummary` listed the stored data literally — one row per pattern
-position, crew or a dash. Correct, and badly misleading: two crews on a
-seven-card week rendered as **five dashes**, which reads as "the assignment was
-lost", not "the crews are staggered". The user reported it as the Summary "not
-being the same as the suggested assignment"; it was the same data, shown in a
-form that hid the rotation.
+- **rows = shifts**, columns = cycle days, cells = crew count, red `0` when
+  unstaffed, plus an "On duty" footer. This is the rule the feature keeps.
+- **rows = crews** below it — each crew's own journey, so you can see somebody
+  hopping shifts. Two shifts on one day render as `M/N` in destructive red.
 
-It now repeats **the same coverage grid the step ends on**, then lists only the
-positions someone actually starts on, under a line saying they are starting
-points and that the rest days travel with each crew. Positions nobody starts on
-carry no information once the grid is there — and in any rotation with fewer
-crews than cards, most positions are empty by definition.
+Then the warning list. Reused verbatim by the Summary step.
 
-That required both screens to reconstruct crews from the pattern the same way,
-so `patternToSlots` + `assignmentsFromPattern` moved out of the step into
-**`src/features/schedules/rotation-crews.ts`**. It deliberately keeps
-`rotation-suggestion.ts` schema-free: the pure module still knows nothing about
-`RotatePatternEntry`, and this new one is the only bridge between the stored
-shape and the search's own types.
+## The Summary read-back
 
-> Same root cause as the "days 6 and 7 have teams on them?" question that
-> opened the session: **the grid's columns are cycle days, not pattern cards.**
-> Each crew is at its own offset, so a card's Off-ness is per crew. The two
-> rest cards travel; they are not a weekend. If every crew must rest on the
-> same days, that is a *fixed* schedule (or a one-crew rotation), and the UI
-> should probably say so somewhere — it currently does not.
+`AssignToSummary` repeats **the same coverage grid the step ends on**, reading
+`day_coverage`. The 09-03 "starting positions" list is gone — starting positions
+are not a thing any more.
+
+The **calendar preview is deliberately unchanged**: it walks the *pattern*,
+which is one crew's journey, so it shows one shift a day even when the schedule
+runs three. A line above it now says so and points at the grid.
 
 ## Seed — the third rotation
 
-`sched-panama-223` "Plant Coverage (2-2-3)": 14-day mask, 4 crews, two pinned to
-mornings and two to nights. Read it on the **Daily** tab.
+`sched-panama-223` "Plant Coverage (2-2-3)": 14-day mask, 4 crews. Read it on the
+**Daily** tab.
 
-The starting positions (0, 3, 7, 10) are **not arbitrary**. The crews pair up
-differently day to day — {0,10}, {0,3}, {3,7}, {7,10} — which forms a 4-cycle,
-so both shifts are covered every day only because the pins alternate around it
-(0 and 7 mornings, 3 and 10 nights). Move one crew and a day loses night cover.
-`scenario.test.ts` locks all 14 days, both shifts, equal 7-day workloads, and
-the wrap on day 15.
+It is now the clearest demonstration of the whole rework: **every working card
+names Morning, and Night is staffed on all fourteen days.** Under the old model
+this roster needed four hand-set `crew_shift_id` pins; now the suggestion moves
+two crews onto nights by itself. Amir and Carla hold mornings, Bilal and Dana
+nights, interleaved so no day loses cover.
 
-> Got this wrong once while writing it — put `emp-c` on position 9 instead of
-> position 8. Positions are 1-based, offsets 0-based, and both those cards are
-> rest cards so it looks identical in the UI. Check offsets, not appearance.
+All three seeds' matrices were hand-computed and are locked by
+`scenario.test.ts` ("staffs every selected shift on every day of every seeded
+cycle") — which is what verified the arithmetic.
 
-**`SEED_VERSION` bumped to `'2026-09-02-rotation-suggestion'`** — required, or a
+**`SEED_VERSION` bumped to `'2026-09-06-day-coverage-matrix'`** — required, or a
 browser that has already opened the app keeps its cached `schedules` blob.
 
-## Files
+## Files (2026-09-06 pass)
 
-**New:** `schedules/rotation-suggestion.ts` + `.test.ts`,
-`schedules/data/rotation-presets.ts`,
-`schedules/components/schedule-form/rotation-coverage-panel.tsx`,
-`schedules/rotation-crews.ts` *(09-03)*,
-`schedules/components/schedule-form/schedule-form.test.tsx` *(09-03)*
+**Rewritten:** `schedules/rotation-suggestion.ts`, `schedules/rotation-crews.ts`,
+`schedule-form/rotation-coverage-panel.tsx`,
+`schedule-form/schedule-assign-to-fields.tsx` (+ both tests)
 
-**Changed:** `schedules/data/schema.ts` (`crew_shift_id` + its refine),
-`schedules/data/schedules.ts` (third seed), `schedule-assign-to-fields.tsx`
-(+ its test), `pattern-builder.tsx` (preset picker), `schedule-summary.tsx`
-(shows the pin; 09-03 rewrite of the roster read-back),
-`schedule-form.tsx` *(09-03, the commit ref)*,
-`schedule-rotation/{utils,data,index}.tsx|ts`,
-`schedule-rotation/components/schedule-rotation-table.tsx`, `lib/seed-store.ts`,
-`schedule-rotation/{utils,scenario}.test.ts`, `vite.config.ts` (see the gotcha
-below)
+**New:** `schedules/rotation-crews.test.ts`
+
+**Changed:** `schedules/data/schema.ts` (pattern slimmed, `day_coverage` +
+its three well-formedness refines), `schedules/data/schedules.ts` (all three
+seeds), `schedule-form/{pattern-builder,schedule-summary,schedule-form}.tsx`
+(+ `schedule-form.test.tsx`), `schedule-rotation/utils.ts` (+ `utils.test.ts`,
+`scenario.test.ts`), `lib/seed-store.ts`
 
 ## ⚠️ Cold-cache "Invalid hook call" — `optimizeDeps.include`
 
-Adding the manual-mode `Switch` pulled in `@radix-ui/react-switch`, which
-vitest's browser mode optimized **mid-run**, reloaded the page, and briefly
-resolved a second React — throwing `Invalid hook call` across the file. It
-passed on every run afterwards, so it only reproduces on a **cold**
-`node_modules/.vite`.
-
-That is the same signature the existing `resolve.dedupe` comment describes,
-which makes it easy to dismiss as already handled. Fixed by pre-bundling:
+vitest's browser mode optimizing a dep **mid-run** reloads the page and briefly
+resolves a second React — `Invalid hook call` across the file, only on a **cold**
+`node_modules/.vite`. Same signature as the existing `resolve.dedupe` comment,
+which makes it easy to dismiss as already handled.
 
 ```ts
 optimizeDeps: { include: ['@radix-ui/react-switch', '@radix-ui/react-popover'] },
 ```
 
-**It recurred on 2026-09-03, exactly as predicted**, the first time a test
-mounted the whole `ScheduleForm` (popover, via the date/calendar fields) — same
-`Invalid hook call`, gone on the second run. `@radix-ui/react-popover` added.
-Re-verified with `rm -rf node_modules/.vite`.
-
+Hit twice (switch on 09-02, popover on 09-03, exactly as predicted). **Did not
+recur on 2026-09-06** — the new UI reuses primitives already in the list.
 **Anything a component test mounts that is not already reached from
-`src/main.tsx` belongs in that list.** Verified by `rm -rf node_modules/.vite`
-and re-running. Sibling note in
-`.claude/handoff/schedule-rotation-screen.md`'s gotcha section.
+`src/main.tsx` belongs there.**
 
-## Status (2026-09-03)
+## Status (2026-09-06)
 
 - `npm run build` **clean**.
-- `npm run test` — **229 passed / 3 failed**, the 3 being the pre-existing
-  unowned `search-provider.test.tsx` failures. (Baseline was 174/3 before this
-  feature; 224/3 at the end of 2026-09-02; +5 this session — three in the new
-  `schedule-form.test.tsx`, two in `rotation-suggestion.test.ts`.)
-- `npx eslint` on `features/schedules`, `features/schedule-rotation`,
-  `lib/seed-store.ts` — **0 errors**, 3 warnings, all pre-existing (two
-  `exhaustive-deps` in `pattern-builder.tsx`, one `incompatible-library` in
-  `schedule-form.tsx`).
-- Prettier: every file this session created **or** that was clean at HEAD is
-  clean. Deliberately did not touch the repo-wide drift.
-- **Still NOT browser-verified by hand.** No browser automation in either
-  session. Coverage in real Chromium is now two layers:
+- `npm run test` — **243 passed / 3 failed**, the 3 being the pre-existing
+  unowned `search-provider.test.tsx` failures. (229/3 at the end of 09-03;
+  +14 this session.)
+- `npx eslint` on `features/schedules`, `features/schedule-rotation` —
+  **0 errors**, 3 warnings, all pre-existing (two `exhaustive-deps` in
+  `pattern-builder.tsx`, one `incompatible-library` in `schedule-form.tsx`).
+- Prettier clean on every touched file. Repo-wide drift still untouched.
+- **Still NOT browser-verified by hand — no browser automation available in
+  this session either.** Real-Chromium coverage is two layers:
   `schedule-assign-to-fields.test.tsx` (manual toggle, one card per cycle day,
-  disabled shift field, single-crew-kind, off-day write-back, pool → Suggest →
-  staggered offsets) and **`schedule-form.test.tsx`, new 09-03**, which drives
-  the whole wizard — basics → shifts → pattern → assign-to → Next → Next →
-  Save — and asserts on the submitted payload. That covers the *flow*; it does
-  not look at anything. **Two pieces of markup have still never been seen:**
-  the day-card grid at 2/3/4 columns, and the Summary's new grid + starting-
-  position list.
-- **Uncommitted** at handoff time — now two sessions' worth.
+  one picker per shift, free cell edit, cell-drop-on-empty, pool → Suggest) and
+  `schedule-form.test.tsx` (whole wizard → submitted payload). That covers the
+  *flow*; it does not look at anything.
+  **Never-seen markup:** the coverage panel's two grids + warning list, and the
+  day × shift manual grid.
+- **Uncommitted** at handoff time — now three sessions' worth (09-02, 09-03,
+  09-06).
 
 ## Open calls / follow-ups
 
-1. **Browser-verify.** In order: preset → 14 cards render and cycle length
-   reads 14; **Assign to** → pool of 4 → Suggest → "On duty" reads `2` under
-   every one of the 14 columns; flip **Assign manually** on → 14 day cards in a
-   2/3/4-column grid, each with a **greyed** shift field above a live crew
-   dropdown, and only one crew kind offered; move one crew there by hand → the
-   On-duty row reacts immediately (proves the panel reads live form state, not
-   the last suggestion); step back to Pattern and return → crew survives;
-   **Next → Next → Summary → the coverage grid there matches the one on the
-   step**, with only the started-on positions listed under it (09-03 markup,
-   never seen); `/schedule-rotation` → *Plant Coverage (2-2-3)* → Daily tab
-   steps one card per day.
-   Also worth one pass on the 09-03 fixes specifically: a **5-2 preset with 2
-   crews** must come back with **no red `0`** in the On-duty row, and toggling
-   Teams ⇄ Employees **with the manual grid open** must not put employee names
-   in a team field.
-2. **`crew_shift_id` has no UI on the rotation screen's legend.** The cycle
-   legend still decodes the *pattern's* letters, so a pinned crew's row shows its
-   own shift while the legend shows the card's. Not wrong, but potentially
-   confusing on a mixed rotation.
-3. **The Daily tab is withheld when one card is not one real day** —
-   `getScheduleCycleLength(schedule) !== pattern.length`, which is the
-   weekly-`shift_repeat`-card case (open call #4 in the companion file). This
-   guards the disagreement rather than resolving it; the two engines still
-   disagree in principle.
-4. **`analyzeRotation` runs the full cost function on every relevant form
-   change.** Memoised on `[slots, assignments, startDate]` and cheap at these
-   sizes, but it is not incremental — a very long cycle with many crews would be
-   worth profiling before assuming it stays free.
-5. **Crews cannot have different rest masks** (see the boundary note above).
+1. **Browser-verify.** The motivating case first: Rotate → select **Morning +
+   Night** → Pattern → preset **5-2** (every card Morning) → **Assign to** →
+   pool of **4** → *Suggest* → the shift rows must read `1` for Morning *and*
+   Night on all seven days, no red `0`. Before this rework Night was `0` on all
+   seven. Then: preset **2-2-3 Panama**, 2 shifts, 4 crews → one crew on each
+   shift all 14 days. Then flip **Assign manually** on → each day card lists
+   Morning and Night with its own picker; clear one → red `0` appears
+   immediately *and a warning naming that shift*, and **Next still advances**.
+   Then under-crew it (3 shifts, 2 crews) → the warning must read structural
+   ("N crews would cover every shift every day"), not as something done wrong.
+   Then **Next → Next → Summary** → grid matches the step's. Then
+   `/schedule-rotation` → *Plant Coverage (2-2-3)* → **Daily** tab.
+   Also: toggling Teams ⇄ Employees with the manual grid open must not put
+   employee names in a team field.
+2. **The manual grid is `L × N` pickers** — 84 for a 28-day 3-shift cycle. Fine
+   in principle (opt-in, behind a switch) but unmeasured. If it drags, the fix
+   is probably rendering only the day currently expanded.
+3. **`getScheduleTotalHours` still reads the pattern**, not the matrix — it
+   reports one crew's average day, which is arguably right, but it is now a
+   different question from "what does this schedule cost". Left alone
+   deliberately; revisit if anyone reads it as a total.
+4. **The rotation screen's cycle legend decodes the *pattern's* letters**, so on
+   a schedule where crews are transposed onto other shifts the legend and the
+   rows disagree. Same shape as the old `crew_shift_id` note. Not wrong, but
+   potentially confusing.
+5. **The Daily tab is withheld when one card is not one real day** —
+   `getScheduleCycleLength(schedule) !== pattern.length`, the weekly-`shift_repeat`
+   case (open call #4 in the companion file). Guards the disagreement rather
+   than resolving it.
+6. **`analyzeDayCoverage` runs on every relevant form change.** Memoised and
+   cheap at these sizes, but not incremental. The *search* is now multi-start
+   and strictly more expensive than 09-03's — still instant on the presets,
+   worth profiling before assuming a 56-day/8-crew roster is free.
+7. **Crews cannot have different rest masks** (see the boundary note above).
    Would need independent pattern groups; deliberately out of scope.

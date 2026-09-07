@@ -444,25 +444,71 @@ a genuine missing-import that `tsc -b` caught.
   browser-verified by hand.**
   → `.claude/handoff/rotation-suggestion.md`
 
+## Session state (2026-09-06)
+
+- **The rotate pattern stopped deciding which shifts run each day.** It is
+  now a *template* — one crew's journey through the cycle ("Morning,
+  Morning, off, Afternoon") — and `shift_ids` decides what has to run:
+  **every selected shift, every day**. The unlock is one new degree of
+  freedom per crew, `shiftStep`, which transposes its journey through the
+  shift list (ordered by **start time**) on top of the existing
+  `dayOffset`. Before this, an all-Morning 5-2 pattern could never staff
+  Night however many crews you added — every crew visits every card, and
+  every card said Morning.
+- **Schema break, deliberate.** `rotatePatternEntrySchema` lost
+  `employee_ids`, `team_ids` **and** `crew_shift_id`; the rotate branch
+  gained **`day_coverage`**, a sparse `(cycle day × shift) → crews`
+  matrix. That shape is forced by the user's choice of **free cell
+  editing** in the manual grid — no pair of offsets can express an
+  arbitrary cell edit, so offsets now live only *inside* the search.
+  Saved schedules still load (zod strips the dead keys) but come back with
+  an empty roster; `SEED_VERSION` → `'2026-09-06-day-coverage-matrix'`.
+- **Watch out: the search needs multiple starts.** Seeding only
+  round-robin shift steps *loses to plain even spacing* on DuPont and
+  DDNNOO, which already encode their own day/night alternation and want
+  every step at 0. It now starts from all-zero steps, round-robin, a
+  greedy construction, and the exhaustive day pass per step seed, then
+  hill-climbs each. Four tests caught this; don't simplify it back.
+- **An arithmetic trap worth remembering:** 2 crews on a 5-2 with 2 shifts
+  is 10 crew-days for 14 cells — **4 cells must stay empty**. "No red 0"
+  needs **4** crews. The 09-02 understaffed-trap rule is unchanged and
+  still load-bearing: severity is decided by fixability
+  (`crewDays >= cycleLength × shiftCount`), never by outcome.
+- **The warning list is rendered again**, which is the rewrite the 09-02
+  note asked for — messages now name the shift. It has to be visible: an
+  unstaffed shift is a warning, never a validation error (user's call:
+  *warn, don't block*), so the coverage panel is the only place it is
+  reported. New `crew-double-booked` warning, reachable only by hand.
+- `npm run build` clean; `npm run test` **243 passed / 3 failed** (the same
+  unowned `search-provider.test.tsx` three); eslint **0 errors** / 3
+  pre-existing warnings. **Still uncommitted — now three sessions' worth —
+  and still not browser-verified: no browser tooling in this session
+  either.**
+  → `.claude/handoff/rotation-suggestion.md`
+
 ## Pick up here next session
 
-0. **Browser-verify the rotation suggestion** — newest work, and the only
-   item here with a written click-list. Schedule form → Rotate → pick 2
-   shifts → **Pattern** → preset "2-2-3 Panama" → **Assign to** → pool of
-   4 → *Suggest*: the "On duty" row should read `2` under all 14 columns.
-   Then flip **Assign manually** on — 14 day cards, each with a *greyed*
-   shift field above a live crew dropdown, one crew kind only — and move a
-   crew by hand: the On-duty row must react immediately, which is what
-   proves the panel reads live form state rather than the last suggestion.
-   Then **Next → Next → Summary**: the coverage grid there must match the
-   one on the step. Then `/schedule-rotation` → *Plant Coverage (2-2-3)* →
-   **Daily** tab.
-   **Two pieces of markup have never been seen** — the day-card grid's
-   column layout, and the Summary's 09-03 grid + starting-position list.
-   Add one pass on the 09-03 fixes: a **5-2 preset with 2 crews** must show
-   **no red `0`** in the On-duty row, and toggling Teams ⇄ Employees with
-   the manual grid open must not put employee names in a team field. Full
-   list in `.claude/handoff/rotation-suggestion.md`.
+0. **Browser-verify the rotation coverage rework** — newest work, and the
+   only item here with a written click-list. Start with the case that
+   motivated it: schedule form → Rotate → select **Morning + Night** →
+   **Pattern** → preset **5-2** (every card says Morning) → **Assign to** →
+   pool of **4** → *Suggest*: the shift rows must read `1` for Morning
+   *and* Night on all seven days, **no red `0`**. Before the rework Night
+   was `0` on all seven. Then preset **2-2-3 Panama**, 2 shifts, 4 crews →
+   one crew on each shift all 14 days.
+   Then flip **Assign manually** on — each day card lists **one picker per
+   selected shift** — and clear one: a red `0` must appear immediately
+   *and* a warning naming that shift, and **Next must still advance**
+   (warn, don't block). Under-crew it (3 shifts, 2 crews) → the warning
+   must read structural ("N crews would cover every shift every day"), not
+   as something done wrong. Then **Next → Next → Summary**: the coverage
+   grid there must match the one on the step. Then `/schedule-rotation` →
+   *Plant Coverage (2-2-3)* → **Daily** tab.
+   **Never-seen markup:** the coverage panel's two grids + warning list,
+   and the day × shift manual grid. Also re-check the 09-03 fix — toggling
+   Teams ⇄ Employees with the manual grid open must not put employee names
+   in a team field. Full list in
+   `.claude/handoff/rotation-suggestion.md`.
 1. **Click through the seven screens that have never been opened in a
    browser here**: `/schedule-rotation` (**three** seeded rotations),
    `/public-holidays` and `/schedule-templates`, `/teams`, plus

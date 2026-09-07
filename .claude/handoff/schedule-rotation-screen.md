@@ -33,51 +33,54 @@ supplied.
 > what changed and why; everything in this section describes the current
 > behaviour.
 >
-> **Extended 2026-09-02** with a `daily` step and per-crew fixed shifts. Both
-> are noted inline below; the full account is in
+> **Extended 2026-09-02** with a `daily` step and per-crew fixed shifts, then
+> **reworked again 2026-09-06**: the roster moved off the pattern onto its own
+> stored matrix. Both are noted inline below; the full account is in
 > `.claude/handoff/rotation-suggestion.md`.
 
-- **The crew is stored on the schedule's pattern.** Each entry of
-  `pattern[]` carries `employee_ids` / `team_ids` (see
-  `rotatePatternEntrySchema`), set on the schedule form's own **"Assign to"**
-  step. `getRotationRoster` reads these and **nothing else** — a position's
-  shift is consulted only for its name, letter and badge colour.
-- **A position's pick is that crew's starting slot.** Someone assigned to the
-  Morning position starts the cycle on Morning. An **off position is
-  assignable like any other**, which is how "this crew starts on a rest day"
-  gets expressed — it has no shift of its own to carry a pick.
-- **One step per period**: `assignedIndex = (offset + periodIndex) mod
-  cycleLength`, where `offset` is the position the crew was assigned to and
-  `periodIndex` is whole days/weeks/months between the viewed period and the
-  `start_date` period. Off positions are ordinary cycle members — everyone
-  rotates through them. The Daily/Weekly/Monthly toggle only changes *what one
-  step means*; it is independent of `cycle_length`.
+- **The crew is stored on the schedule as a matrix.** `schedule.day_coverage`
+  is a sparse list of `{ day, shift_id, employee_ids, team_ids }` cells — a
+  (cycle day × shift) → crews grid — set on the schedule form's **"Assign to"**
+  step. `getRotationRoster` reads that and **nothing else**.
+  **Superseded 2026-09-06:** it used to read `pattern[].employee_ids` /
+  `team_ids`, treating a crew's card index as its offset. Those fields are
+  **gone from the schema**, along with `crew_shift_id` — one offset cannot name
+  two shifts, so that model could not express "cover every selected shift every
+  day", which is now the rule. See the companion file's "The model".
+- **The pattern is a template, not the roster.** It describes one crew's
+  journey ("Morning, Morning, off, Afternoon"); `getRotationPositions` still
+  resolves it for the letters/labels/colours of the reference row, but who
+  works what comes from the matrix.
+- **One step per period**: `assignedIndex = periodIndex mod cycleLength` — the
+  same cycle day for everyone now, since people differ by what the matrix gives
+  them rather than by an offset into a shared pattern. `periodIndex` is whole
+  days/weeks/months between the viewed period and the `start_date` period. The
+  Daily/Weekly/Monthly toggle only changes *what one step means*; it is
+  independent of `cycle_length`.
+  `RotationRow.offset` survives as **the first cycle day that employee works**,
+  a sort key and nothing more.
 - **`daily` is what a day-based pattern needs** (2-2-3, 4-on-4-off, DuPont):
-  one card advances one calendar day, so the composition is literally
-  `(daysSinceStart + offset) mod patternLength`. Read through the weekly step
-  the same cards would describe a cycle seven times longer. It is **disabled**
-  when `getScheduleCycleLength(schedule) !== pattern.length` — the
+  one card advances one calendar day. Read through the weekly step the same
+  cards would describe a cycle seven times longer. It is **disabled** when
+  `getScheduleCycleLength(schedule) !== pattern.length` — the
   weekly-`shift_repeat`-card case in open call #4 below, where one card really
   does span a week.
-- **`pattern[].crew_shift_id` (optional) pins a crew to one shift.** Set, the
-  crew works that shift on every working card instead of the card's own;
-  unset — every schedule written before 2026-09-02 — it rotates as before.
-  It exists because a shared `pattern[]` alone **cannot** express fixed-shift
-  crews: over one cycle every crew visits every card, so "Team A always days,
-  Team B always nights, same rest mask" had no representation at all. Resolved
-  by `applyCrewShift`; an off card stays off.
 - **`cycleLength === pattern.length`**, regardless of `cycle_type`. This
   screen never reads `cycle_length.days` or `shift_repeat`.
 - **Shifts keep their own "Assign to" tab**, and their `employee_ids` /
   `team_ids` are kept as sample data. They say who *may* work a shift; they no
   longer decide who holds which slot of a rotation.
+- A crew hand-placed on **two shifts the same day** renders as the first one
+  here rather than flickering; the form warns about it in place
+  (`crew-double-booked`).
 
 Core logic is pure in `src/features/schedule-rotation/utils.ts`
-(`buildRotation`, `getRotationPositions`, `getRotationRoster`, `getAssignedIndex`,
-`applyCrewShift`, period helpers), unit-tested in `utils.test.ts` and locked
-against the real seeds in `scenario.test.ts`.
+(`buildRotation`, `getRotationPositions`, `getRotationRoster`,
+`getAssignedIndex`, period helpers), unit-tested in `utils.test.ts` and locked
+against the real seeds in `scenario.test.ts`. `applyCrewShift` was **deleted**
+2026-09-06 with `crew_shift_id`.
 
-Choosing the offsets in the first place lives elsewhere and is pure too —
+Producing the matrix in the first place lives elsewhere and is pure too —
 `src/features/schedules/rotation-suggestion.ts`, driven from the form's
 "Assign to" step. This screen only ever *reads* the result.
 
@@ -103,13 +106,19 @@ starts where".
   `schedule-form/schedule-assign-to-fields.tsx`. One row per cycle position,
   each with Employees + Teams multi-selects, built from the same `MultiSelect`
   the shift form's own Assign-to tab uses.
-- `getRotationRoster` now reads `pos.employeeIds` / `pos.teamIds` only.
-- `pattern[].employee_ids` / `team_ids` stop being an off-slot special case and
-  become the whole roster. **No schema restriction was added** — an unassigned
-  position stays valid and the step never blocks "Next".
-- `pattern-builder.tsx`'s `custom_shifts` rebuild now carries crew across by
-  position. Without it, stepping back to Pattern and changing an interval
-  silently emptied the roster.
+- `getRotationRoster` now reads the schedule, not the shifts. **No schema
+  restriction was added** — an unassigned position stays valid and the step
+  never blocks "Next", a call that still holds today.
+- `pattern-builder.tsx`'s `custom_shifts` rebuild carried crew across by
+  position, so stepping back to Pattern and changing an interval did not empty
+  the roster.
+
+> **Superseded 2026-09-06.** The crew fields left the pattern entirely for
+> `day_coverage`, so the carry-across logic (`crewAt`) and the crew keys in the
+> drag-reorder payload were all deleted — a card is only a shift or a rest day
+> now, and reordering one cannot disturb the roster. The 2026-08-29 *direction*
+> (declare the roster on the schedule, do not infer it from shifts) stands; only
+> its storage shape changed.
 - The Summary step gained an "Assign to" section; the rotation screen's
   "no employees" empty state now points at the schedule's step rather than the
   shift's tab.
@@ -121,11 +130,12 @@ schedule level.
 
 ## Seed data — three scenarios
 
-Rewritten 2026-08-29, third added 2026-09-02. The first two are the same shape
-at different sizes: **one cycle position per shift plus a rest slot, and one
-crew per position**, so every crew covers every shift and exactly one is off at
-a time. The third is deliberately a different animal — a pure rest mask read
-daily, with crews pinned to shifts.
+Rewritten 2026-08-29, third added 2026-09-02, **all three re-expressed as
+`day_coverage` matrices 2026-09-06**. The first two are the same shape at
+different sizes: **one cycle position per shift plus a rest slot, and one crew
+per position**, so every crew covers every shift and exactly one is off at a
+time. The third is deliberately a different animal — a pure rest mask read
+daily, with crews spread across shifts.
 
 | Schedule | Crew | Cycle | Pattern type | Read on |
 |---|---|---|---|---|
@@ -133,11 +143,16 @@ daily, with crews pinned to shifts.
 | **Desk Alternation** | Team B — Elias, Farah, Ghassan | 3 — `E L O` | Custom alternate (`custom_shifts`) | Weekly |
 | **Plant Coverage (2-2-3)** | Amir, Bilal, Carla, Dana as four one-person crews | 14-day 2-2-3 mask | Rotate pattern (`pattern_shifts`) | **Daily** |
 
-Plant Coverage is the fixed-shift case: offsets 0/3/7/10, with 0 and 7 pinned
-to Morning and 3 and 10 to Night. Those pins are load-bearing — the crews pair
-up differently day to day ({0,10}, {0,3}, {3,7}, {7,10}, a 4-cycle), so both
-shifts are covered every day only because the pins alternate around it. Move one
-crew and a day loses its night cover.
+Plant Coverage is the fixed-shift case, and since 2026-09-06 it is also the
+clearest demonstration of the whole model: **every working card of its pattern
+names Morning, and Night is staffed on all fourteen days.** Amir and Carla hold
+mornings, Bilal and Dana nights, interleaved (the crews pair up differently day
+to day — a 4-cycle) so no day loses cover. It used to need four hand-set
+`crew_shift_id` pins; the suggestion now produces it unaided.
+
+`scenario.test.ts` locks every seeded cycle's matrix against the rule — "staffs
+every selected shift on every day of every seeded cycle" — which is what
+verified the hand-computed cells.
 
 Supporting data:
 
@@ -165,12 +180,15 @@ Design constraints that shaped these (worth knowing before editing them):
 
 ## Status
 
-> **2026-09-02 supersedes the numbers below**: `npm run build` clean;
-> `npm run test` **221 passed / 3 failed** (same three unowned
+> **2026-09-06 supersedes every number below**: `npm run build` clean;
+> `npm run test` **243 passed / 3 failed** (same three unowned
 > `search-provider.test.tsx` failures); `npx eslint` **0 errors**, 3 warnings,
-> all pre-existing. `scenario.test.ts` now also locks the Plant Coverage seed
-> day by day, and `utils.test.ts` covers the `daily` step. Still **not
-> browser-verified**, and **uncommitted**.
+> all pre-existing. `utils.test.ts` and `scenario.test.ts` were rewritten onto
+> `day_coverage` and now also assert every seeded cycle staffs every selected
+> shift on every day. Still **not browser-verified**, and **uncommitted** —
+> three sessions' worth (09-02, 09-03, 09-06).
+>
+> *(The 2026-09-02 line this replaces read 221 passed / 3 failed.)*
 
 ### As of 2026-08-29
 
@@ -183,7 +201,9 @@ Design constraints that shaped these (worth knowing before editing them):
 - **Automated coverage of the new step**: `schedule-assign-to-fields.test.tsx`
   renders it in real Chromium — one row per position including Off, seeded crew
   resolved to full names, and a typed pick on the **off** position landing in
-  `pattern.3.employee_ids`.
+  the roster. *(Rewritten 2026-09-06 for the day × shift grid: one picker per
+  selected shift per day, a free cell edit disturbing nothing else, and a cell
+  dropped once its last crew is removed.)*
 - `scenario.test.ts` locks both rotations week by week, and asserts the roster
   is unchanged when every shift's `employee_ids`/`team_ids` are stripped —
   i.e. proves the schedule is the only source.
@@ -282,9 +302,11 @@ npx vitest run --browser.enabled=false --environment=node <files>
    `getScheduleCycleLength(schedule) !== pattern.length`, so the two engines
    cannot silently contradict each other on screen. They still disagree in
    principle.
-5. **The cycle legend decodes the *pattern's* letters**, so on a rotation using
-   `crew_shift_id` a pinned crew's row shows its own shift while the legend
-   shows the card's. Not wrong, but worth a look on a mixed rotation.
+5. **The cycle legend decodes the *pattern's* letters**, so on a rotation where
+   crews are transposed onto other shifts (every rotation, since 2026-09-06 —
+   this is how full coverage is reached) the legend and the rows disagree. Not
+   wrong, but more likely to be seen now than when it needed an explicit
+   `crew_shift_id` pin. Worth a look.
 5. **The shift Assign-to tab is now decorative for rotations.** Kept
    deliberately ("leave the assign to data in the shift for later use"), but
    `/shifts` will show assignments that don't drive anything — worth a label or

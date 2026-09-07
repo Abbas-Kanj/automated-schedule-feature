@@ -4,7 +4,6 @@ import { GripVerticalIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -63,11 +63,14 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
   const shiftIds =
     (useWatch({ control, name: 'shift_ids' }) as string[] | undefined) ?? []
   const cycleLength = useWatch({ control, name: 'cycle_length' }) as
-    { unit: string; days: number } | undefined
+    | { unit: string; days: number }
+    | undefined
   const cycleType = useWatch({ control, name: 'cycle_type' }) as
-    string | undefined
+    | string
+    | undefined
   const shiftRepeatRaw = useWatch({ control, name: 'shift_repeat' }) as
-    ShiftRepeat[] | undefined
+    | ShiftRepeat[]
+    | undefined
   const shiftRepeat = useMemo(() => shiftRepeatRaw ?? [], [shiftRepeatRaw])
 
   const isCustomShifts = cycleType === 'custom_shifts'
@@ -137,35 +140,19 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       )
     if (alreadyMatches) return
 
-    // The crew picked on the "Assign to" step belongs to the slot, not to
-    // whichever shift currently sits in it — so carry it across a rebuild by
-    // position. Same reasoning as the drag-reorder below, which deliberately
-    // makes crew travel with its card; dropping it here would silently empty
-    // the roster whenever someone stepped back and changed an interval.
-    const crewAt = (i: number) => ({
-      employee_ids: current[i]?.employee_ids,
-      team_ids: current[i]?.team_ids,
-    })
-
+    // Nothing to carry across a rebuild: the roster lives on the schedule's
+    // own `day_coverage` matrix now, not on the cards (see
+    // `schedule-assign-to-fields.tsx`), so a card is only ever a shift or a
+    // rest day.
     const next: RotatePatternEntry[] = []
     let position = 1
     for (const r of shiftRepeat) {
       for (let i = 0; i < r.interval; i++, position++) {
-        next.push({
-          position,
-          is_off: false,
-          shift_id: r.shift_id,
-          ...crewAt(position - 1),
-        })
+        next.push({ position, is_off: false, shift_id: r.shift_id })
       }
     }
     while (position <= totalPatternLength) {
-      next.push({
-        position,
-        is_off: true,
-        shift_id: undefined,
-        ...crewAt(position - 1),
-      })
+      next.push({ position, is_off: true, shift_id: undefined })
       position++
     }
     replace(next)
@@ -184,8 +171,6 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     if (!preset || shiftIds.length === 0) return
 
     const cards = preset.buildCards(shiftIds.length)
-    const current =
-      (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
 
     setValue(
       'cycle_length',
@@ -193,17 +178,11 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       { shouldDirty: true }
     )
 
-    // Crew is carried across by position, same as the `custom_shifts` rebuild
-    // and the drag-reorder below — it belongs to the slot, not to whichever
-    // shift happens to be sitting in it.
     replace(
       cards.map((card, i) => ({
         position: i + 1,
         is_off: card === null,
         shift_id: card === null ? undefined : shiftIds[card % shiftIds.length],
-        employee_ids: current[i]?.employee_ids,
-        team_ids: current[i]?.team_ids,
-        crew_shift_id: current[i]?.crew_shift_id,
       }))
     )
   }
@@ -574,14 +553,12 @@ function usePatternReorder() {
 
       const pattern = getValues('pattern') as RotatePatternEntry[]
       // Everything a card *is*, minus its `position` — that's the slot the
-      // card sits in, so it stays with the index rather than travelling.
-      // The direct roster picks travel: they belong to the crew on that
-      // card, not to the day of the cycle it currently occupies.
+      // card sits in, so it stays with the index rather than travelling. A
+      // card is only a shift or a rest day now; the roster lives on the
+      // schedule's `day_coverage` matrix and is unaffected by a reorder.
       const content = pattern.map((p) => ({
         is_off: p.is_off,
         shift_id: p.shift_id,
-        employee_ids: p.employee_ids,
-        team_ids: p.team_ids,
       }))
       const [moved] = content.splice(from, 1)
       let insertAt = to.side === 'after' ? to.index + 1 : to.index
@@ -596,14 +573,6 @@ function usePatternReorder() {
           shouldDirty: true,
         })
         setValue(`pattern.${i}.is_off`, c.is_off, {
-          shouldValidate: true,
-          shouldDirty: true,
-        })
-        setValue(`pattern.${i}.employee_ids`, c.employee_ids, {
-          shouldValidate: true,
-          shouldDirty: true,
-        })
-        setValue(`pattern.${i}.team_ids`, c.team_ids, {
           shouldValidate: true,
           shouldDirty: true,
         })
@@ -749,7 +718,8 @@ function PatternDayCard({
   const shifts = useShiftsStore((s) => s.shifts)
   const isOff = useWatch({ control, name: `pattern.${index}.is_off` })
   const shiftId = useWatch({ control, name: `pattern.${index}.shift_id` }) as
-    string | undefined
+    | string
+    | undefined
   const value = !isOff && shiftId ? shiftId : 'off'
   const items = [{ value: 'off', label: 'Off' }, ...shiftOptions]
 
@@ -949,7 +919,7 @@ function PatternPresetPicker({
         </SelectContent>
       </Select>
       {presetId && (
-        <p className='text-muted-foreground text-xs'>
+        <p className='text-xs text-muted-foreground'>
           {getRotationPreset(presetId)?.description} Suggested crew size:{' '}
           {getRotationPreset(presetId)?.suggestedCrews}. Every card stays
           editable below.

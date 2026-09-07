@@ -46,9 +46,11 @@ export function isRotateSchedule(
 // afternoons next week" rotation the seeded schedules describe.
 export type RotationPeriodType = 'daily' | 'weekly' | 'monthly'
 
-// One resolved position in the rotation cycle (pattern order). `isOff` is
-// re-derived rather than trusting the pattern flag alone, so a position
-// pointing at a since-deleted shift still reads as off.
+// One resolved day of the rotation cycle. Used two ways: as a card of the
+// schedule's own `pattern` (the template — see `getRotationPositions`), and as
+// one cell of an employee's actual cycle (what they work that day — see
+// `buildRotation`). `isOff` is re-derived rather than trusting a flag, so a
+// day pointing at a since-deleted shift still reads as off.
 export type RotationPosition = {
   index: number
   shift?: Shift
@@ -58,28 +60,20 @@ export type RotationPosition = {
   letter: string
   label: string
   badgeColor?: ShiftBadgeColor
-  // The crew working this position, from the schedule's own "Assign to" step
-  // (see `rotatePatternEntrySchema` and
-  // `schedule-form/schedule-assign-to-fields.tsx`). This is the whole roster
-  // — the position's shift is only read for its name, letter and colour.
-  employeeIds: string[]
-  teamIds: string[]
-  // Set when the crew starting here is pinned to one shift for the whole
-  // rotation rather than taking each card's own shift (see
-  // `crew_shift_id` in `schedules/data/schema.ts`).
-  crewShiftId?: string
 }
 
 export type RotationRow = {
   employee: Employee
   employeeId: string
   fullName: string
-  // Which cycle position this employee starts at (the first pattern position
-  // they're assigned to) — their stagger into the rotation.
+  // First cycle day this employee works. Not a stagger any more — the roster
+  // is stored per (day, shift) rather than as an offset into the pattern (see
+  // `day_coverage` in `schedules/data/schema.ts`) — it is kept only to sort
+  // the table in a stable, readable order.
   offset: number
   assignedIndex: number
   assigned: RotationPosition
-  // The full cycle, rotated so the employee's current position comes first
+  // The employee's own cycle, rotated so the day they are on now comes first
   // (matches the reference UI: Alice "M A N O", Bob "A N O M").
   sequence: RotationPosition[]
 }
@@ -96,103 +90,99 @@ export type Rotation = {
 
 const OFF_LETTER = 'O'
 
+function toPosition(
+  index: number,
+  shift: Shift | undefined,
+  forcedOff = false
+): RotationPosition {
+  const isOff = forcedOff || !shift
+  return {
+    index,
+    shift: isOff ? undefined : shift,
+    isOff,
+    letter: isOff
+      ? OFF_LETTER
+      : (shift!.name.trim().charAt(0) || '?').toUpperCase(),
+    label: isOff ? 'Off' : shift!.name,
+    badgeColor: isOff ? undefined : shift!.badge_color,
+  }
+}
+
 // Resolves a rotate schedule's pattern (sorted by position) into display-ready
-// cycle positions.
+// cycle days. This is the *template* — one crew's journey, the thing the
+// suggestion works from (see `schedules/rotation-suggestion.ts`) — not what
+// anybody in particular works. Who works what comes from `getRotationRoster`.
 export function getRotationPositions(
   schedule: RotateSchedule,
   shifts: Shift[]
 ): RotationPosition[] {
   return [...schedule.pattern]
     .sort((a, b) => a.position - b.position)
-    .map((entry, index) => {
-      const shift = entry.is_off
-        ? undefined
-        : shifts.find((s) => s.id === entry.shift_id)
-      const isOff = entry.is_off || !shift
-      return {
+    .map((entry, index) =>
+      toPosition(
         index,
-        shift,
-        isOff,
-        letter: isOff
-          ? OFF_LETTER
-          : (shift!.name.trim().charAt(0) || '?').toUpperCase(),
-        label: isOff ? 'Off' : shift!.name,
-        badgeColor: isOff ? undefined : shift!.badge_color,
-        employeeIds: entry.employee_ids ?? [],
-        teamIds: entry.team_ids ?? [],
-        crewShiftId: entry.crew_shift_id,
-      }
-    })
+        entry.is_off ? undefined : shifts.find((s) => s.id === entry.shift_id),
+        entry.is_off
+      )
+    )
 }
 
-// Re-reads a cycle position through the eyes of a crew pinned to one shift:
-// the card still decides whether the crew is working, its own shift decides
-// what it works. An off card stays off — being pinned to days does not mean
-// working through the rest cards.
-export function applyCrewShift(
-  position: RotationPosition,
-  crewShiftId: string | undefined,
-  shifts: Shift[]
-): RotationPosition {
-  if (!crewShiftId || position.isOff) return position
-  const shift = shifts.find((s) => s.id === crewShiftId)
-  if (!shift) return position
-
-  return {
-    ...position,
-    shift,
-    letter: (shift.name.trim().charAt(0) || '?').toUpperCase(),
-    label: shift.name,
-    badgeColor: shift.badge_color,
-  }
-}
-
-// The roster is the schedule's own crew: every employee a cycle position is
-// assigned (directly, or through a team), deduped. An employee's offset is
-// the first cycle position they appear on — their stagger into the cycle.
+// The roster is the schedule's own `day_coverage` matrix: for every employee
+// it names (directly, or through a team), which shift they work on each day of
+// the cycle.
 //
-// This reads the pattern and nothing else. A position's shift still carries
-// its own "Assign to" picks (see `features/shifts`), but those say who may
-// work that shift in general, not who holds which slot of this rotation.
-// Inferring the cycle from them broke down as soon as a shift named a whole
-// team — every member landed on the same position — and an off position has
-// no shift to name anyone at all. A rotation's crew is set on the schedule
-// now, in the form's own "Assign to" step.
+// It used to be inferred from the pattern — a crew sat on one card and its
+// offset was that card's index. That could not express what the feature now
+// requires, a rotation covering *every* selected shift every day: two crews on
+// the same rest rhythm working different shifts have the same offset, and one
+// offset cannot name two shifts. So the resolved matrix is stored instead and
+// read straight back here.
+//
+// A position's shift still carries its own "Assign to" picks (see
+// `features/shifts`), but those say who may work that shift in general, not
+// who covers which day of this rotation.
 export function getRotationRoster(
-  positions: RotationPosition[],
+  schedule: RotateSchedule,
   employees: Employee[],
   teams: Team[]
 ): {
   employee: Employee
   employeeId: string
   offset: number
-  crewShiftId?: string
+  byDay: Map<number, string>
 }[] {
   const teamById = new Map(teams.map((t) => [t.id, t]))
   const employeeById = new Map(
     employees.filter((e) => e.id).map((e) => [e.id as string, e])
   )
-  const offsetByEmployee = new Map<string, number>()
-  const crewShiftByEmployee = new Map<string, string | undefined>()
+  const byEmployee = new Map<string, Map<number, string>>()
 
-  const resolveTeams = (teamIds: string[]) =>
-    teamIds.flatMap((id) => teamById.get(id)?.employee_ids ?? [])
+  const record = (employeeId: string, day: number, shiftId: string) => {
+    if (!employeeById.has(employeeId)) return
+    let days = byEmployee.get(employeeId)
+    if (!days) {
+      days = new Map()
+      byEmployee.set(employeeId, days)
+    }
+    // First one wins, so a hand-made double booking renders as one shift
+    // rather than flickering between two. The form warns about it in place.
+    if (!days.has(day)) days.set(day, shiftId)
+  }
 
-  positions.forEach((pos) => {
-    const memberIds = [...pos.employeeIds, ...resolveTeams(pos.teamIds)]
-    memberIds.forEach((employeeId) => {
-      if (!offsetByEmployee.has(employeeId) && employeeById.has(employeeId)) {
-        offsetByEmployee.set(employeeId, pos.index)
-        crewShiftByEmployee.set(employeeId, pos.crewShiftId)
-      }
+  schedule.day_coverage.forEach((cell) => {
+    cell.employee_ids.forEach((id) => record(id, cell.day, cell.shift_id))
+    cell.team_ids.forEach((teamId) => {
+      teamById
+        .get(teamId)
+        ?.employee_ids.forEach((id) => record(id, cell.day, cell.shift_id))
     })
   })
 
-  return [...offsetByEmployee.entries()]
-    .map(([employeeId, offset]) => ({
+  return [...byEmployee.entries()]
+    .map(([employeeId, byDay]) => ({
       employeeId,
-      offset,
-      crewShiftId: crewShiftByEmployee.get(employeeId),
+      byDay,
+      offset: Math.min(...byDay.keys()),
       employee: employeeById.get(employeeId)!,
     }))
     .sort(
@@ -251,8 +241,9 @@ export function getPeriodIndex(
     : differenceInCalendarMonths(current, anchor)
 }
 
-// Cycle position an employee lands on for a given period — their offset
-// advanced by the period index, wrapped into [0, cycleLength).
+// Cycle day a given period lands on, wrapped into [0, cycleLength). The
+// `offset` is 0 for the cycle itself; it stays a parameter because the pattern
+// preview elsewhere still walks the cards from an arbitrary starting card.
 export function getAssignedIndex(
   offset: number,
   periodIndex: number,
@@ -286,36 +277,40 @@ export function buildRotation(
 ): Rotation {
   const positions = getRotationPositions(schedule, shifts)
   const cycleLength = positions.length
-  const roster = getRotationRoster(positions, employees, teams)
+  const roster = getRotationRoster(schedule, employees, teams)
   const periodIndex = getPeriodIndex(schedule, viewDate, periodType)
   const periodStart = getPeriodStart(viewDate, periodType)
   const periodEnd = getPeriodEnd(viewDate, periodType)
+  const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
 
-  const rows: RotationRow[] = roster.map(
-    ({ employee, employeeId, offset, crewShiftId }) => {
-      const assignedIndex = cycleLength
-        ? getAssignedIndex(offset, periodIndex, cycleLength)
-        : 0
-      // A pinned crew reads its own shift off every working card, so the whole
-      // sequence is re-resolved rather than just the current position.
-      const sequence = positions.map((_, i) =>
-        applyCrewShift(
-          positions[(assignedIndex + i) % cycleLength],
-          crewShiftId,
-          shifts
-        )
-      )
-      return {
-        employee,
-        employeeId,
-        fullName: getEmployeeFullName(employee),
-        offset,
-        assignedIndex,
-        assigned: applyCrewShift(positions[assignedIndex], crewShiftId, shifts),
-        sequence,
-      }
+  // The cycle day the current period lands on. The same day for everyone now:
+  // people no longer differ by an offset into a shared pattern, they differ by
+  // what the matrix gives each of them on that day.
+  const assignedIndex = cycleLength
+    ? getAssignedIndex(0, periodIndex, cycleLength)
+    : 0
+
+  const rows: RotationRow[] = roster.map(({ employee, employeeId, byDay }) => {
+    const dayFor = (day: number) => {
+      const shiftId = byDay.get(day)
+      return toPosition(day, shiftId ? shiftById.get(shiftId) : undefined)
     }
-  )
+    // Rotated so the day they are on right now reads first, matching the
+    // "Current Schedule Sequence" column.
+    const sequence = positions.map((_, i) =>
+      dayFor((assignedIndex + i) % cycleLength)
+    )
+
+    return {
+      employee,
+      employeeId,
+      fullName: getEmployeeFullName(employee),
+      offset: Math.min(...byDay.keys()),
+      assignedIndex,
+      assigned: dayFor(assignedIndex),
+      sequence,
+    }
+  })
 
   return {
     positions,

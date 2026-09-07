@@ -1,11 +1,16 @@
 import { buildDefaultDays } from '../utils'
 import { type Shift } from './schema'
 
-// The shifts behind the two seeded rotations (see
-// `features/schedules/data/schedules.ts`): Morning / Afternoon / Night for
-// Team A's four-position cycle, and Early / Late for Team B's three-position
-// one. Deliberately a small set — this checkout carries two end-to-end
-// rotation scenarios rather than a broad sample.
+// The shifts behind the seeded schedules (see
+// `features/schedules/data/schedules.ts`):
+//
+//   Morning / Afternoon / Night   8-hour continuous cover — Team A's demo
+//                                 rotation and both factory line rosters.
+//   Early / Late                  Team B's desk alternation.
+//   Day 12h / Night 12h           two 12-hour watches — every security and
+//                                 hospital roster runs on this pair.
+//   Office                        Monday–Friday 09:00–17:00 for the fixed
+//                                 head-office schedule.
 //
 // `employee_ids`/`team_ids` here say who *may* work a shift. They are no
 // longer what builds a rotation: who holds which slot of a cycle is set on
@@ -154,6 +159,101 @@ export const defaultShifts: Shift[] = [
     assign_to_enabled: true,
     employee_ids: [],
     team_ids: ['team-b'],
+    break_enabled: false,
+    breaks: [],
+  },
+  {
+    id: 'shift-day-12',
+    name: 'Day 12h',
+    short_code: 'DAY12',
+    badge_color: 'orange',
+    icon: 'sun',
+    shift_type: 'rotate',
+    category: 'regular',
+    timezone_mode: 'local',
+    hours_mode: 'same',
+    days: buildDefaultDays({
+      from_time: '07:00',
+      to_time: '19:00',
+      overnight: false,
+    }),
+    full_day_hours: 12,
+    half_day_hours: 6,
+    description: 'Twelve-hour day watch — security and hospital rosters.',
+    is_active: true,
+    policy_ids: [],
+    status: 'confirmed',
+    time_slot_type: 'regular',
+    repeat_enabled: false,
+    repeat: {},
+    assign_to_enabled: false,
+    employee_ids: [],
+    team_ids: [],
+    break_enabled: false,
+    breaks: [],
+  },
+  {
+    id: 'shift-night-12',
+    name: 'Night 12h',
+    short_code: 'NGT12',
+    badge_color: 'violet',
+    icon: 'moon',
+    shift_type: 'rotate',
+    category: 'night',
+    timezone_mode: 'local',
+    hours_mode: 'same',
+    // Wraps past midnight — flagged `overnight` rather than failing the
+    // "end after start" check (see `shiftFieldsSchema`).
+    days: buildDefaultDays({
+      from_time: '19:00',
+      to_time: '07:00',
+      overnight: true,
+    }),
+    full_day_hours: 12,
+    half_day_hours: 6,
+    description: 'Twelve-hour night watch — security and hospital rosters.',
+    is_active: true,
+    policy_ids: [],
+    status: 'confirmed',
+    time_slot_type: 'regular',
+    repeat_enabled: false,
+    repeat: {},
+    assign_to_enabled: false,
+    employee_ids: [],
+    team_ids: [],
+    break_enabled: false,
+    breaks: [],
+  },
+  {
+    id: 'shift-office',
+    name: 'Office',
+    short_code: 'OFFICE',
+    badge_color: 'cyan',
+    icon: 'briefcase',
+    shift_type: 'fixed',
+    category: 'regular',
+    timezone_mode: 'local',
+    hours_mode: 'same',
+    // Monday–Friday only — the weekend days are toggled off.
+    days: buildDefaultDays({
+      from_time: '09:00',
+      to_time: '17:00',
+      overnight: false,
+    }).map((day) =>
+      day.day === 'sat' || day.day === 'sun' ? { ...day, enabled: false } : day
+    ),
+    full_day_hours: 8,
+    half_day_hours: 4,
+    description: 'Standard Monday-to-Friday office hours.',
+    is_active: true,
+    policy_ids: [],
+    status: 'confirmed',
+    time_slot_type: 'regular',
+    repeat_enabled: false,
+    repeat: {},
+    assign_to_enabled: true,
+    employee_ids: [],
+    team_ids: ['team-office'],
     break_enabled: false,
     breaks: [],
   },

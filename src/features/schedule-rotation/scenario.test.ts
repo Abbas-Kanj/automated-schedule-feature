@@ -11,13 +11,17 @@ import { teamSchema } from '@/features/teams/data/schema'
 import { defaultTeams } from '@/features/teams/data/teams'
 import { type RotateSchedule, buildRotation, isRotateSchedule } from './utils'
 
-// Locks the two scenarios this checkout is seeded for. Both are the same
+// Locks the seeded scenarios. The two small demo rotations are the same
 // shape at different sizes: one cycle position per shift plus a rest slot,
 // one crew per position, advancing one position per week — so every crew
 // covers every shift and exactly one is off at a time.
 //
 //   Shift Rotation    Team A, 4 crew, Morning / Afternoon / Night / Off
 //   Desk Alternation  Team B, 3 crew, Early / Late / Off
+//
+// The rest of the seed set (Panama, and the security / factory / hospital
+// rosters) is checked more lightly here — that it parses, and that every
+// rotate cycle staffs every selected shift on every day.
 //
 // The seeds are the app's real starting data, so this doubles as a check
 // that they still satisfy their own zod schemas — the stores parse them at
@@ -70,29 +74,68 @@ describe('seed data', () => {
     )
   })
 
-  it('seeds exactly the three scenarios', () => {
-    expect(employees).toHaveLength(7)
+  it('seeds the demo rotations plus the wider 24/7 sample', () => {
+    expect(employees).toHaveLength(30)
     expect(defaultShifts.map((s) => s.name)).toEqual([
       'Morning',
       'Afternoon',
       'Night',
       'Early',
       'Late',
+      'Day 12h',
+      'Night 12h',
+      'Office',
     ])
-    expect(defaultSchedules).toHaveLength(3)
+    expect(defaultSchedules.map((s) => s.id)).toEqual([
+      'sched-rotation',
+      'sched-alternation',
+      'sched-panama-223',
+      'sched-security-dupont',
+      'sched-security-223',
+      'sched-factory-continental',
+      'sched-factory-swing',
+      'sched-hospital-pitman',
+      'sched-office-weekdays',
+    ])
     expect(defaultTeams.map((t) => [t.name, t.employee_ids.length])).toEqual([
       ['Team A', 4],
       ['Team B', 3],
+      ['Guard Alpha', 2],
+      ['Guard Bravo', 2],
+      ['Guard Charlie', 2],
+      ['Guard Delta', 2],
+      ['Line Blue', 2],
+      ['Line Gold', 2],
+      ['Line Red', 2],
+      ['Line Green', 2],
+      ['Head Office', 3],
     ])
   })
 
   it('gives each rotation one crew per cycle position', () => {
     for (const schedule of [rotation, alternation]) {
-      const crew = schedule.pattern.flatMap((p) => [
-        ...(p.employee_ids ?? []),
-        ...(p.team_ids ?? []),
+      const crew = schedule.day_coverage.flatMap((cell) => [
+        ...cell.employee_ids,
+        ...cell.team_ids,
       ])
       expect(new Set(crew).size).toBe(schedule.pattern.length)
+    }
+  })
+
+  it('staffs every selected shift on every day of every seeded cycle', () => {
+    // The rule the rework exists to keep: the pattern supplies the rhythm,
+    // `shift_ids` supplies what has to run, and nothing is left uncovered.
+    // Covers the two demo rotations, the Panama roster, and every scenario
+    // in the wider 24/7 sample (security / factory / hospital).
+    for (const schedule of defaultSchedules.filter(isRotateSchedule)) {
+      const staffed = new Set(
+        schedule.day_coverage
+          .filter((cell) => cell.employee_ids.length || cell.team_ids.length)
+          .map((cell) => `${cell.day}:${cell.shift_id}`)
+      )
+      expect(staffed.size).toBe(
+        schedule.pattern.length * schedule.shift_ids.length
+      )
     }
   })
 

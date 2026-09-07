@@ -106,31 +106,82 @@ const schedule: RotateSchedule = {
   temporary_schedule: false,
   cycle_type: 'pattern_shifts',
   cycle_length: { unit: 'custom_days', days: 4 },
-  // The whole roster, stated on the schedule rather than inferred from the
-  // shifts: one crew per position, including the day off (which has no
-  // shift to carry a pick in the first place).
+  // The pattern is only the template — one crew's journey through the cycle.
   pattern: [
-    {
-      position: 1,
-      shift_id: 'shift-morning',
-      is_off: false,
-      employee_ids: ['e-alice'],
-    },
-    {
-      position: 2,
-      shift_id: 'shift-afternoon',
-      is_off: false,
-      employee_ids: ['e-bob'],
-    },
-    {
-      position: 3,
-      shift_id: 'shift-night',
-      is_off: false,
-      team_ids: ['team-night'],
-    },
-    { position: 4, is_off: true, employee_ids: ['e-dana'] },
+    { position: 1, shift_id: 'shift-morning', is_off: false },
+    { position: 2, shift_id: 'shift-afternoon', is_off: false },
+    { position: 3, shift_id: 'shift-night', is_off: false },
+    { position: 4, is_off: true },
   ],
   shift_repeat: [],
+  // The whole roster, stated on the schedule rather than inferred from the
+  // shifts: four crews staggered one card apart, so every shift is covered
+  // every day and exactly one crew is resting. Charlie arrives through a
+  // team rather than by name.
+  day_coverage: [
+    {
+      day: 0,
+      shift_id: 'shift-morning',
+      employee_ids: ['e-alice'],
+      team_ids: [],
+    },
+    {
+      day: 0,
+      shift_id: 'shift-afternoon',
+      employee_ids: ['e-bob'],
+      team_ids: [],
+    },
+    {
+      day: 0,
+      shift_id: 'shift-night',
+      employee_ids: [],
+      team_ids: ['team-night'],
+    },
+    {
+      day: 1,
+      shift_id: 'shift-morning',
+      employee_ids: ['e-dana'],
+      team_ids: [],
+    },
+    {
+      day: 1,
+      shift_id: 'shift-afternoon',
+      employee_ids: ['e-alice'],
+      team_ids: [],
+    },
+    { day: 1, shift_id: 'shift-night', employee_ids: ['e-bob'], team_ids: [] },
+    {
+      day: 2,
+      shift_id: 'shift-morning',
+      employee_ids: [],
+      team_ids: ['team-night'],
+    },
+    {
+      day: 2,
+      shift_id: 'shift-afternoon',
+      employee_ids: ['e-dana'],
+      team_ids: [],
+    },
+    {
+      day: 2,
+      shift_id: 'shift-night',
+      employee_ids: ['e-alice'],
+      team_ids: [],
+    },
+    {
+      day: 3,
+      shift_id: 'shift-morning',
+      employee_ids: ['e-bob'],
+      team_ids: [],
+    },
+    {
+      day: 3,
+      shift_id: 'shift-afternoon',
+      employee_ids: [],
+      team_ids: ['team-night'],
+    },
+    { day: 3, shift_id: 'shift-night', employee_ids: ['e-dana'], team_ids: [] },
+  ],
   start_date: '2026-08-17',
   end_settings: { end_type: 'never' },
 }
@@ -155,51 +206,54 @@ describe('getRotationPositions', () => {
 })
 
 describe('getRotationRoster', () => {
-  it('derives employees from the pattern (incl. teams), offset by position', () => {
-    const positions = getRotationPositions(schedule, shifts)
-    const roster = getRotationRoster(positions, employees, teams)
+  it('derives every employee from day_coverage, teams resolved to members', () => {
+    const roster = getRotationRoster(schedule, employees, teams)
+    // `offset` is now just the first cycle day each one works — a sort key,
+    // not a stagger into a shared pattern.
     expect(roster.map((r) => [r.employeeId, r.offset])).toEqual([
       ['e-alice', 0],
-      ['e-bob', 1],
-      ['e-charlie', 2], // resolved from the team on the Night position
-      ['e-dana', 3], // on the off position
+      ['e-bob', 0],
+      ['e-charlie', 0], // resolved from the team named on day 0's Night cell
+      ['e-dana', 1],
     ])
   })
 
-  it("ignores crew assigned to a position's shift", () => {
-    // Same shifts, all still naming Alice/Bob/the Night Crew in their own
-    // "Assign to" tab — but nothing on the pattern, so nobody rotates.
-    const positions = getRotationPositions(
-      {
-        ...schedule,
-        pattern: schedule.pattern.map(({ position, shift_id, is_off }) => ({
-          position,
-          shift_id,
-          is_off,
-        })),
-      },
-      shifts
-    )
-    expect(getRotationRoster(positions, employees, teams)).toEqual([])
+  it('gives each employee the shift the matrix puts them on, per cycle day', () => {
+    const roster = getRotationRoster(schedule, employees, teams)
+    const alice = roster.find((r) => r.employeeId === 'e-alice')!
+    expect([...alice.byDay.entries()]).toEqual([
+      [0, 'shift-morning'],
+      [1, 'shift-afternoon'],
+      [2, 'shift-night'],
+    ])
   })
 
-  it('ignores a direct pick that no longer matches an employee', () => {
-    const positions = getRotationPositions(
+  it("ignores crew assigned to a shift's own Assign-to tab", () => {
+    // Same shifts, all still naming Alice/Bob/the Night Crew in their own
+    // "Assign to" tab — but an empty matrix, so nobody rotates.
+    expect(
+      getRotationRoster({ ...schedule, day_coverage: [] }, employees, teams)
+    ).toEqual([])
+  })
+
+  it('ignores a pick that no longer matches an employee', () => {
+    const roster = getRotationRoster(
       {
         ...schedule,
-        pattern: [
-          ...schedule.pattern.slice(0, 3),
-          { position: 4, is_off: true, employee_ids: ['e-ghost'] },
+        day_coverage: [
+          ...schedule.day_coverage,
+          {
+            day: 3,
+            shift_id: 'shift-morning',
+            employee_ids: ['e-ghost'],
+            team_ids: [],
+          },
         ],
       },
-      shifts
+      employees,
+      teams
     )
-    const roster = getRotationRoster(positions, employees, teams)
-    expect(roster.map((r) => r.employeeId)).toEqual([
-      'e-alice',
-      'e-bob',
-      'e-charlie',
-    ])
+    expect(roster.map((r) => r.employeeId)).not.toContain('e-ghost')
   })
 })
 
@@ -312,7 +366,7 @@ describe('daily period type', () => {
         const periodIndex = getPeriodIndex(schedule, viewDate, 'daily')
         expect(periodIndex).toBe(days)
         expect(getAssignedIndex(offset, periodIndex, cycleLength)).toBe(
-          ((days + offset) % cycleLength + cycleLength) % cycleLength
+          (((days + offset) % cycleLength) + cycleLength) % cycleLength
         )
       }
     }

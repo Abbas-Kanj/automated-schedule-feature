@@ -46,13 +46,27 @@ async function finish(screen: Screen) {
   await userEvent.click(screen.getByRole('button', { name: 'Save schedule' }))
 }
 
-// One string per cycle position: the teams on it, then the employees.
-function crewByPosition(schedule: Schedule) {
-  const pattern = (schedule as Extract<Schedule, { type: 'rotate' }>).pattern
-  return pattern.map(
-    (entry) =>
-      `${(entry.team_ids ?? []).join('+') || '-'}/${(entry.employee_ids ?? []).join('+') || '-'}`
+// Everyone the stored coverage matrix names, once each, sorted.
+function crewKeys(schedule: Schedule) {
+  const coverage = (schedule as Extract<Schedule, { type: 'rotate' }>)
+    .day_coverage
+  const keys = new Set<string>()
+  coverage.forEach((cell) => {
+    cell.team_ids.forEach((id) => keys.add(`team:${id}`))
+    cell.employee_ids.forEach((id) => keys.add(`employee:${id}`))
+  })
+  return [...keys].sort()
+}
+
+// How many (cycle day, shift) cells nobody is on.
+function uncoveredCells(schedule: Schedule) {
+  const rotate = schedule as Extract<Schedule, { type: 'rotate' }>
+  const staffed = new Set(
+    rotate.day_coverage
+      .filter((cell) => cell.employee_ids.length || cell.team_ids.length)
+      .map((cell) => `${cell.day}:${cell.shift_id}`)
   )
+  return rotate.pattern.length * rotate.shift_ids.length - staffed.size
 }
 
 describe('ScheduleForm — rotate crew assignment', () => {
@@ -70,13 +84,12 @@ describe('ScheduleForm — rotate crew assignment', () => {
     await finish(screen)
 
     expect(onSubmit).toHaveBeenCalledTimes(1)
-    const crew = crewByPosition(onSubmit.mock.calls[0][0])
-    // Both teams placed, one per position, on their own cards — and the
-    // employees the seed had on those positions cleared, not left to
-    // double-book them.
-    expect(crew.filter((slot) => slot !== '-/-')).toHaveLength(2)
-    expect(crew).toContain('team-a/-')
-    expect(crew).toContain('team-b/-')
+    // Both teams placed — and the employees the seed had assigned cleared,
+    // not left behind to double-book the cycle.
+    expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
+      'team:team-a',
+      'team:team-b',
+    ])
   })
 
   it('applies the suggestion on Next when the button was never pressed', async () => {
@@ -91,10 +104,10 @@ describe('ScheduleForm — rotate crew assignment', () => {
     // continuing used to advance with the old roster still in place.
     await finish(screen)
 
-    const crew = crewByPosition(onSubmit.mock.calls[0][0])
-    expect(crew.filter((slot) => slot !== '-/-')).toHaveLength(2)
-    expect(crew).toContain('team-a/-')
-    expect(crew).toContain('team-b/-')
+    expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
+      'team:team-a',
+      'team:team-b',
+    ])
   })
 
   it('leaves a hand-placed roster alone while Assign manually is on', async () => {
@@ -104,17 +117,27 @@ describe('ScheduleForm — rotate crew assignment', () => {
     )
 
     await goToAssignTo(screen)
-    await userEvent.click(screen.getByRole('switch'))
     await pickTeams(screen, ['Team A'])
+    // Switch to the manual view *after* picking a pool: the pool selection is
+    // still there, but "Assign manually" says the stored matrix wins.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Assign manually' })
+    )
     await finish(screen)
 
-    // The pool says teams, the pattern says employees — and the manual toggle
-    // says the pattern wins.
-    expect(crewByPosition(onSubmit.mock.calls[0][0])).toEqual([
-      '-/emp-a',
-      '-/emp-b',
-      '-/emp-c',
-      '-/emp-d',
+    // The pool says teams, the stored matrix says employees — and the manual
+    // toggle says the matrix wins.
+    expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
+      'employee:emp-a',
+      'employee:emp-b',
+      'employee:emp-c',
+      'employee:emp-d',
     ])
+  })
+
+  it('staffs every shift on every cycle day when there are crews enough', () => {
+    // The seeded rotation is the shape the rework exists for: three shifts,
+    // four crews, and a pattern that only ever names one shift per card.
+    expect(uncoveredCells(rotation)).toBe(0)
   })
 })

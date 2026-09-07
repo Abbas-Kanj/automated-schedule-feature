@@ -3,32 +3,50 @@ import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { defaultSchedules } from '../../data/schedules'
+import { type RotateDayCoverage } from '../../data/schema'
 import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 
 // The "Assign to" step is the only place a rotation's roster can be set (see
 // the component's own comment and
 // `features/schedule-rotation/utils.ts#getRotationRoster`). Two paths through
-// it are worth locking: the suggestion writing offsets back into the pattern,
-// and the manual grid behind its toggle — including that it offers one cycle
-// day per pattern card, the off day included.
+// it are worth locking: the suggestion writing a whole coverage matrix, and
+// the manual grid behind its toggle — which now offers one row per selected
+// shift on every cycle day, so a hole is a visibly empty picker.
 
 const rotation = defaultSchedules.find((s) => s.id === 'sched-rotation')!
 
-// Crew per position is echoed into the DOM so a pick can be asserted on as
+// The stored matrix is echoed into the DOM so a pick can be asserted on as
 // form state rather than as a rendered chip.
-function PatternCrew() {
+function CoverageState() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pattern = useWatch<any>({ name: 'pattern' }) as
-    | { employee_ids?: string[]; team_ids?: string[] }[]
+  const coverage = useWatch<any>({ name: 'day_coverage' }) as
+    | RotateDayCoverage[]
     | undefined
+  const cells = coverage ?? []
   return (
     <>
-      <output data-testid='off-crew'>
-        {(pattern?.[3]?.employee_ids ?? []).join(',')}
+      <output data-testid='cells'>
+        {cells
+          .map(
+            (cell) =>
+              `${cell.day}:${cell.shift_id}=${[
+                ...cell.team_ids,
+                ...cell.employee_ids,
+              ].join('+')}`
+          )
+          .sort()
+          .join(' ')}
       </output>
-      <output data-testid='all-teams'>
-        {(pattern ?? [])
-          .map((entry) => (entry.team_ids ?? []).join('+') || '-')
+      <output data-testid='crew-keys'>
+        {[
+          ...new Set(
+            cells.flatMap((cell) => [
+              ...cell.team_ids.map((id) => `team:${id}`),
+              ...cell.employee_ids.map((id) => `employee:${id}`),
+            ])
+          ),
+        ]
+          .sort()
           .join(',')}
       </output>
     </>
@@ -41,21 +59,21 @@ function Harness() {
   return (
     <FormProvider {...form}>
       <ScheduleAssignToFields />
-      <PatternCrew />
+      <CoverageState />
     </FormProvider>
   )
 }
 
-// The manual grid is behind a toggle — off by default, since suggesting is
-// the intended path.
-async function enableManual(
-  screen: ReturnType<typeof render> extends Promise<infer T> ? T : never
-) {
-  await userEvent.click(screen.getByRole('switch'))
+type Screen = Awaited<ReturnType<typeof render>>
+
+// The step shows one view at a time — "Suggest" by default, since that is the
+// intended path. Switching to "Assign manually" swaps in the day grid.
+async function enableManual(screen: Screen) {
+  await userEvent.click(screen.getByRole('button', { name: 'Assign manually' }))
 }
 
 describe('ScheduleAssignToFields', () => {
-  it('hides the manual grid until its toggle is turned on', async () => {
+  it('hides the manual grid until its view is selected', async () => {
     const screen = await render(<Harness />)
 
     await expect
@@ -77,24 +95,28 @@ describe('ScheduleAssignToFields', () => {
     }
   })
 
-  it('shows the shift as a disabled field on each day card', async () => {
+  it('gives every selected shift its own picker on every day', async () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
-    // The pattern owns the shift — this step only decides who works it.
-    await expect
-      .element(screen.getByTestId('assign-day-0').getByRole('combobox').first())
-      .toBeDisabled()
+    // Three selected shifts, so three pickers per card — including on the
+    // pattern's rest card, which the schedule still has to staff.
+    for (const day of [0, 3]) {
+      const card = screen.getByTestId(`assign-day-${day}`)
+      expect(await card.getByRole('combobox').all()).toHaveLength(3)
+      for (const name of ['Morning', 'Afternoon', 'Night']) {
+        await expect.element(card.getByText(name)).toBeVisible()
+      }
+    }
   })
 
-  it('shows the crew each position is already assigned', async () => {
+  it('shows the crew each cell is already assigned', async () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
-    // Rendered from `pattern[].employee_ids` through the employees store, so
-    // this covers the id -> full name resolution as well as the binding.
-    // Scoped to the card: a crew name also appears in the pool picker and the
-    // coverage grid.
+    // Rendered from `day_coverage` through the employees store, so this covers
+    // the id -> full name resolution as well as the binding. Scoped to the
+    // card: a crew name also appears in the pool picker and the coverage grid.
     await expect
       .element(
         screen.getByTestId('assign-day-0').getByText('Amir Nabil Haddad')
@@ -111,39 +133,62 @@ describe('ScheduleAssignToFields', () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
-    // The seed staffs positions with `employee_ids`, so the cards offer
-    // employees only — the old two-picker (Employees *and* Teams) row is gone.
+    // The seed staffs cells with `employee_ids`, so the cards offer employees
+    // only — the old two-picker (Employees *and* Teams) row is gone.
     const card = screen.getByTestId('assign-day-0')
     await expect.element(card.getByText('Team A')).not.toBeInTheDocument()
     await expect.element(card.getByText('Amir Nabil Haddad')).toBeVisible()
   })
 
-  it('writes a pick on the off day back to the pattern', async () => {
+  it('writes a free cell edit straight to that one cell', async () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
-    // First combobox on a card is the disabled shift; the crew picker follows.
-    const offDayCrew = screen
+    // Day 4's Morning cell — seeded with Bilal. Adding Dana to it must not
+    // disturb any other cell: no journey follows a crew around any more.
+    const cell = screen
       .getByTestId('assign-day-3')
       .getByRole('combobox')
-      .nth(1)
-    await userEvent.click(offDayCrew)
-    await userEvent.fill(offDayCrew, 'Bilal')
+      .first()
+    await userEvent.click(cell)
+    await userEvent.fill(cell, 'Dana')
     await userEvent.keyboard('{Enter}')
 
     await expect
-      .element(screen.getByTestId('off-crew'))
-      .toHaveTextContent('emp-d,emp-b')
+      .element(screen.getByTestId('cells'))
+      .toHaveTextContent('3:shift-morning=emp-b+emp-d')
+    // The rest of the matrix is untouched — Dana is still on her own cells.
+    await expect
+      .element(screen.getByTestId('cells'))
+      .toHaveTextContent('1:shift-morning=emp-d')
   })
 
-  it('suggests an assignment that spreads the pool across the cycle', async () => {
+  it('drops a cell entirely once its last crew is removed', async () => {
+    const screen = await render(<Harness />)
+    await enableManual(screen)
+
+    const cell = screen
+      .getByTestId('assign-day-0')
+      .getByRole('combobox')
+      .first()
+    await userEvent.click(cell)
+    // Backspace on an empty input clears the last selected value in
+    // react-select, which is what a user reaching for "remove" actually does.
+    await userEvent.keyboard('{Backspace}')
+
+    await expect
+      .element(screen.getByTestId('cells'))
+      .not.toHaveTextContent('0:shift-morning=')
+  })
+
+  it('suggests an assignment that covers every shift every day', async () => {
     const screen = await render(<Harness />)
 
     // The seeded rotation is staffed by individual employees, so the pool
     // opens in Employees mode — switch it before picking teams.
     await userEvent.click(screen.getByRole('button', { name: 'Teams' }))
 
-    // Pool picker is the step's first combobox, above the manual toggle.
+    // Pool picker is the step's first combobox, part of the Suggest view.
     const pool = screen.getByRole('combobox').first()
     for (const team of ['Team A', 'Team B']) {
       await userEvent.click(pool)
@@ -153,22 +198,14 @@ describe('ScheduleAssignToFields', () => {
     // The menu stays open over the button otherwise, and swallows the click.
     await userEvent.keyboard('{Escape}')
 
-    await userEvent.click(screen.getByRole('button', { name: /suggest/i }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Suggest assignment' })
+    )
 
+    // The seeded employees are gone and both teams are placed — a whole-field
+    // write, so nothing can be left behind to double-book a cell.
     await expect
-      .element(screen.getByTestId('all-teams'))
-      .toHaveTextContent('team-a')
-
-    const positions = (
-      screen.getByTestId('all-teams').element().textContent ?? ''
-    ).split(',')
-
-    // Both teams placed, each on its own position, and the rest left empty —
-    // i.e. the suggestion staggered them rather than piling them onto one card.
-    expect(positions).toHaveLength(4)
-    expect(positions.filter((slot) => slot !== '-')).toHaveLength(2)
-    expect(positions.indexOf('team-a')).toBeGreaterThanOrEqual(0)
-    expect(positions.indexOf('team-b')).toBeGreaterThanOrEqual(0)
-    expect(positions.indexOf('team-a')).not.toBe(positions.indexOf('team-b'))
+      .element(screen.getByTestId('crew-keys'))
+      .toHaveTextContent('team:team-a,team:team-b')
   })
 })

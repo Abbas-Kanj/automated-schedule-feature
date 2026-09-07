@@ -19,9 +19,15 @@ import {
   REGULAR_TYPE_OPTIONS,
   SCHEDULE_TYPES,
 } from '../../data/data'
-import { type RotatePatternEntry } from '../../data/schema'
-import { assignmentsFromPattern, patternToSlots } from '../../rotation-crews'
-import { analyzeRotation } from '../../rotation-suggestion'
+import {
+  type RotateDayCoverage,
+  type RotatePatternEntry,
+} from '../../data/schema'
+import {
+  crewsFromDayCoverage,
+  orderShiftIdsByStart,
+} from '../../rotation-crews'
+import { analyzeDayCoverage } from '../../rotation-suggestion'
 import { calculateHours, formatTimes } from '../../utils'
 import { RotationCoveragePanel } from './rotation-coverage-panel'
 import { ScheduleCalendarPreview } from './schedule-calendar-preview'
@@ -263,13 +269,10 @@ function ShiftsSummary({ values }: { values: any }) {
 
 // Rotate only: the roster, read back the way the "Assign to" step showed it.
 //
-// The stored form of that roster is one crew sitting on one pattern position
-// (see `features/schedule-rotation/utils.ts#getRotationRoster`) — a *starting*
-// position, since every crew then walks the whole cycle. Listing only that
-// under-reports the roster badly: two crews on a seven-card week read as five
-// empty days, which looks like the assignment was lost rather than staggered.
-// So the same coverage grid the step ends on is repeated here, and the
-// positions below it are labelled as the starting points they are.
+// It is the same coverage grid rather than a list, because a list of who works
+// where under-reports a rotation badly — the interesting fact is whether every
+// selected shift is covered on every day of the cycle, and that is a grid-
+// shaped fact. Below it, each crew's own cycle is spelled out in one line.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AssignToSummary({ values }: { values: any }) {
   const shifts = useShiftsStore((s) => s.shifts)
@@ -278,6 +281,14 @@ function AssignToSummary({ values }: { values: any }) {
   const pattern = useMemo(
     () => (values.pattern ?? []) as RotatePatternEntry[],
     [values.pattern]
+  )
+  const dayCoverage = useMemo(
+    () => (values.day_coverage ?? []) as RotateDayCoverage[],
+    [values.day_coverage]
+  )
+  const shiftIds = useMemo(
+    () => (values.shift_ids ?? []) as string[],
+    [values.shift_ids]
   )
 
   const employeeLabels = useMemo(
@@ -293,72 +304,50 @@ function AssignToSummary({ values }: { values: any }) {
     [employees]
   )
 
-  const slots = useMemo(() => patternToSlots(pattern), [pattern])
-  const assignments = useMemo(
-    () => assignmentsFromPattern(pattern, teams, employeeLabels),
-    [pattern, teams, employeeLabels]
+  const orderedShiftIds = useMemo(
+    () => orderShiftIdsByStart(shiftIds, shifts),
+    [shiftIds, shifts]
+  )
+  const crews = useMemo(
+    () => crewsFromDayCoverage(dayCoverage, teams, employeeLabels),
+    [dayCoverage, teams, employeeLabels]
+  )
+  const shiftLabels = useMemo(
+    () => new Map(shifts.map((shift) => [shift.id, shift.name])),
+    [shifts]
   )
   const analysis = useMemo(
-    () => analyzeRotation(slots, assignments),
-    [slots, assignments]
+    () =>
+      analyzeDayCoverage(crews, orderedShiftIds, pattern.length, {
+        shiftLabels,
+      }),
+    [crews, orderedShiftIds, pattern.length, shiftLabels]
   )
-
-  // Positions nobody starts on carry no information once the grid above has
-  // shown the whole rotation — and in any rotation with fewer crews than cards
-  // most positions are empty by definition.
-  const startingPositions = pattern.flatMap((entry, i) => {
-    const crew = [
-      ...(entry.team_ids ?? []).map(
-        (id) => teams.find((t) => t.id === id)?.name ?? id
-      ),
-      ...(entry.employee_ids ?? []).map((id) => employeeLabels.get(id) ?? id),
-    ]
-    if (crew.length === 0) return []
-    const shift = entry.is_off
-      ? undefined
-      : shifts.find((s) => s.id === entry.shift_id)
-    // A pinned crew ignores the cards' own shifts, so saying who starts where
-    // without saying that would misdescribe the roster.
-    const pinnedShift = entry.crew_shift_id
-      ? shifts.find((s) => s.id === entry.crew_shift_id)
-      : undefined
-    return [
-      {
-        key: entry.position ?? i,
-        label: `${i + 1}. ${shift?.name ?? 'Off'}`,
-        value: pinnedShift
-          ? `${crew.join(', ')} — always ${pinnedShift.name}`
-          : crew.join(', '),
-      },
-    ]
-  })
 
   return (
     <SummarySection title='Assign to'>
       {pattern.length === 0 && (
         <p className='text-sm text-muted-foreground'>No pattern to assign</p>
       )}
-      {pattern.length > 0 && assignments.length === 0 && (
+      {pattern.length > 0 && crews.length === 0 && (
         <p className='text-sm text-muted-foreground'>
           Nobody is on this rotation yet
         </p>
       )}
-      {assignments.length > 0 && (
+      {crews.length > 0 && (
         <>
           <RotationCoveragePanel
-            slots={slots}
-            assignments={assignments}
+            crews={crews}
             analysis={analysis}
+            orderedShiftIds={orderedShiftIds}
+            cycleLength={pattern.length}
             shifts={shifts}
           />
           <p className='text-xs text-muted-foreground'>
-            Each crew starts on the position listed below and moves one card
-            further along the cycle at every step, so the rest days travel with
-            it rather than falling on the same days for everyone.
+            The cycle repeats from its start date, so each crew works the row
+            above over and over. A shift showing 0 on a day is nobody covering
+            it that day.
           </p>
-          {startingPositions.map((row) => (
-            <SummaryRow key={row.key} label={row.label} value={row.value} />
-          ))}
         </>
       )}
     </SummarySection>
@@ -384,6 +373,16 @@ export function ScheduleSummary({ control }: ScheduleSummaryProps) {
           <ShiftsSummary values={values} />
           {values.type === 'rotate' && <AssignToSummary values={values} />}
           <SummarySection title='Calendar preview'>
+            {values.type === 'rotate' && (
+              // The preview walks the *pattern*, which is one crew's journey
+              // — so it shows one shift a day even when the schedule runs
+              // several. Who covers the rest is the grid above, not this.
+              <p className='text-xs text-muted-foreground'>
+                One crew&apos;s cycle on real dates. The other selected shifts
+                run on the same days, covered by the other crews — see “Assign
+                to” above.
+              </p>
+            )}
             <ScheduleCalendarPreview values={values} />
           </SummarySection>
         </>

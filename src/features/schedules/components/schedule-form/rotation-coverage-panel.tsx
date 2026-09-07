@@ -1,16 +1,18 @@
+import { AlertTriangle, Info, OctagonAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SHIFT_BADGE_COLOR_OPTIONS } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import {
-  type CrewAssignment,
+  type CoverageCrew,
   type RotationAnalysis,
-  type SuggestionSlot,
+  type SuggestionWarning,
 } from '../../rotation-suggestion'
 
 type RotationCoveragePanelProps = {
-  slots: SuggestionSlot[]
-  assignments: CrewAssignment[]
+  crews: CoverageCrew[]
   analysis: RotationAnalysis
+  orderedShiftIds: string[]
+  cycleLength: number
   shifts: Shift[]
 }
 
@@ -18,61 +20,144 @@ function shiftLetter(name: string): string {
   return (name.trim().charAt(0) || '?').toUpperCase()
 }
 
-// One cell of the grid: the shift a crew works on that day of the cycle, or a
-// muted dash for a rest day.
-function CoverageCell({ shift, isOff }: { shift?: Shift; isOff: boolean }) {
-  if (isOff || !shift) {
-    return <span className='font-mono text-xs text-muted-foreground/50'>·</span>
-  }
-
+function ShiftSwatch({ shift }: { shift?: Shift }) {
   const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-    (option) => option.value === shift.badge_color
+    (option) => option.value === shift?.badge_color
   )
-
   return (
     <span
-      title={shift.name}
-      className='inline-flex items-center justify-center gap-1 font-mono text-xs font-semibold'
-    >
-      <span
-        className={cn(
-          'size-1.5 shrink-0 rounded-full',
-          color?.swatchClassName ?? 'bg-muted-foreground/40'
-        )}
-      />
-      {shiftLetter(shift.name)}
-    </span>
+      className={cn(
+        'size-1.5 shrink-0 rounded-full',
+        color?.swatchClassName ?? 'bg-muted-foreground/40'
+      )}
+    />
   )
 }
 
-// Shows what the current assignment actually produces: who works which card of
-// the cycle, and how many crews are on each day.
+const WARNING_STYLES: Record<
+  SuggestionWarning['severity'],
+  { icon: typeof Info; className: string }
+> = {
+  error: { icon: OctagonAlert, className: 'text-destructive' },
+  warning: {
+    icon: AlertTriangle,
+    className: 'text-amber-600 dark:text-amber-400',
+  },
+  info: { icon: Info, className: 'text-muted-foreground' },
+}
+
+// Shows what the current assignment actually produces, and it is the *only*
+// place a coverage hole is reported: leaving a shift unstaffed is deliberately
+// not a validation error (whether a hole is fixable depends on the crew count,
+// not the shape of the data), so "Next" always advances and this panel has to
+// carry the whole message.
+//
+// Two grids, because they answer different questions. The shift rows answer
+// "is every selected shift covered every day", which is the rule the feature
+// now exists to keep. The crew rows below answer "what does each crew's week
+// look like", which is what you read before deciding a roster is humane.
 //
 // Driven by whatever is in the form right now rather than by the last
-// suggestion, so hand-editing a position updates it immediately and it works
-// just as well for someone who never presses Suggest.
-//
-// `analysis.warnings` is deliberately **not** rendered — the grid itself shows
-// the thin days, and a prose list under it repeated one near-identical line per
-// shift, which read as a wall of complaints about a correct roster. The
-// warnings stay part of `analyzeRotation`'s API (and its tests) for any caller
-// that wants them.
+// suggestion, so a hand edit updates it immediately and it works just as well
+// for someone who never presses Suggest.
 export function RotationCoveragePanel({
-  slots,
-  assignments,
+  crews,
   analysis,
+  orderedShiftIds,
+  cycleLength,
   shifts,
 }: RotationCoveragePanelProps) {
   const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
-  const cycleLength = slots.length
+  const days = Array.from({ length: cycleLength }, (_, day) => day)
 
   const onDutyCounts = analysis.coverage.map((day) => day.onDuty)
   const minOnDuty = onDutyCounts.length ? Math.min(...onDutyCounts) : 0
   const maxOnDuty = onDutyCounts.length ? Math.max(...onDutyCounts) : 0
 
+  // Only the lines that flag something to act on. The 'info' notes (weekday
+  // drift/anchor, structural-gap explanations) are dropped from the UI —
+  // `analysis.warnings` still carries them for callers and tests.
+  const shownWarnings = analysis.warnings.filter(
+    (warning) => warning.severity !== 'info'
+  )
+
+  if (cycleLength === 0 || orderedShiftIds.length === 0) return null
+
   return (
     <div className='space-y-3'>
-      {assignments.length > 0 && cycleLength > 0 && (
+      <div className='overflow-x-auto rounded-md border'>
+        <table className='w-full border-collapse text-sm'>
+          <thead>
+            <tr className='border-b'>
+              <th className='sticky start-0 bg-muted/40 px-3 py-2 text-start text-xs font-medium'>
+                Shift
+              </th>
+              {days.map((day) => (
+                <th
+                  key={day}
+                  className='w-8 px-1 py-2 text-center text-xs font-medium text-muted-foreground tabular-nums'
+                >
+                  {day + 1}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {orderedShiftIds.map((shiftId) => {
+              const shift = shiftById.get(shiftId)
+              return (
+                <tr key={shiftId} className='border-b last:border-b-0'>
+                  <td className='sticky start-0 max-w-40 truncate bg-muted/40 px-3 py-1.5 text-xs font-medium'>
+                    <span className='inline-flex items-center gap-1.5'>
+                      <ShiftSwatch shift={shift} />
+                      {shift?.name ?? 'Unknown shift'}
+                    </span>
+                  </td>
+                  {analysis.coverage.map((day) => {
+                    const count = day.byShiftId[shiftId] ?? 0
+                    return (
+                      <td
+                        key={day.index}
+                        className={cn(
+                          'px-1 py-1.5 text-center font-mono text-xs tabular-nums',
+                          count === 0 && 'font-semibold text-destructive'
+                        )}
+                      >
+                        {count}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr className='border-t bg-muted/20'>
+              <td className='sticky start-0 bg-muted/40 px-3 py-1.5 text-xs font-medium'>
+                On duty
+              </td>
+              {analysis.coverage.map((day) => (
+                <td
+                  key={day.index}
+                  className={cn(
+                    'px-1 py-1.5 text-center font-mono text-xs tabular-nums',
+                    // Only call out the dips once the cycle actually varies —
+                    // a flat rotation should read as calm.
+                    minOnDuty !== maxOnDuty &&
+                      day.onDuty === minOnDuty &&
+                      'text-amber-600 dark:text-amber-400',
+                    day.onDuty === 0 && 'font-semibold text-destructive'
+                  )}
+                >
+                  {day.onDuty}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {crews.length > 0 && (
         <div className='overflow-x-auto rounded-md border'>
           <table className='w-full border-collapse text-sm'>
             <thead>
@@ -80,68 +165,78 @@ export function RotationCoveragePanel({
                 <th className='sticky start-0 bg-muted/40 px-3 py-2 text-start text-xs font-medium'>
                   Crew
                 </th>
-                {slots.map((slot) => (
+                {days.map((day) => (
                   <th
-                    key={slot.index}
+                    key={day}
                     className='w-8 px-1 py-2 text-center text-xs font-medium text-muted-foreground tabular-nums'
                   >
-                    {slot.index + 1}
+                    {day + 1}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {assignments.map(({ crew, offset }) => (
+              {crews.map((crew) => (
                 <tr key={crew.key} className='border-b last:border-b-0'>
                   <td className='sticky start-0 max-w-40 truncate bg-muted/40 px-3 py-1.5 text-xs font-medium'>
                     {crew.label}
                   </td>
-                  {slots.map((_, day) => {
-                    const slot =
-                      slots[
-                        (((day + offset) % cycleLength) + cycleLength) %
-                          cycleLength
-                      ]
-                    const shiftId = slot.isOff
-                      ? undefined
-                      : (crew.fixedShiftId ?? slot.shiftId)
+                  {days.map((day) => {
+                    const worked = crew.byDay.get(day) ?? []
+                    if (worked.length === 0) {
+                      return (
+                        <td key={day} className='px-1 py-1.5 text-center'>
+                          <span className='font-mono text-xs text-muted-foreground/50'>
+                            ·
+                          </span>
+                        </td>
+                      )
+                    }
                     return (
                       <td key={day} className='px-1 py-1.5 text-center'>
-                        <CoverageCell
-                          shift={shiftId ? shiftById.get(shiftId) : undefined}
-                          isOff={slot.isOff}
-                        />
+                        <span
+                          title={worked
+                            .map((id) => shiftById.get(id)?.name ?? id)
+                            .join(', ')}
+                          className={cn(
+                            'inline-flex items-center justify-center gap-1 font-mono text-xs font-semibold',
+                            // Two shifts on one day is only reachable by hand,
+                            // and it is a mistake — say so in place.
+                            worked.length > 1 && 'text-destructive'
+                          )}
+                        >
+                          <ShiftSwatch shift={shiftById.get(worked[0])} />
+                          {worked
+                            .map((id) =>
+                              shiftLetter(shiftById.get(id)?.name ?? '?')
+                            )
+                            .join('/')}
+                        </span>
                       </td>
                     )
                   })}
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr className='border-t bg-muted/20'>
-                <td className='sticky start-0 bg-muted/40 px-3 py-1.5 text-xs font-medium'>
-                  On duty
-                </td>
-                {analysis.coverage.map((day) => (
-                  <td
-                    key={day.index}
-                    className={cn(
-                      'px-1 py-1.5 text-center font-mono text-xs tabular-nums',
-                      // Only call out the dips and spikes once the cycle
-                      // actually varies — a flat rotation should read as calm.
-                      minOnDuty !== maxOnDuty &&
-                        day.onDuty === minOnDuty &&
-                        'text-amber-600 dark:text-amber-400',
-                      day.onDuty === 0 && 'font-semibold text-destructive'
-                    )}
-                  >
-                    {day.onDuty}
-                  </td>
-                ))}
-              </tr>
-            </tfoot>
           </table>
         </div>
+      )}
+
+      {shownWarnings.length > 0 && (
+        <ul className='space-y-1.5'>
+          {shownWarnings.map((warning, index) => {
+            const { icon: Icon, className } = WARNING_STYLES[warning.severity]
+            return (
+              <li
+                key={`${warning.code}-${index}`}
+                className={cn('flex gap-2 text-xs', className)}
+              >
+                <Icon className='mt-0.5 size-3.5 shrink-0' />
+                <span>{warning.message}</span>
+              </li>
+            )
+          })}
+        </ul>
       )}
     </div>
   )

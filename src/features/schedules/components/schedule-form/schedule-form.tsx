@@ -146,6 +146,12 @@ function getRegularTypeDefaults(type: RegularType) {
         frequency: string
         interval: number
       }[],
+      day_coverage: [] as {
+        day: number
+        shift_id: string
+        employee_ids: string[]
+        team_ids: string[]
+      }[],
     }
   }
 
@@ -184,11 +190,13 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   if (stepId === 'pattern') {
     return ['cycle_type', 'cycle_length', 'pattern', 'shift_repeat']
   }
-  // Crew picks are optional — an unassigned position stays valid, so this
-  // step never blocks "Next". It still re-validates `pattern` so anything
-  // wrong carried over from the previous step surfaces here too.
+  // Coverage is optional — an unstaffed shift stays valid, so this step never
+  // blocks "Next" (whether a hole is fixable depends on the crew count, not
+  // the data; the coverage panel warns instead). It still re-validates
+  // `pattern` so anything wrong carried over from the previous step surfaces
+  // here too.
   if (stepId === 'assign-to') {
-    return ['pattern']
+    return ['pattern', 'day_coverage']
   }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']

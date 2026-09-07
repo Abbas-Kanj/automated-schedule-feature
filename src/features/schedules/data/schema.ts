@@ -225,32 +225,38 @@ const cycleLengthSchema = z.object({
 // hand-authored "block" — rotate's step 1/2 match fixed/flexible's exactly
 // (see `shiftDefinitionFieldsSchema`), so there's no separate block concept
 // left to reference.
+// The pattern is a *template*, not a declaration of what runs each day: it
+// describes one crew's journey through the cycle — "Morning, Morning, off,
+// Afternoon, …". It shapes the suggestion in the "Assign to" step, and
+// nothing more. How many shifts actually run on a day is decided by
+// `shift_ids`: every selected shift is meant to be covered every day, which
+// is what `day_coverage` below records. Crews therefore no longer live on a
+// pattern card at all.
 const rotatePatternEntrySchema = z.object({
   position: z.number().min(1),
   shift_id: z.string().optional(),
   is_off: z.boolean(),
-  // The crew that starts the cycle on this position, set on the schedule
-  // form's own "Assign to" step (see
-  // `schedule-form/schedule-assign-to-fields.tsx`). This is the entire
-  // rotation roster — `features/schedule-rotation/utils.ts#getRotationRoster`
-  // reads these and nothing else, so a position's shift is only consulted
-  // for its name/colour. An `is_off` position is assignable like any other,
-  // which is the only way to say "this person starts the cycle on a day off".
-  // Both stay optional: a position nobody has been put on yet omits them.
-  employee_ids: z.array(z.string()).optional(),
-  team_ids: z.array(z.string()).optional(),
-  // Optional: pins the crew starting here to one shift for the whole
-  // rotation. Left unset (the default, and how every pre-existing schedule
-  // reads) the crew takes whichever shift the card it lands on names, which
-  // is the rotating behaviour this feature has always had.
-  //
-  // It exists because a single shared `pattern` cannot otherwise express
-  // fixed-shift crews: over one cycle every crew visits every card, so
-  // "Team A is always on days, Team B always on nights, both on the same
-  // 2-2-3 rest mask" — an extremely common real roster — has no
-  // representation. With this set, the pattern's cards decide *when* a crew
-  // works and this decides *what* it works, which covers both families.
-  crew_shift_id: z.string().optional(),
+})
+
+// The rotation roster, as an explicit (cycle day × shift) → crews matrix.
+//
+// It used to be implicit — a crew's starting card was its offset, and the
+// card's own shift was what it worked. That made the pattern decide which
+// shifts ran: a 5-2 pattern of all-Morning cards could never staff Night,
+// however many crews were added. The matrix decouples the two, and it is
+// also what lets the "Assign to" step's manual grid edit any one cell
+// without dragging a whole crew's journey along with it.
+//
+// Sparse: only cells with somebody on them are stored, so an empty cell and
+// an absent one mean the same thing (that shift is unstaffed that day —
+// reported as a warning in `rotation-coverage-panel.tsx`, never a hard
+// validation error).
+const rotateDayCoverageSchema = z.object({
+  // 0-based cycle day, i.e. the index of the pattern card it lines up with.
+  day: z.number().int().min(0),
+  shift_id: z.string().min(1),
+  employee_ids: z.array(z.string()).default([]),
+  team_ids: z.array(z.string()).default([]),
 })
 
 // "Custom shifts" mode: each selected shift gets its own repeat config —
@@ -326,6 +332,7 @@ const rotateFieldsSchema = z.object({
   cycle_length: cycleLengthSchema,
   pattern: z.array(rotatePatternEntrySchema).min(1),
   shift_repeat: z.array(shiftRepeatSchema).default([]),
+  day_coverage: z.array(rotateDayCoverageSchema).default([]),
 })
 
 // --- assemble the three `regular` arms ---
@@ -420,16 +427,40 @@ const regularScheduleSchema = z
             path: ['pattern', i, 'shift_id'],
           })
         }
+      })
 
-        // A crew can only be pinned to a shift this schedule actually
-        // selected — same rule `shift_repeat` follows above.
-        if (p.crew_shift_id && !val.shift_ids.includes(p.crew_shift_id)) {
+      // `day_coverage` is only checked for being *well formed*. A shift left
+      // unstaffed on some day is deliberately not an error here — the
+      // coverage panel warns about it and "Next" still advances, because
+      // whether a hole is fixable depends on the crew count, not the shape
+      // of the data (see `rotation-suggestion.ts`'s warning severities).
+      const seenCells = new Set<string>()
+      val.day_coverage.forEach((cell, i) => {
+        if (!val.shift_ids.includes(cell.shift_id)) {
           ctx.addIssue({
             code: 'custom',
-            message: 'Pinned shift is not one of this schedule’s shifts',
-            path: ['pattern', i, 'crew_shift_id'],
+            message: 'Assigned shift is not one of this schedule’s shifts',
+            path: ['day_coverage', i, 'shift_id'],
           })
         }
+
+        if (cell.day >= val.pattern.length) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Assigned day falls outside the cycle',
+            path: ['day_coverage', i, 'day'],
+          })
+        }
+
+        const key = `${cell.day}:${cell.shift_id}`
+        if (seenCells.has(key)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Each shift can only be assigned once per cycle day',
+            path: ['day_coverage', i],
+          })
+        }
+        seenCells.add(key)
       })
 
       if (val.cycle_type === 'custom_shifts') {
@@ -569,3 +600,7 @@ export type ShiftRepeat = Extract<
   RegularSchedule,
   { type: 'rotate' }
 >['shift_repeat'][number]
+export type RotateDayCoverage = Extract<
+  RegularSchedule,
+  { type: 'rotate' }
+>['day_coverage'][number]
