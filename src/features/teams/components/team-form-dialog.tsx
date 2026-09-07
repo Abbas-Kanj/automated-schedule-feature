@@ -90,7 +90,18 @@ export function TeamFormDialog({
         onOpenChange(state)
       }}
     >
-      <DialogContent className='sm:max-w-lg'>
+      <DialogContent
+        className='sm:max-w-lg'
+        // The Employees dropdown portals its menu to <body> (so the scrollable
+        // form below doesn't clip it) — keep a click on those options from
+        // registering as an outside-click that closes the dialog.
+        onInteractOutside={(event) => {
+          const target = event.detail.originalEvent.target as HTMLElement | null
+          if (target?.closest('.multi-select-menu-portal')) {
+            event.preventDefault()
+          }
+        }}
+      >
         <DialogHeader className='text-start'>
           <DialogTitle>{isEdit ? 'Edit team' : 'Add new team'}</DialogTitle>
           <DialogDescription>
@@ -156,6 +167,16 @@ export function TeamFormDialog({
                     }
                     isMulti
                     placeholder='Select employees'
+                    menuPortalTarget={
+                      typeof document !== 'undefined' ? document.body : null
+                    }
+                    menuPosition='fixed'
+                    styles={{
+                      menuPortal: (base: Record<string, unknown>) => ({
+                        ...base,
+                        zIndex: 60,
+                      }),
+                    }}
                   />
                   <FormMessage />
                 </FormItem>

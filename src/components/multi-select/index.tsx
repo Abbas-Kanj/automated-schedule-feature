@@ -121,6 +121,9 @@ export const MultiSelect = ({
           dropdownIndicator: () => s.dropdownIndicator,
 
           menu: () => s.menu,
+          // Tag the portaled menu so a host (e.g. a Radix Dialog) can tell a
+          // click inside the dropdown apart from a real outside-click.
+          menuPortal: () => 'multi-select-menu-portal',
           groupHeading: () => s?.groupHeading,
           noOptionsMessage: () => s?.noOptionsMessage,
 
