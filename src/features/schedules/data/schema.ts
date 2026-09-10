@@ -327,12 +327,39 @@ const shiftRepeatSchema = z.object({
     .optional(),
 })
 
+// How the roster was *generated*, stored next to the matrix it produced.
+//
+// `day_coverage` above stays the source of truth: it is what every screen
+// reads, and free cell editing can put a crew somewhere no pair of offsets
+// would. But the matrix on its own cannot answer the question every
+// real-world rotation is actually written in — "Team B starts on week 2".
+// These two numbers per crew are that sentence, so they are kept rather than
+// discarded once the cells have been written.
+//
+// Deliberately *not* a second source of truth. Whether they still describe
+// the stored cells is re-derived — regenerate from them and compare, see
+// `dayCoverageMatchesPlacements` in `rotation-crews.ts` — rather than tracked
+// by a flag that could drift out of step with the cells. A hand edit in the
+// manual grid simply stops them matching, and the step says so instead of
+// silently re-applying them over the edit.
+const rotateCrewPlacementSchema = z.object({
+  // `team:<id>` or `employee:<id>` — the same crew key the suggestion and the
+  // "Assign to" step's pool both use.
+  crew: z.string().min(1),
+  // Which cycle card this crew stands on at day 0.
+  day_offset: z.number().int().min(0),
+  // How far its journey is transposed through the shift list, ordered by
+  // start time — see `shiftForCard` in `rotation-suggestion.ts`.
+  shift_step: z.number().int().min(0),
+})
+
 const rotateFieldsSchema = z.object({
   cycle_type: cycleTypeSchema,
   cycle_length: cycleLengthSchema,
   pattern: z.array(rotatePatternEntrySchema).min(1),
   shift_repeat: z.array(shiftRepeatSchema).default([]),
   day_coverage: z.array(rotateDayCoverageSchema).default([]),
+  crew_placements: z.array(rotateCrewPlacementSchema).default([]),
 })
 
 // --- assemble the three `regular` arms ---
@@ -461,6 +488,38 @@ const regularScheduleSchema = z
           })
         }
         seenCells.add(key)
+      })
+
+      // Same treatment as `day_coverage`: well-formedness only. Placements
+      // that no longer describe the matrix are not an error — hand-editing a
+      // cell is a supported thing to do, and the "Assign to" step reports the
+      // mismatch in place rather than refusing to advance.
+      const seenCrews = new Set<string>()
+      val.crew_placements.forEach((placement, i) => {
+        if (placement.day_offset >= val.pattern.length) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Crew start day falls outside the cycle',
+            path: ['crew_placements', i, 'day_offset'],
+          })
+        }
+
+        if (placement.shift_step >= Math.max(val.shift_ids.length, 1)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Shift track falls outside this schedule’s shifts',
+            path: ['crew_placements', i, 'shift_step'],
+          })
+        }
+
+        if (seenCrews.has(placement.crew)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Each crew can only be placed once',
+            path: ['crew_placements', i, 'crew'],
+          })
+        }
+        seenCrews.add(placement.crew)
       })
 
       if (val.cycle_type === 'custom_shifts') {
@@ -604,3 +663,7 @@ export type RotateDayCoverage = Extract<
   RegularSchedule,
   { type: 'rotate' }
 >['day_coverage'][number]
+export type RotateCrewPlacement = Extract<
+  RegularSchedule,
+  { type: 'rotate' }
+>['crew_placements'][number]

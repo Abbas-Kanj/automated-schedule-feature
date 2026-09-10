@@ -118,6 +118,7 @@ const schedule: RotateSchedule = {
   // shifts: four crews staggered one card apart, so every shift is covered
   // every day and exactly one crew is resting. Charlie arrives through a
   // team rather than by name.
+  crew_placements: [],
   day_coverage: [
     {
       day: 0,
@@ -240,6 +241,7 @@ describe('getRotationRoster', () => {
     const roster = getRotationRoster(
       {
         ...schedule,
+        crew_placements: [],
         day_coverage: [
           ...schedule.day_coverage,
           {

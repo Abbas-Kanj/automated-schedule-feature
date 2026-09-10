@@ -7,12 +7,43 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { describeStartDay } from '@/features/schedules/utils'
 import { type RotationPeriodType, type RotationRow } from '../utils'
 import { ShiftBadge } from './shift-badge'
 
 type ScheduleRotationTableProps = {
   rows: RotationRow[]
   periodType: RotationPeriodType
+  cycleLength: number
+}
+
+// How this employee's crew was placed against the pattern — the sentence the
+// rotation was designed in ("Team B starts on week 2"), read back where
+// somebody is looking at the result.
+//
+// Absent for a rotation finished by hand: `startDay` is only filled in while
+// the stored start days still describe the stored matrix (see
+// `buildRotation`), so nothing here can claim a stagger the grid does not
+// have. The crew name still shows, because that stays true either way.
+function CrewNote({
+  row,
+  cycleLength,
+}: {
+  row: RotationRow
+  cycleLength: number
+}) {
+  if (!row.crewLabel && row.startDay === undefined) return null
+  return (
+    <div className='text-xs text-muted-foreground'>
+      {[
+        row.crewLabel,
+        row.startDay !== undefined &&
+          `starts ${describeStartDay(row.startDay, cycleLength).toLowerCase()}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    </div>
+  )
 }
 
 // The single-letter cycle chips, rotated so the employee's current position
@@ -27,7 +58,7 @@ function SequenceChips({ row }: { row: RotationRow }) {
           className={cn(
             'tabular-nums',
             i === 0
-              ? 'text-foreground font-semibold underline decoration-2 underline-offset-4'
+              ? 'font-semibold text-foreground underline decoration-2 underline-offset-4'
               : 'text-muted-foreground'
           )}
         >
@@ -41,6 +72,7 @@ function SequenceChips({ row }: { row: RotationRow }) {
 export function ScheduleRotationTable({
   rows,
   periodType,
+  cycleLength,
 }: ScheduleRotationTableProps) {
   return (
     <div className='rounded-lg border'>
@@ -62,10 +94,11 @@ export function ScheduleRotationTable({
               <TableCell className='ps-4 align-middle'>
                 <div className='font-medium'>{row.fullName}</div>
                 {row.employee.position?.label && (
-                  <div className='text-muted-foreground text-xs'>
+                  <div className='text-xs text-muted-foreground'>
                     {row.employee.position.label}
                   </div>
                 )}
+                <CrewNote row={row} cycleLength={cycleLength} />
               </TableCell>
               <TableCell className='align-middle'>
                 <SequenceChips row={row} />

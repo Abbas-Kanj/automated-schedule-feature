@@ -238,6 +238,7 @@ export function ScheduleRotation() {
               <ScheduleRotationTable
                 rows={rotation.rows}
                 periodType={effectivePeriodType}
+                cycleLength={rotation.cycleLength}
               />
             )}
           </div>

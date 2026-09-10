@@ -34,6 +34,12 @@ function ShiftSwatch({ shift }: { shift?: Shift }) {
   )
 }
 
+const SHOWN_INFO_CODES = new Set<SuggestionWarning['code']>([
+  'uncovered-shift',
+  'weekday-anchor',
+  'weekday-drift',
+])
+
 const WARNING_STYLES: Record<
   SuggestionWarning['severity'],
   { icon: typeof Info; className: string }
@@ -74,11 +80,24 @@ export function RotationCoveragePanel({
   const minOnDuty = onDutyCounts.length ? Math.min(...onDutyCounts) : 0
   const maxOnDuty = onDutyCounts.length ? Math.max(...onDutyCounts) : 0
 
-  // Only the lines that flag something to act on. The 'info' notes (weekday
-  // drift/anchor, structural-gap explanations) are dropped from the UI —
-  // `analysis.warnings` still carries them for callers and tests.
+  // Every line that flags something to act on, plus the 'info' notes that
+  // explain something already visible on screen and would otherwise go
+  // unaccounted for:
+  //
+  //   - an unstaffed shift, which drops to 'info' precisely when no
+  //     assignment can fix it — exactly when the red 0 in the grid above most
+  //     needs explaining;
+  //   - the weekday notes, which say how the cycle lands on real dates. A
+  //     14-day pattern read Monday-first behaves differently from the same
+  //     pattern started on a Wednesday, and the start date is set two steps
+  //     away where nothing connects the two.
+  //
+  // What stays hidden is the nobody-in-today line for an office week: the
+  // "On duty" row already shows the zero, and the grid is not lying about it.
+  // `analysis.warnings` still carries every line for callers and tests.
   const shownWarnings = analysis.warnings.filter(
-    (warning) => warning.severity !== 'info'
+    (warning) =>
+      warning.severity !== 'info' || SHOWN_INFO_CODES.has(warning.code)
   )
 
   if (cycleLength === 0 || orderedShiftIds.length === 0) return null

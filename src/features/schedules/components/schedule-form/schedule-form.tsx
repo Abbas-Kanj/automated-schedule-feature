@@ -152,6 +152,11 @@ function getRegularTypeDefaults(type: RegularType) {
         employee_ids: string[]
         team_ids: string[]
       }[],
+      crew_placements: [] as {
+        crew: string
+        day_offset: number
+        shift_step: number
+      }[],
     }
   }
 
@@ -196,7 +201,7 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   // `pattern` so anything wrong carried over from the previous step surfaces
   // here too.
   if (stepId === 'assign-to') {
-    return ['pattern', 'day_coverage']
+    return ['pattern', 'day_coverage', 'crew_placements']
   }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']

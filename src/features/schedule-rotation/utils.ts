@@ -20,6 +20,11 @@ import {
   type RegularSchedule,
   type Schedule,
 } from '@/features/schedules/data/schema'
+import {
+  dayCoverageMatchesPlacements,
+  orderShiftIdsByStart,
+  patternToSlots,
+} from '@/features/schedules/rotation-crews'
 import { type Shift, type ShiftBadgeColor } from '@/features/shifts/data/schema'
 import { type Team } from '@/features/teams/data/schema'
 
@@ -71,6 +76,16 @@ export type RotationRow = {
   // `day_coverage` in `schedules/data/schema.ts`) — it is kept only to sort
   // the table in a stable, readable order.
   offset: number
+  // The crew this employee rotates with, and the cycle day that crew starts
+  // on — the "Team B starts on week 2" half of the schedule (see
+  // `crew_placements` in `schedules/data/schema.ts`).
+  //
+  // `startDay` is only filled in when the stored start days still describe
+  // the stored matrix. After a hand edit they are history, and repeating them
+  // here would describe a roster this screen is not showing.
+  crewKey?: string
+  crewLabel?: string
+  startDay?: number
   assignedIndex: number
   assigned: RotationPosition
   // The employee's own cycle, rotated so the day they are on now comes first
@@ -149,6 +164,8 @@ export function getRotationRoster(
   employee: Employee
   employeeId: string
   offset: number
+  crewKey?: string
+  crewLabel?: string
   byDay: Map<number, string>
 }[] {
   const teamById = new Map(teams.map((t) => [t.id, t]))
@@ -156,9 +173,20 @@ export function getRotationRoster(
     employees.filter((e) => e.id).map((e) => [e.id as string, e])
   )
   const byEmployee = new Map<string, Map<number, string>>()
+  // Which crew put this employee on the rotation. A team crew is worth naming
+  // — it is the unit the roster was built out of; an individually picked
+  // employee is their own crew, so repeating their name under their name
+  // would say nothing and is left off.
+  const crewByEmployee = new Map<string, { key: string; label?: string }>()
 
-  const record = (employeeId: string, day: number, shiftId: string) => {
+  const record = (
+    employeeId: string,
+    day: number,
+    shiftId: string,
+    crew: { key: string; label?: string }
+  ) => {
     if (!employeeById.has(employeeId)) return
+    if (!crewByEmployee.has(employeeId)) crewByEmployee.set(employeeId, crew)
     let days = byEmployee.get(employeeId)
     if (!days) {
       days = new Map()
@@ -170,11 +198,17 @@ export function getRotationRoster(
   }
 
   schedule.day_coverage.forEach((cell) => {
-    cell.employee_ids.forEach((id) => record(id, cell.day, cell.shift_id))
+    cell.employee_ids.forEach((id) =>
+      record(id, cell.day, cell.shift_id, { key: `employee:${id}` })
+    )
     cell.team_ids.forEach((teamId) => {
-      teamById
-        .get(teamId)
-        ?.employee_ids.forEach((id) => record(id, cell.day, cell.shift_id))
+      const team = teamById.get(teamId)
+      team?.employee_ids.forEach((id) =>
+        record(id, cell.day, cell.shift_id, {
+          key: `team:${teamId}`,
+          label: team.name,
+        })
+      )
     })
   })
 
@@ -183,6 +217,8 @@ export function getRotationRoster(
       employeeId,
       byDay,
       offset: Math.min(...byDay.keys()),
+      crewKey: crewByEmployee.get(employeeId)?.key,
+      crewLabel: crewByEmployee.get(employeeId)?.label,
       employee: employeeById.get(employeeId)!,
     }))
     .sort(
@@ -290,27 +326,53 @@ export function buildRotation(
     ? getAssignedIndex(0, periodIndex, cycleLength)
     : 0
 
-  const rows: RotationRow[] = roster.map(({ employee, employeeId, byDay }) => {
-    const dayFor = (day: number) => {
-      const shiftId = byDay.get(day)
-      return toPosition(day, shiftId ? shiftById.get(shiftId) : undefined)
-    }
-    // Rotated so the day they are on right now reads first, matching the
-    // "Current Schedule Sequence" column.
-    const sequence = positions.map((_, i) =>
-      dayFor((assignedIndex + i) % cycleLength)
-    )
+  // Are the schedule's stored start days still a true description of its
+  // matrix? Checked once for the whole table rather than per row, and only
+  // when it holds are start days shown at all — a roster finished by hand is
+  // no longer "each crew a week apart", and saying so anyway would be the
+  // screen making something up.
+  const orderedShiftIds = orderShiftIdsByStart(schedule.shift_ids, shifts)
+  const placementsDescribeCoverage = dayCoverageMatchesPlacements(
+    patternToSlots(
+      [...schedule.pattern].sort((a, b) => a.position - b.position)
+    ),
+    schedule.crew_placements,
+    orderedShiftIds,
+    schedule.day_coverage
+  )
+  const placementByCrew = new Map(
+    schedule.crew_placements.map((placement) => [placement.crew, placement])
+  )
 
-    return {
-      employee,
-      employeeId,
-      fullName: getEmployeeFullName(employee),
-      offset: Math.min(...byDay.keys()),
-      assignedIndex,
-      assigned: dayFor(assignedIndex),
-      sequence,
+  const rows: RotationRow[] = roster.map(
+    ({ employee, employeeId, byDay, crewKey, crewLabel }) => {
+      const dayFor = (day: number) => {
+        const shiftId = byDay.get(day)
+        return toPosition(day, shiftId ? shiftById.get(shiftId) : undefined)
+      }
+      // Rotated so the day they are on right now reads first, matching the
+      // "Current Schedule Sequence" column.
+      const sequence = positions.map((_, i) =>
+        dayFor((assignedIndex + i) % cycleLength)
+      )
+
+      return {
+        employee,
+        employeeId,
+        fullName: getEmployeeFullName(employee),
+        offset: Math.min(...byDay.keys()),
+        crewKey,
+        crewLabel,
+        startDay:
+          placementsDescribeCoverage && crewKey
+            ? placementByCrew.get(crewKey)?.day_offset
+            : undefined,
+        assignedIndex,
+        assigned: dayFor(assignedIndex),
+        sequence,
+      }
     }
-  })
+  )
 
   return {
     positions,

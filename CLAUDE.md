@@ -486,9 +486,99 @@ a genuine missing-import that `tsc -b` caught.
   either.**
   → `.claude/handoff/rotation-suggestion.md`
 
+## Session state (2026-09-08)
+
+- **Analysis only — no code written, nothing changed in `src/`.** The user
+  pasted four real-world rotation write-ups (4-crew 2-2-3 Panama with team
+  day-offsets; a 4-team/3-shift 28-day weekly forward rotation; a 7-week /
+  49-day master rotation; a 4-week healthcare 5/2 with forward-rotation,
+  weekend-equity and skill-mix guardrails) and asked whether our rotate model
+  already implements them.
+- **Answer: the patterns themselves already work** — all four are expressible
+  as day-card patterns, and `choosePlacement`'s *first* search seed
+  (`evenSpacedOffsets` × all-zero shift steps) is exactly the 0/7/14/21 stagger
+  those week-block templates want. "Repeat indefinitely every 28 days" is
+  `end_settings: never` on a 28-card pattern.
+- **Four real gaps found.** (1) **Crew start offset is not a concept** —
+  `dayOffset`/`shiftStep` live only inside the search and are discarded into
+  `day_coverage`, so nothing can say or read back "Team B starts Week 2"; every
+  one of the four write-ups is built on exactly that. (2) No forward-rotation /
+  minimum-rest guardrail — nothing flags Night → Morning on consecutive days.
+  (3) The `weekday-anchor` / `weekday-drift` warnings **are computed and then
+  hidden** by the panel's `severity !== 'info'` filter, and `schedule-summary.tsx`
+  passes no `startDate` at all — so the user's "align the start date with day
+  one" rule is invisible. (4) Three of the four templates have no preset.
+  Skill-mix was judged out of scope (it's about team *composition*).
+- **Three scope questions were asked and not answered** before the session was
+  closed — how far to take persisted crew offsets, which guardrails to build,
+  and whether to add the three presets. **Ask them again before writing code.**
+  → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
+
+## Session state (2026-09-10)
+
+- **Crew start days are a real, editable, persisted field.** The 09-08 scope
+  questions were answered — persist + editable, all three presets, guardrails
+  delegated — and built. `rotateFieldsSchema` gained **`crew_placements[]`**
+  (`crew` key + `day_offset` + `shift_step`), which is the "Team B starts on
+  week 2" sentence every real-world rotation is written in. **`day_coverage`
+  is still the source of truth**; placements are a generator record beside it,
+  so the 09-06 free-cell-editing model is untouched. Surfaced three places:
+  an editor on the "Assign to" step, a read-back on Summary, and a per-employee
+  line on `/schedule-rotation`.
+- **Staleness is re-derived, never flagged.** `dayCoverageMatchesPlacements`
+  regenerates cells from the offsets and compares. A `stale` boolean would have
+  to be cleared on every path that touches a cell, and the one path that
+  forgets makes the record lie. After a hand edit every screen shows the matrix
+  and says the start days no longer describe it — and **nothing re-applies
+  them**.
+- **Watch out: the rest guardrail has to be measured in hours, not list
+  positions.** Shifts are ordered by start time, so Night → Morning steps one
+  place *forward* through the list while being the textbook quick turnaround
+  (off at 06:00, back on at 06:00). A rule written on `orderedShiftIds` indices
+  waves through the one transition it exists to catch. `shiftHoursById` gives
+  real clock spans, pushing an overnight end past 1440 so
+  `1440 + nextStart − prevEnd` lands on zero instead of going negative. New
+  `quick-turnaround` warning — one line, not one per occurrence.
+- **Forward rotation is in the scorer as a tie-break only** (`1e-3` per
+  offence) and **gated on `shiftHours` being supplied**, so every pre-existing
+  test scores identically by construction. No rebaselining was needed and none
+  was done. Weekend-equity scoring was deliberately deferred: stacking two new
+  scoring terms at once makes a regression unattributable.
+- **The alignment warnings are visible at last.** `weekday-anchor` /
+  `weekday-drift` were computed and then filtered out by the coverage panel,
+  and `schedule-summary.tsx` was passing **no** `startDate` *or* `shiftHours` —
+  so weekday, weekend and rest warnings were all silently absent there while
+  showing on "Assign to".
+- **Three presets added** — `weekly_forward_28`, `master_49`,
+  `healthcare_five_two`. Two caveats worth carrying: the healthcare write-up's
+  fourth week was transcribed as **8 cards** in the 09-08 notes (impossible for
+  a 28-day cycle — built as 7, confirm against the source), and **`master_49`
+  cannot be flat**: 210 crew-days over 49 days is a mean of 4.29, so the
+  library's ≤1 on-duty spread is arithmetically out of reach. Recorded as a
+  commented exception in the test rather than by loosening the rule for all
+  fifteen presets.
+- **No migration.** `crew_placements` defaults to `[]`, so saved schedules load
+  fine and read as "set by hand". **`SEED_VERSION` not bumped.** The eight
+  rotate seeds carry `[]` — their real offsets were never recorded, so **no
+  seeded rotation demonstrates the start-day read-back yet**.
+- `npm run build` clean; `npm run test` **267 passed / 3 failed** (up from
+  243/3 — the same unowned `search-provider.test.tsx` three); eslint **0
+  errors** / 3 pre-existing warnings. **Still uncommitted — now four sessions'
+  worth — and still not browser-verified.**
+  → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
+
 ## Pick up here next session
 
-0. **Browser-verify the rotation coverage rework** — newest work, and the
+0. **Derive real `crew_placements` for the eight rotate seeds.** They all
+   carry `[]`, so every seeded rotation reads as "set by hand" and **nothing
+   on `/schedule-rotation` demonstrates the new start-day read-back**.
+   Mechanical: for each crew in a seed's `day_coverage`, search the
+   `(day_offset, shift_step)` pair whose `placementShifts` reproduces that
+   crew's row exactly; emit `[]` for any seed whose crews don't all match.
+   Also confirm the healthcare preset's fourth week against the original
+   write-up (the 09-08 notes transcribed it as 8 cards for a 28-day cycle).
+   → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
+1. **Browser-verify the rotation coverage rework** — newest work, and the
    only item here with a written click-list. Start with the case that
    motivated it: schedule form → Rotate → select **Morning + Night** →
    **Pattern** → preset **5-2** (every card says Morning) → **Assign to** →
@@ -509,7 +599,7 @@ a genuine missing-import that `tsc -b` caught.
    Teams ⇄ Employees with the manual grid open must not put employee names
    in a team field. Full list in
    `.claude/handoff/rotation-suggestion.md`.
-1. **Click through the seven screens that have never been opened in a
+2. **Click through the seven screens that have never been opened in a
    browser here**: `/schedule-rotation` (**three** seeded rotations),
    `/public-holidays` and `/schedule-templates`, `/teams`, plus
    `/employees` and `/employees-list` (both reworked 2026-08-27 — flat
@@ -521,37 +611,37 @@ a genuine missing-import that `tsc -b` caught.
    drives the Schedule Rotation roster — that moved onto the schedule on
    2026-08-29 — so it is sample data only; worth a look, but a bug there
    is now cosmetic rather than load-bearing.
-2. **Click through the schedule form** — the `ToggleButton` conversions in
+3. **Click through the schedule form** — the `ToggleButton` conversions in
    the weekday / month-day / cycle-length / calendar grids shipped without
    a browser check (see `.claude/handoff/shift-policies.md`).
-3. **Teams and the shift Assign-to employees/teams pickers were never
+4. **Teams and the shift Assign-to employees/teams pickers were never
    documented anywhere** — built in an earlier, unrecorded session and
    only surfaced (then committed, `d808701` + `c8c333c`) on 2026-08-27
    when picking up a large batch of uncommitted work. See
    `.claude/handoff/teams-and-shift-assignment.md` for what's actually
    there.
-4. Decide on the repo-wide Prettier normalization — still open, and still
+5. Decide on the repo-wide Prettier normalization — still open, and still
    its own commit if it happens (running `prettier --write` on an
    untouched HEAD file reorders unrelated Tailwind classes).
-5. Authenticate mem0 with a **correct** key (`m0-...` format, from
+6. Authenticate mem0 with a **correct** key (`m0-...` format, from
    https://app.mem0.ai/dashboard/api-keys) via `mem0 init --api-key <key>`,
    then run the Step 1 cross-project search before other work.
-6. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
+7. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
    surfaced by graphify (`shadcn-admin.netlify.app` vs. the real GitHub
    Pages deploy target).
-7. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
+8. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
    remove the references to it in `ARCHITECTURE.md`/`FEATURE_MAPPING.md`.
    `docs/ARCHITECTURE.md` / `FEATURE_MAPPING.md` also predate
    `shift-policies` and the shared `DataTable`.
-8. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
+9. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
    work — not needed for anything done so far.
-9. **Decide on the duplicate sidebar entry** for `/schedule-rotation`
-   (top-level button *and* the Time Track → Schedules leaf) — kept both
-   rather than deleting from a hierarchy that was deliberate and recent.
-10. **`pattern-builder.tsx` week-count readout divides by a hardcoded `6`**
-   while `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is `7` — a 7-day
-   weekly cycle renders as "1 week" correct by luck. Found, not fixed.
-11. **`eslint` now reports 11 errors / 3 warnings** (mostly
+10. **Decide on the duplicate sidebar entry** for `/schedule-rotation`
+    (top-level button *and* the Time Track → Schedules leaf) — kept both
+    rather than deleting from a hierarchy that was deliberate and recent.
+11. **`pattern-builder.tsx` week-count readout divides by a hardcoded `6`**
+    while `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is `7` — a 7-day
+    weekly cycle renders as "1 week" correct by luck. Found, not fixed.
+12. **`eslint` now reports 11 errors / 3 warnings** (mostly
     `react-hooks/set-state-in-effect`) in files untouched since the
     2026-08-25 session recorded "eslint clean" — reconcile before
     treating lint as a gate.

@@ -15,10 +15,16 @@
 // backwards into a night.
 import { toMinutes } from '@/lib/time'
 import { type Shift } from '@/features/shifts/data/schema'
-import { type RotateDayCoverage, type RotatePatternEntry } from './data/schema'
+import { getShiftTimeRange } from '@/features/shifts/utils'
+import {
+  type RotateCrewPlacement,
+  type RotateDayCoverage,
+  type RotatePatternEntry,
+} from './data/schema'
 import {
   type CoverageCrew,
   type CrewPlacement,
+  type ShiftHours,
   type SuggestionSlot,
   placementShifts,
 } from './rotation-suggestion'
@@ -69,6 +75,33 @@ export function orderShiftIdsByStart(
       shiftA.name.localeCompare(shiftB.name)
     )
   })
+}
+
+// Each shift's span in clock minutes, which is what turns "Night then
+// Morning" into a number of hours off. Built here rather than in
+// `rotation-suggestion.ts`, which stays free of the shift schema.
+//
+// A shift finishing at or before it starts runs past midnight, so its end is
+// pushed into the next day — that is what makes the rest arithmetic work out
+// to zero for a night ending at 06:00 followed by a morning starting at
+// 06:00, instead of to a nonsensical negative day.
+//
+// Shifts with no enabled day are left out entirely rather than defaulted:
+// inventing hours for an unconfigured shift would invent a rest violation
+// with them.
+export function shiftHoursById(shifts: Shift[]): Map<string, ShiftHours> {
+  const hours = new Map<string, ShiftHours>()
+  shifts.forEach((shift) => {
+    const range = getShiftTimeRange(shift.days)
+    if (!range) return
+    const startMinutes = toMinutes(range.from_time)
+    const endMinutes = toMinutes(range.to_time)
+    hours.set(shift.id, {
+      startMinutes,
+      endMinutes: endMinutes > startMinutes ? endMinutes : endMinutes + 1440,
+    })
+  })
+  return hours
 }
 
 // The stored matrix, read back as crews. A crew is one team (all its members
@@ -131,9 +164,14 @@ export function crewsFromDayCoverage(
 // The other direction: what the search decided, as storable cells. Sparse —
 // only cells somebody landed on are written, so "no cell" and "empty cell"
 // stay the same thing everywhere.
-export function cellsFromPlacements(
+//
+// Takes the *stored* placement shape (a crew key and two numbers) rather than
+// the search's own, because the two callers that matter both hold that shape:
+// the suggestion after `crewPlacementsToStored`, and the step's per-crew
+// "starts on day N" editor, which has no search result behind it at all.
+export function cellsFromCrewPlacements(
   slots: SuggestionSlot[],
-  placements: CrewPlacement[],
+  placements: RotateCrewPlacement[],
   orderedShiftIds: string[]
 ): RotateDayCoverage[] {
   const cells = new Map<string, RotateDayCoverage>()
@@ -149,19 +187,91 @@ export function cellsFromPlacements(
   }
 
   placements.forEach((placement) => {
-    const id = placement.crew.key.slice(placement.crew.key.indexOf(':') + 1)
-    placementShifts(slots, placement, orderedShiftIds).forEach(
-      (shiftId, day) => {
-        if (!shiftId) return
-        const cell = cellFor(day, shiftId)
-        if (placement.crew.kind === 'team') cell.team_ids.push(id)
-        else cell.employee_ids.push(id)
-      }
-    )
+    const separator = placement.crew.indexOf(':')
+    if (separator < 0) return
+    const kind = placement.crew.slice(0, separator)
+    const id = placement.crew.slice(separator + 1)
+    if (!id) return
+
+    placementShifts(
+      slots,
+      { dayOffset: placement.day_offset, shiftStep: placement.shift_step },
+      orderedShiftIds
+    ).forEach((shiftId, day) => {
+      if (!shiftId) return
+      const cell = cellFor(day, shiftId)
+      if (kind === 'team') cell.team_ids.push(id)
+      else cell.employee_ids.push(id)
+    })
   })
 
   return [...cells.values()].sort(
     (a, b) => a.day - b.day || a.shift_id.localeCompare(b.shift_id)
+  )
+}
+
+export function cellsFromPlacements(
+  slots: SuggestionSlot[],
+  placements: CrewPlacement[],
+  orderedShiftIds: string[]
+): RotateDayCoverage[] {
+  return cellsFromCrewPlacements(
+    slots,
+    crewPlacementsToStored(placements),
+    orderedShiftIds
+  )
+}
+
+// The search's placements in the shape the schedule stores. Only the crew's
+// key survives — the label and headcount are looked up from the stores on the
+// way back out, so a renamed team does not leave a stale name in the record.
+export function crewPlacementsToStored(
+  placements: CrewPlacement[]
+): RotateCrewPlacement[] {
+  return placements.map((placement) => ({
+    crew: placement.crew.key,
+    day_offset: placement.dayOffset,
+    shift_step: placement.shiftStep,
+  }))
+}
+
+function normalizeCells(cells: RotateDayCoverage[]): string {
+  return JSON.stringify(
+    cells
+      .filter((cell) => cell.employee_ids.length || cell.team_ids.length)
+      .map((cell) => ({
+        day: cell.day,
+        shift_id: cell.shift_id,
+        employee_ids: [...cell.employee_ids].sort(),
+        team_ids: [...cell.team_ids].sort(),
+      }))
+      .sort((a, b) => a.day - b.day || a.shift_id.localeCompare(b.shift_id))
+  )
+}
+
+// Do the stored placements still describe the stored matrix?
+//
+// Re-derived rather than tracked. A `stale` flag next to the data is one more
+// thing that can be wrong — it has to be cleared on every path that touches a
+// cell, and the one path that forgets makes the record lie. Regenerating and
+// comparing cannot drift: the answer is a fact about the two values sitting
+// in the form right now.
+//
+// False means somebody hand-edited a cell (or the pool changed under them),
+// so the offsets are history rather than a description. Callers show the
+// matrix and say the offsets no longer describe it; they must not re-apply
+// them, which would silently undo the edit.
+export function dayCoverageMatchesPlacements(
+  slots: SuggestionSlot[],
+  placements: RotateCrewPlacement[],
+  orderedShiftIds: string[],
+  cells: RotateDayCoverage[]
+): boolean {
+  if (placements.length === 0) return false
+  return (
+    normalizeCells(
+      cellsFromCrewPlacements(slots, placements, orderedShiftIds)
+    ) === normalizeCells(cells)
   )
 }
 

@@ -1,4 +1,5 @@
 import { type ReactNode, useMemo } from 'react'
+import { parse } from 'date-fns'
 import { type Control, useWatch } from 'react-hook-form'
 import { useTimeFormat } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
@@ -20,16 +21,21 @@ import {
   SCHEDULE_TYPES,
 } from '../../data/data'
 import {
+  type RotateCrewPlacement,
   type RotateDayCoverage,
   type RotatePatternEntry,
 } from '../../data/schema'
 import {
   crewsFromDayCoverage,
+  dayCoverageMatchesPlacements,
   orderShiftIdsByStart,
+  patternToSlots,
+  shiftHoursById,
 } from '../../rotation-crews'
-import { analyzeDayCoverage } from '../../rotation-suggestion'
+import { analyzeDayCoverage, crewRequirement } from '../../rotation-suggestion'
 import { calculateHours, formatTimes } from '../../utils'
 import { RotationCoveragePanel } from './rotation-coverage-panel'
+import { CrewStartSummary } from './rotation-crew-starts'
 import { ScheduleCalendarPreview } from './schedule-calendar-preview'
 
 function SummarySection({
@@ -286,10 +292,24 @@ function AssignToSummary({ values }: { values: any }) {
     () => (values.day_coverage ?? []) as RotateDayCoverage[],
     [values.day_coverage]
   )
+  const crewPlacements = useMemo(
+    () => (values.crew_placements ?? []) as RotateCrewPlacement[],
+    [values.crew_placements]
+  )
   const shiftIds = useMemo(
     () => (values.shift_ids ?? []) as string[],
     [values.shift_ids]
   )
+  // The weekday and weekend checks are the reason this is parsed here: they
+  // are the only part of the analysis that depends on real dates, and without
+  // a start date they are silently skipped — which is how this screen used to
+  // drop them while the "Assign to" step showed them.
+  const startDate = useMemo(() => {
+    const raw = values.start_date as string | undefined
+    if (!raw) return undefined
+    const parsed = parse(raw, 'yyyy-MM-dd', new Date())
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  }, [values.start_date])
 
   const employeeLabels = useMemo(
     () =>
@@ -316,12 +336,43 @@ function AssignToSummary({ values }: { values: any }) {
     () => new Map(shifts.map((shift) => [shift.id, shift.name])),
     [shifts]
   )
+  const shiftHours = useMemo(() => shiftHoursById(shifts), [shifts])
+  // Same requirement the "Assign to" step computes, so the panel repeated
+  // here grades the roster identically instead of calling a structural hole
+  // fixable on one screen and not the other.
+  const requirement = useMemo(
+    () => crewRequirement(patternToSlots(pattern), orderedShiftIds),
+    [pattern, orderedShiftIds]
+  )
+  // Every option the step passes, for the same reason: a summary that grades
+  // more leniently than the screen it summarises is worse than no summary.
   const analysis = useMemo(
     () =>
       analyzeDayCoverage(crews, orderedShiftIds, pattern.length, {
+        startDate,
         shiftLabels,
+        shiftHours,
+        minimumCrews: requirement.exact ? requirement.minimumCrews : undefined,
       }),
-    [crews, orderedShiftIds, pattern.length, shiftLabels]
+    [
+      crews,
+      orderedShiftIds,
+      pattern.length,
+      startDate,
+      shiftLabels,
+      shiftHours,
+      requirement,
+    ]
+  )
+  const placementsDescribeCoverage = useMemo(
+    () =>
+      dayCoverageMatchesPlacements(
+        patternToSlots(pattern),
+        crewPlacements,
+        orderedShiftIds,
+        dayCoverage
+      ),
+    [pattern, crewPlacements, orderedShiftIds, dayCoverage]
   )
 
   return (
@@ -336,6 +387,13 @@ function AssignToSummary({ values }: { values: any }) {
       )}
       {crews.length > 0 && (
         <>
+          <CrewStartSummary
+            placements={crewPlacements}
+            crews={crews}
+            cycleLength={pattern.length}
+            shifts={shifts}
+            describesCoverage={placementsDescribeCoverage}
+          />
           <RotationCoveragePanel
             crews={crews}
             analysis={analysis}

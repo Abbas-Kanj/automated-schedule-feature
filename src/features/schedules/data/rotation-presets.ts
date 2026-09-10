@@ -223,6 +223,69 @@ export const ROTATION_PRESETS: RotationPreset[] = [
     ],
   },
   {
+    id: 'weekly_forward_28',
+    label: 'Weekly forward rotation (28-day)',
+    group: 'Named systems',
+    description:
+      'A whole week on each shift in turn — mornings, then afternoons, then nights — followed by a week off. Four crews a week apart keep all three shifts staffed every day, and every change of shift comes with a full week between it and the last.',
+    minShifts: 3,
+    suggestedCrews: 4,
+    buildCards: () => [...on(7, 0), ...on(7, 1), ...on(7, 2), ...off(7)],
+  },
+  {
+    id: 'master_49',
+    label: 'Seven-week master rotation',
+    group: 'Named systems',
+    description:
+      'Forty-nine days: each shift is worked for two weeks, the first anchored to the start of the week and the second to the end of it, then a clear week off. Seven crews a week apart.',
+    minShifts: 3,
+    suggestedCrews: 7,
+    buildCards: () => [
+      // Two weeks per shift, the second phased to the back half of the week,
+      // so the two rest days walk across the weekend rather than sitting on
+      // the same pair of days for a fortnight.
+      ...on(5, 0),
+      ...off(2),
+      ...off(2),
+      ...on(5, 0),
+      ...on(5, 1),
+      ...off(2),
+      ...off(2),
+      ...on(5, 1),
+      ...on(5, 2),
+      ...off(2),
+      ...off(2),
+      ...on(5, 2),
+      ...off(7),
+    ],
+  },
+  {
+    id: 'healthcare_five_two',
+    label: 'Healthcare 5/2 rotating (28-day)',
+    group: 'Named systems',
+    description:
+      'Four weeks of five-on/two-off that move through mornings, afternoons and nights. The last week is deliberately broken up, so the rest days do not fall on the same weekday every month. Leaves nights uncovered on one cycle day by design — the coverage panel will say so.',
+    minShifts: 3,
+    suggestedCrews: 4,
+    buildCards: () => [
+      // Week 1 — mornings, weekend off.
+      ...on(5, 0),
+      ...off(2),
+      // Week 2 — afternoons, rest at the front of the week instead.
+      ...off(2),
+      ...on(5, 1),
+      // Week 3 — nights, split by a two-day break.
+      ...on(3, 2),
+      ...off(2),
+      ...on(2, 2),
+      // Week 4 — a short mixed week that unwinds back to mornings.
+      ...on(2, 1),
+      ...off(1),
+      ...on(2, 0),
+      ...off(2),
+    ],
+  },
+  {
     id: 'southern_swing',
     label: 'Southern Swing',
     group: 'Named systems',

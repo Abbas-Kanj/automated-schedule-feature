@@ -59,6 +59,7 @@ export const defaultSchedules: Schedule[] = [
     shift_repeat: [],
     // Four crews on a four-card cycle, staggered one card apart: every shift
     // is covered every day and exactly one crew is resting.
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,
@@ -168,6 +169,7 @@ export const defaultSchedules: Schedule[] = [
       { shift_id: 'shift-early', frequency: 'daily', interval: 2 },
       { shift_id: 'shift-late', frequency: 'daily', interval: 1 },
     ],
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,
@@ -243,6 +245,7 @@ export const defaultSchedules: Schedule[] = [
       { position: 14, is_off: true },
     ],
     shift_repeat: [],
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,
@@ -471,6 +474,7 @@ export const defaultSchedules: Schedule[] = [
       { position: 28, is_off: true },
     ],
     shift_repeat: [],
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,
@@ -847,6 +851,7 @@ export const defaultSchedules: Schedule[] = [
       { position: 14, is_off: true },
     ],
     shift_repeat: [],
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,
@@ -1049,6 +1054,7 @@ export const defaultSchedules: Schedule[] = [
       { position: 8, is_off: true },
     ],
     shift_repeat: [],
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,
@@ -1246,6 +1252,7 @@ export const defaultSchedules: Schedule[] = [
       { position: 28, is_off: true },
     ],
     shift_repeat: [],
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,
@@ -1789,6 +1796,7 @@ export const defaultSchedules: Schedule[] = [
       { position: 14, is_off: true },
     ],
     shift_repeat: [],
+    crew_placements: [],
     day_coverage: [
       {
         day: 0,

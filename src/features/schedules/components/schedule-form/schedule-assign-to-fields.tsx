@@ -1,7 +1,7 @@
 import { type RefObject, useEffect, useMemo, useState } from 'react'
 import { parse } from 'date-fns'
 import { useFormContext, useWatch } from 'react-hook-form'
-import { Wand2 } from 'lucide-react'
+import { CheckCircle2, TriangleAlert, Wand2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,22 +13,29 @@ import { SHIFT_BADGE_COLOR_OPTIONS } from '@/features/shifts/data/data'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import {
+  type RotateCrewPlacement,
   type RotateDayCoverage,
   type RotatePatternEntry,
 } from '../../data/schema'
 import {
-  cellsFromPlacements,
+  cellsFromCrewPlacements,
   crewKeysFromDayCoverage,
+  crewPlacementsToStored,
   crewsFromDayCoverage,
+  dayCoverageMatchesPlacements,
   orderShiftIdsByStart,
   patternToSlots,
+  shiftHoursById,
 } from '../../rotation-crews'
 import {
+  type CrewRequirement,
   type SuggestionCrew,
   analyzeDayCoverage,
+  crewRequirement,
   suggestRotationCoverage,
 } from '../../rotation-suggestion'
 import { RotationCoveragePanel } from './rotation-coverage-panel'
+import { CrewStartEditor } from './rotation-crew-starts'
 
 type Option = { value: string; label: string }
 
@@ -76,6 +83,10 @@ export function ScheduleAssignToFields({
     | RotateDayCoverage[]
     | undefined
   const dayCoverage = useMemo(() => coverageRaw ?? [], [coverageRaw])
+  const placementsRaw = useWatch({ control, name: 'crew_placements' }) as
+    | RotateCrewPlacement[]
+    | undefined
+  const crewPlacements = useMemo(() => placementsRaw ?? [], [placementsRaw])
   const shiftIdsRaw = useWatch({ control, name: 'shift_ids' }) as
     | string[]
     | undefined
@@ -122,6 +133,23 @@ export function ScheduleAssignToFields({
     [shifts]
   )
 
+  // Real clock times, which is what turns "Night then Morning" into a number
+  // of hours off. Feeds both the search — as a tie-break between rosters that
+  // are otherwise equally covered — and the warning below it.
+  const shiftHours = useMemo(() => shiftHoursById(shifts), [shifts])
+
+  // Labels for every crew that could appear in a placement, both kinds at
+  // once: a saved schedule can hold team placements while the step is showing
+  // the employee pool, and an unlabelled row would read as a bug.
+  const crewLabels = useMemo(() => {
+    const labels = new Map<string, string>()
+    teams.forEach((team) => labels.set(`team:${team.id}`, team.name))
+    employeeOptions.forEach((option) =>
+      labels.set(`employee:${option.value}`, option.label)
+    )
+    return labels
+  }, [teams, employeeOptions])
+
   // The crew pool is deliberately not a form field. The union of what is
   // already assigned *is* the pool, so it round-trips through a saved schedule
   // without adding anything to the schema. This component unmounts when the
@@ -157,13 +185,50 @@ export function ScheduleAssignToFields({
     return Number.isNaN(parsed.getTime()) ? undefined : parsed
   }, [startDateValue])
 
+  // What the pool needs to be *before* anything is placed — see
+  // `crewRequirement`. Derived from the pattern and the selected shifts only,
+  // so it is already on screen when the pool is still empty. Deliberately not
+  // keyed on the pool: it answers what this pattern needs, not what has been
+  // picked, and re-running the probe on every pick would be wasted work.
+  const requirement = useMemo(
+    () => crewRequirement(patternToSlots(pattern), orderedShiftIds),
+    [pattern, orderedShiftIds]
+  )
+
   const analysis = useMemo(
     () =>
       analyzeDayCoverage(crews, orderedShiftIds, pattern.length, {
         startDate,
         shiftLabels,
+        shiftHours,
+        // Without this the panel can tell someone who has just pressed
+        // Suggest that there are enough crews and to press it again.
+        minimumCrews: requirement.exact ? requirement.minimumCrews : undefined,
       }),
-    [crews, orderedShiftIds, pattern.length, startDate, shiftLabels]
+    [
+      crews,
+      orderedShiftIds,
+      pattern.length,
+      startDate,
+      shiftLabels,
+      shiftHours,
+      requirement,
+    ]
+  )
+
+  // Do the stored start days still describe the stored matrix? Re-derived
+  // rather than flagged — see `dayCoverageMatchesPlacements`. False after any
+  // edit in the manual grid, which is exactly when the editor must stop
+  // presenting itself as a description of the roster.
+  const placementsDescribeCoverage = useMemo(
+    () =>
+      dayCoverageMatchesPlacements(
+        patternToSlots(pattern),
+        crewPlacements,
+        orderedShiftIds,
+        dayCoverage
+      ),
+    [pattern, crewPlacements, orderedShiftIds, dayCoverage]
   )
 
   const poolOptions = crewKind === 'team' ? teamOptions : employeeOptions
@@ -206,17 +271,31 @@ export function ScheduleAssignToFields({
       patternToSlots(currentPattern),
       suggestionCrews,
       orderedShiftIds,
-      { startDate, shiftLabels }
+      { startDate, shiftLabels, shiftHours }
     )
 
-    // One whole-field write: the matrix the suggestion produced replaces
-    // whatever was there, so a crew left over from a previous run cannot stay
-    // behind and quietly double-book a cell.
+    applyPlacements(crewPlacementsToStored(placements))
+  }
+
+  // The one place both halves of the roster are written, so they cannot drift
+  // apart. The matrix is regenerated from the start days every time rather
+  // than patched, which is what makes moving one crew safe: nothing survives
+  // from the previous arrangement to double-book a cell.
+  //
+  // Both are whole-field writes for the same reason — a crew dropped from the
+  // pool has to disappear from the matrix too, and merging would leave it
+  // behind.
+  function applyPlacements(next: RotateCrewPlacement[]) {
+    const currentPattern =
+      (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
+    if (currentPattern.length === 0) return
+
+    setValue('crew_placements', next, { shouldDirty: true })
     setValue(
       'day_coverage',
-      cellsFromPlacements(
+      cellsFromCrewPlacements(
         patternToSlots(currentPattern),
-        placements,
+        next,
         orderedShiftIds
       ),
       { shouldDirty: true }
@@ -338,6 +417,13 @@ export function ScheduleAssignToFields({
                 along the shift list so every selected shift is covered every
                 day.
               </p>
+              <CrewRequirementNote
+                requirement={requirement}
+                cycleLength={pattern.length}
+                shiftCount={orderedShiftIds.length}
+                selectedCount={poolIds.length}
+                crewKind={crewKind}
+              />
               <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
                 <div className='flex-1'>
                   <MultiSelect
@@ -346,9 +432,7 @@ export function ScheduleAssignToFields({
                       poolIds.includes(option.value)
                     )}
                     onChange={(selected: Option[]) =>
-                      setPoolIds(
-                        (selected ?? []).map((option) => option.value)
-                      )
+                      setPoolIds((selected ?? []).map((option) => option.value))
                     }
                     isMulti
                     placeholder={
@@ -371,6 +455,21 @@ export function ScheduleAssignToFields({
                   Suggest assignment
                 </Button>
               </div>
+
+              {/* Only once there is something to describe. Before the first
+                  Suggest there are no start days, and an editor full of
+                  day 1s would invent a roster nobody asked for. */}
+              <CrewStartEditor
+                placements={crewPlacements}
+                crewLabels={crewLabels}
+                slots={patternToSlots(pattern)}
+                orderedShiftIds={orderedShiftIds}
+                cycleLength={pattern.length}
+                shifts={shifts}
+                describesCoverage={placementsDescribeCoverage}
+                disabled={disabled}
+                onChange={applyPlacements}
+              />
             </div>
           ) : (
             <div className='space-y-3'>
@@ -407,6 +506,94 @@ export function ScheduleAssignToFields({
           />
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? '' : 's'}`
+}
+
+type CrewRequirementNoteProps = {
+  requirement: CrewRequirement
+  cycleLength: number
+  shiftCount: number
+  selectedCount: number
+  crewKind: CrewKind
+}
+
+// The headline number for this step: how many crews the pattern needs before
+// full coverage is even arithmetically possible.
+//
+// It is shown while the pool is still empty, which is the whole point — the
+// coverage panel below can only report a shortfall once crews are placed, and
+// by then the user has already made the choice this would have informed. The
+// arithmetic is spelled out because the number is otherwise surprising: two
+// crews on a 5-2 with two shifts is 10 crew-days against 14 cells, so four
+// cells stay empty no matter who is placed where.
+//
+// Being under the minimum is a fact about the pattern, not a mistake — same
+// rule the warnings follow — so this never blocks anything and never uses the
+// destructive colour.
+function CrewRequirementNote({
+  requirement,
+  cycleLength,
+  shiftCount,
+  selectedCount,
+  crewKind,
+}: CrewRequirementNoteProps) {
+  const { workDaysPerCrew, cellsPerCycle, minimumCrews } = requirement
+  // An all-off pattern or no selected shifts: there is no grid to size a pool
+  // against, and the previous steps already say so.
+  if (minimumCrews === 0 || shiftCount === 0) return null
+
+  const unit = crewKind === 'team' ? 'team' : 'employee'
+  const short = minimumCrews - selectedCount
+  // Only a demonstrated requirement licenses the green line — see
+  // `CrewRequirement.exact`. Promising full coverage and then showing a red 0
+  // is the exact failure this note exists to prevent.
+  const enough = requirement.exact && short <= 0
+
+  return (
+    <div
+      className='rounded-md border bg-muted/30 p-3 text-xs'
+      data-testid='crew-requirement-note'
+    >
+      <p className='text-sm font-medium'>
+        Covering every shift every day needs{' '}
+        {requirement.exact ? '' : 'more than '}
+        {plural(minimumCrews, unit)}.
+      </p>
+      <p className='mt-1 text-muted-foreground'>
+        {plural(shiftCount, 'shift')} over {plural(cycleLength, 'cycle day')} is{' '}
+        {plural(cellsPerCycle, 'crew-day')} to fill; each crew works{' '}
+        {plural(workDaysPerCrew, 'day')} of this pattern, and can only be on one
+        shift a day.
+      </p>
+      <p
+        className={cn(
+          'mt-1.5 flex items-center gap-1.5 font-medium',
+          selectedCount === 0
+            ? 'text-muted-foreground'
+            : enough
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-amber-600 dark:text-amber-400'
+        )}
+      >
+        {selectedCount > 0 &&
+          (enough ? (
+            <CheckCircle2 className='size-3.5 shrink-0' />
+          ) : (
+            <TriangleAlert className='size-3.5 shrink-0' />
+          ))}
+        {selectedCount === 0
+          ? `No ${unit}s picked yet.`
+          : enough
+            ? `${plural(selectedCount, unit)} picked — enough to cover every shift on every cycle day.`
+            : short > 0
+              ? `${plural(selectedCount, unit)} picked — ${short} short, so some shifts stay empty on some days whichever way they are placed.`
+              : `${plural(selectedCount, unit)} picked — this pattern may still leave gaps; the grid below shows what the suggestion manages.`}
+      </p>
     </div>
   )
 }
