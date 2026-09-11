@@ -15,6 +15,13 @@ that consume it.
   `shift-times-tab.tsx`, `shifts/data/schema.ts`, `shifts/data/defaults.ts`,
   and new `time-24-input.tsx`. Typechecking and green on tests, still not
   browser-verified.
+- **The holiday-work rule shape shipped `783b18b`, pushed to `main`**
+  (2026-08-27, as part of a 9-commit session that also committed several
+  other already-written features): `working_on_day_off` and
+  `working_on_public_holiday` got their own rule shape instead of being
+  forced into `WindowRule` — see the updated model below. New
+  `holiday-work-fields.tsx`. Still not browser-verified — folded into the
+  same unverified list as the rest of this feature.
 - The earlier "shift policies as records" work (`d43c79d`) and the
   schedule-form polish that rode with it are **done** — see
   `.claude/handoff/schedule-form-ui-polish.md` for the latter.
@@ -25,8 +32,11 @@ A policy is a **named bag of typed rules**. The policy itself has no type:
 
 ```
 ShiftPolicy      = { id, name, description?, rules[] }
-PolicyRule       = WindowRule | MissedPunchRule   // discriminated on policy_type
+PolicyRule       = WindowRule | HolidayWorkRule | MissedPunchRule   // discriminated on policy_type
 WindowRule       = { id, policy_type, name, from_time, to_time, factor, attendance_type }
+HolidayWorkRule  = { id, policy_type: 'working_on_day_off' | 'working_on_public_holiday', name,
+                     work_hours, work_mode: 'normal' | 'overtime' | 'substitute',
+                     holiday_attendance_type?, rate_per_hour? }
 MissedPunchRule  = { id, policy_type: 'missed_punch_error', name,
                      operator, occurrences, period_unit, from_period, to_period,
                      attendance_type: 'deduction', deduction_unit, deduction_hours? }
@@ -35,11 +45,21 @@ MissedPunchRule  = { id, policy_type: 'missed_punch_error', name,
 - `policy_type` on a rule: Tardy | Departure | Missed Punch Error | Working
   on Day Off | Working on Public Holiday | Overtime. One policy can mix
   them — the seeded "Attendance" policy deliberately does.
-- `WINDOW_POLICY_TYPES` is a **hand-written tuple** separate from
-  `POLICY_TYPES` (not filtered from it) so `z.enum` gets literal types.
-  Adding a type means touching both.
+- **Three rule shapes as of 2026-08-27**, not two: window types describe a
+  from/to span with a factor; `working_on_day_off` /
+  `working_on_public_holiday` (`HOLIDAY_WORK_POLICY_TYPES`, own tuple)
+  take a flat `work_hours` instead, with `work_mode` picking which
+  case-specific fields apply — day-off overtime books `rate_per_hour`,
+  every other case (but normal work) books a `holiday_attendance_type`
+  from a per-case list (`getHolidayAttendanceOptions` in `data.ts`);
+  missed-punch counts occurrences over a span. `WINDOW_POLICY_TYPES` and
+  `HOLIDAY_WORK_POLICY_TYPES` are both **hand-written tuples** separate
+  from `POLICY_TYPES` (not filtered from it) so `z.enum` gets literal
+  types — adding a type means touching the relevant tuple too.
 - `factor` is `>= 1` in half-steps; the read-only **Result** beside it is
-  `(to − from) × factor`, derived, never stored.
+  `(to − from) × factor`, derived, never stored. Holiday-work rules have no
+  window, so no `factor` — their own describe-line shows hours × rate for
+  the day-off-overtime case, hours + mode + attendance type otherwise.
 - A missed-punch rule is always booked as a deduction —
   `z.literal('deduction')`, shown as a disabled select. Only the "Hours"
   deduction unit carries a number; half/full day resolve against the
@@ -103,15 +123,21 @@ MissedPunchRule  = { id, policy_type: 'missed_punch_error', name,
 
 ## Verification state
 
-- `tsc -b` + `vite build` clean; `shift-policies` + `shifts` + `schedules`
-  tests **34 passed**. `schema.test.ts` covers the discriminated union,
-  mixed-type policies, both cross-field checks and `getPolicyRuleTypes`.
+- `tsc -b` + `vite build` clean; full suite as of 2026-08-27 **174 passed
+  / 3 failed** (the 3 are the pre-existing unowned
+  `search-provider.test.tsx` failures — see CLAUDE.md). `schema.test.ts`
+  covers all three rule shapes now: the discriminated union, mixed-type
+  policies, both window-rule cross-field checks, each holiday-work case
+  (normal / day-off overtime / substitute), and `getPolicyRuleTypes`.
 - **Typecheck with `npm run build`, not `tsc --noEmit -p tsconfig.json`** —
   the latter misses errors on this repo (project references).
 - **Nothing in this feature has been verified in a real browser.** The
   riskiest unchecked pieces, in order: the search dropdown's click-away
-  behaviour, `Time24Input`'s masking on real keystrokes, and the rule-type
-  switch re-rendering the row's inputs.
+  behaviour, `Time24Input`'s masking on real keystrokes, the rule-type
+  switch re-rendering the row's inputs (now across **three** shapes, not
+  two — including the mode-dependent case fields in
+  `HolidayWorkRuleFields`), and `retypeRule` carrying hours/mode across a
+  move between the two holiday-work types.
 
 ## Pick up here
 

@@ -163,27 +163,16 @@ export const BREAK_TYPE_OPTIONS = [
   { value: 'unpaid', label: 'Unpaid' },
 ] satisfies { value: (typeof BREAK_TYPES)[number]; label: string }[]
 
-// "Assign to" tab dropdowns. There's no backend yet (see CLAUDE.md),
-// so these are representative placeholder options rather than live data.
+// "Assign to" tab — the single "Work type group" dropdown picks how a shift
+// is assigned. There's no backend yet (see CLAUDE.md), so this drives no
+// downstream behavior; picking "Team", say, doesn't yet cascade into a team
+// picker. The former Service resource / Service territory dropdowns are
+// hidden for now (see `assign-to-tab.tsx`).
 export const WORK_TYPE_GROUP_OPTIONS = [
-  { value: 'installation', label: 'Installation' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'repair', label: 'Repair' },
-  { value: 'inspection', label: 'Inspection' },
-]
-
-export const SERVICE_RESOURCE_OPTIONS = [
-  { value: 'alex-johnson', label: 'Alex Johnson' },
-  { value: 'sam-lee', label: 'Sam Lee' },
-  { value: 'jordan-blake', label: 'Jordan Blake' },
-  { value: 'taylor-kim', label: 'Taylor Kim' },
-]
-
-export const SERVICE_TERRITORY_OPTIONS = [
-  { value: 'north-region', label: 'North region' },
-  { value: 'south-region', label: 'South region' },
-  { value: 'east-region', label: 'East region' },
-  { value: 'west-region', label: 'West region' },
+  { value: 'team', label: 'Team' },
+  { value: 'employee', label: 'Employee' },
+  { value: 'group', label: 'Group' },
+  { value: 'by_branch', label: 'By branch' },
 ]
 
 export const DAY_LABELS: Record<(typeof DAYS_OF_WEEK)[number], string> = {

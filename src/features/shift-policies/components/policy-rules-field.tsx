@@ -33,6 +33,7 @@ import {
 } from '../data/data'
 import {
   getRuleResultMinutes,
+  isWindowRule,
   type PolicyType,
   type ShiftPolicyFormValues,
 } from '../data/schema'
@@ -42,6 +43,7 @@ import {
   formatMinutes,
   retypeRule,
 } from '../utils'
+import { HolidayWorkRuleFields } from './holiday-work-fields'
 import { MissedPunchRuleFields } from './missed-punch-fields'
 import { Time24Input } from './time-24-input'
 
@@ -309,6 +311,9 @@ function PolicyRuleRow({
 
       {rule?.policy_type === 'missed_punch_error' ? (
         <MissedPunchRuleFields index={index} />
+      ) : rule?.policy_type === 'working_on_day_off' ||
+        rule?.policy_type === 'working_on_public_holiday' ? (
+        <HolidayWorkRuleFields index={index} />
       ) : (
         <WindowRuleFields index={index} />
       )}
@@ -324,8 +329,11 @@ function PolicyRuleRow({
 function WindowRuleFields({ index }: { index: number }) {
   const form = useFormContext<ShiftPolicyFormValues>()
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
+  // Narrow to the window shape before reading its fields — the other two rule
+  // shapes have no from/to/factor. This component is only rendered for window
+  // types, but the watched value is still the full union.
   const resultMinutes =
-    rule && rule.policy_type !== 'missed_punch_error'
+    rule && isWindowRule(rule)
       ? getRuleResultMinutes({
           from_time: rule.from_time,
           to_time: rule.to_time,

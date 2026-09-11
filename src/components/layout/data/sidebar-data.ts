@@ -5,9 +5,11 @@ import {
   Clock,
   Command,
   GalleryVerticalEnd,
+  RotateCw,
   ShoppingCart,
   Timer,
   Users,
+  UsersRound,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -58,6 +60,8 @@ export const sidebarData: SidebarData = {
               items: [
                 { title: 'General schedule', url: '/schedules' },
                 { title: 'Flexible schedule', url: '/schedules' },
+                { title: 'Schedule rotation', url: '/schedule-rotation' },
+                { title: 'Schedule templates', url: '/schedule-templates' },
               ],
             },
             {
@@ -71,13 +75,23 @@ export const sidebarData: SidebarData = {
           ],
         },
         {
-          title: 'Employees',
+          title: 'Schedule Rotation',
+          url: '/schedule-rotation',
+          icon: RotateCw,
+        },
+        {
+          title: 'Employee Management',
           url: '/employees-list',
           icon: Users,
         },
         {
-          title: 'Holidays',
-          url: '/official-holidays',
+          title: 'Team Management',
+          url: '/teams',
+          icon: UsersRound,
+        },
+        {
+          title: 'Public holidays',
+          url: '/public-holidays',
           icon: CalendarDays,
         },
         {

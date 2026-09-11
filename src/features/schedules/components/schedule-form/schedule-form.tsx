@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { type Control, type Resolver, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -32,6 +32,7 @@ import {
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
 import { PatternBuilder } from './pattern-builder'
+import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 import { ScheduleBasicsFields } from './schedule-basics-fields'
 import { ScheduleStartEndFields } from './schedule-start-end-fields'
 import { ScheduleSummary } from './schedule-summary'
@@ -56,7 +57,10 @@ function getSteps(
     ]
   }
 
-  // rotate gets its own pattern step (cycle/pattern config) PLUS the same
+  // rotate gets its own pattern step (cycle/pattern config), then the
+  // "Assign to" step that names the crew on each position of the pattern it
+  // just built — that pairing is the whole roster the Schedule Rotation
+  // screen reads (see `schedule-assign-to-fields.tsx`). PLUS the same
   // shared "Start & End" step as fixed/flexible (start date + end
   // frequency) — see `schedule-start-end-fields.tsx`.
   if (regularType === 'rotate') {
@@ -64,6 +68,7 @@ function getSteps(
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'pattern', label: 'Pattern' },
+      { id: 'assign-to', label: 'Assign to' },
       { id: 'end-settings', label: 'Start & End' },
       { id: 'summary', label: 'Summary' },
     ]
@@ -141,6 +146,17 @@ function getRegularTypeDefaults(type: RegularType) {
         frequency: string
         interval: number
       }[],
+      day_coverage: [] as {
+        day: number
+        shift_id: string
+        employee_ids: string[]
+        team_ids: string[]
+      }[],
+      crew_placements: [] as {
+        crew: string
+        day_offset: number
+        shift_step: number
+      }[],
     }
   }
 
@@ -179,6 +195,14 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   if (stepId === 'pattern') {
     return ['cycle_type', 'cycle_length', 'pattern', 'shift_repeat']
   }
+  // Coverage is optional — an unstaffed shift stays valid, so this step never
+  // blocks "Next" (whether a hole is fixable depends on the crew count, not
+  // the data; the coverage panel warns instead). It still re-validates
+  // `pattern` so anything wrong carried over from the previous step surfaces
+  // here too.
+  if (stepId === 'assign-to') {
+    return ['pattern', 'day_coverage', 'crew_placements']
+  }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
     if (type === 'weekly_one') return ['type', 'days']
@@ -215,13 +239,18 @@ export function ScheduleForm({
   // open — locks all step navigation so the user can't jump away from
   // underneath it. See `ShiftPickerField`'s `onDialogOpenChange`.
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
+  // Set by the "Assign to" step while it is mounted, so "Next" can accept the
+  // crew assignment it is showing before moving on — see
+  // `schedule-assign-to-fields.tsx#commitPendingSuggestion`.
+  const assignToCommitRef = useRef<(() => void) | null>(null)
 
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const looseControl = form.control as unknown as Control<any>
   const regularType = useWatch({ control: looseControl, name: 'type' }) as
-    RegularType | undefined
+    | RegularType
+    | undefined
 
   const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
@@ -232,6 +261,10 @@ export function ScheduleForm({
   }
 
   const handleNext = async () => {
+    // Before validating, not after: the commit writes crew into `pattern[]`,
+    // and `trigger` has to see the values the user is actually advancing with.
+    if (currentStepId === 'assign-to') assignToCommitRef.current?.()
+
     const valid = await form.trigger(
       getStepFields(currentStepId, parentType, type)
     )
@@ -404,6 +437,15 @@ export function ScheduleForm({
               parentType === 'regular' &&
               regularType === 'rotate' && (
                 <PatternBuilder disabled={disabled} />
+              )}
+
+            {(disabled || currentStepId === 'assign-to') &&
+              parentType === 'regular' &&
+              regularType === 'rotate' && (
+                <ScheduleAssignToFields
+                  disabled={disabled}
+                  commitRef={assignToCommitRef}
+                />
               )}
 
             {(disabled || currentStepId === 'end-settings') &&

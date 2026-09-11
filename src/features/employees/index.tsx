@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
-import type z from 'zod'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link, getRouteApi } from '@tanstack/react-router'
-import { ArrowLeft, UserCog, XIcon } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { toast } from 'sonner'
 import { showSubmittedData } from '@/lib/show-submitted-data'
 import { Button } from '@/components/ui/button'
+import { Form } from '@/components/ui/form'
 import { Separator } from '@/components/ui/separator'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
@@ -13,106 +14,55 @@ import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { PersonalInfo } from './components/personal-info'
-import { Position } from './components/position'
-import { Schedule } from './components/schedule'
-import { SidebarNav } from './components/sidebar-nav'
+import { EmployeeFields } from './components/employee-fields'
 import employeeData from './data/data.json'
-import { EmployeeSchema } from './data/schema'
+import { type Employee, EmployeeSchema } from './data/schema'
 
 const route = getRouteApi('/_authenticated/employees')
 
-const sidebarNavItems = [
-  {
-    title: 'Personal Info',
-    value: 'personal-info',
-    icon: <UserCog size={18} />,
-  },
-  {
-    title: 'Schedule',
-    value: 'schedule',
-    icon: <XIcon size={18} />,
-  },
-  {
-    title: 'Position',
-    value: 'position',
-    icon: <XIcon size={18} />,
-  },
-]
+const DEFAULT_EMPLOYEE: Employee = {
+  firstname: '',
+  middlename: '',
+  lastname: '',
+  dob: '',
+  sex: { value: 'male', label: 'Male' },
+  address: '',
+  email: '',
+  phonenumber: '',
+  position: { value: '', label: '' },
+  organization_unit: { value: '', label: '' },
+}
 
 const EmployeesPage = () => {
-  // States
-  const [currentTab, setCurrentTab] = useState('personal-info')
-
-  // Search — `?action=edit&employeeId=...` is what turns this into the edit
-  // screen, so both derive from the URL rather than from local state.
+  // `?action=edit&employeeId=...` is what turns this into the edit screen, so
+  // the edited record derives from the URL rather than local state.
   const { action, employeeId } = route.useSearch()
-  const values =
+  const editing = (
     action === 'edit'
-      ? employeeData.find((emp) => emp.id === employeeId)
+      ? employeeData.find((employee) => employee.id === employeeId)
       : undefined
-  const isEdit = !!values
+  ) as Employee | undefined
+  const isEdit = !!editing
 
-  /**
-   *
-   */
-  const form = useForm<z.infer<typeof EmployeeSchema>>({
+  const form = useForm<Employee>({
     resolver: zodResolver(EmployeeSchema),
-    defaultValues: {
-      firstname: '',
-      lastname: '',
-      middlename: '',
-      email: '',
-      sex: {
-        value: 'male',
-        label: 'Male',
-      },
-      address: '',
-      dob: '',
-      organization_unit: {
-        value: '',
-        label: '',
-      },
-      position: {
-        value: '',
-        label: '',
-      },
-      punch_code: '',
-      schedule: '',
-      phonenumber: '',
-    },
+    defaultValues: editing ?? DEFAULT_EMPLOYEE,
   })
 
   // The form is an uncontrolled external system — hydrating it from the
   // picked record is what an effect is for.
   useEffect(() => {
-    if (values) {
-      form.reset({
-        firstname: values.firstname,
-        lastname: values.lastname,
-        middlename: values.middlename,
-        email: values.email,
-        sex: values.sex,
-        address: values.address,
-        dob: values.dob,
-        organization_unit: values.organization_unit,
-        position: values.position,
-        punch_code: values.punch_code,
-        schedule: values.schedule,
-        phonenumber: values.phonenumber,
-      })
-    }
-  }, [values, form])
+    if (editing) form.reset(editing)
+  }, [editing, form])
 
-  // Nothing persists yet — there's no employees store or API behind this
-  // screen, so submitting only surfaces the payload.
-  const onSubmit = (data: z.infer<typeof EmployeeSchema>) => {
+  // Nothing persists yet — there's no employees API behind this screen, so
+  // submitting only surfaces the payload.
+  const onSubmit = (data: Employee) => {
     showSubmittedData(data, isEdit ? 'Employee updated:' : 'Employee created:')
   }
 
   return (
     <>
-      {/* ===== Top Heading ===== */}
       <Header>
         <Search className='me-auto' />
         <ThemeSwitch />
@@ -120,43 +70,49 @@ const EmployeesPage = () => {
         <ProfileDropdown />
       </Header>
 
-      <Main fixed>
-        <div className='space-y-0.5'>
-          <Link to='/employees-list' className='flex items-center gap-1'>
-            <ArrowLeft size={18} />
-            <span className='text-sm'>Back to employees list</span>
+      <Main>
+        <Button variant='ghost' size='sm' asChild className='-ms-2 mb-2 w-fit'>
+          <Link to='/employees-list'>
+            <ArrowLeft size={16} />
+            Back to employees
           </Link>
-          <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
-            {isEdit ? 'Edit Employee' : 'Add a new Employee'}
-          </h1>
+        </Button>
 
-          {/* <p className='text-muted-foreground'>
-            Manage your account settings and set e-mail preferences.
-          </p> */}
-        </div>
-        <Separator className='my-4 lg:my-6' />
-        <div className='flex flex-1 flex-col space-y-2 overflow-hidden md:space-y-2 lg:flex-row lg:space-y-0 lg:space-x-12'>
-          <aside className='top-0 lg:sticky lg:w-1/5'>
-            <SidebarNav
-              items={sidebarNavItems}
-              currentTab={currentTab}
-              setCurrentTab={setCurrentTab}
-            />
-          </aside>
-          <div className='flex w-full overflow-y-hidden p-1'>
-            {currentTab === 'personal-info' && <PersonalInfo form={form} />}
-            {currentTab === 'position' && <Position form={form} />}
-            {currentTab === 'schedule' && <Schedule form={form} />}
-            <Button
-              type='button'
-              form='employee-form'
-              onClick={form.handleSubmit(onSubmit)}
-              className='w-fit place-self-end'
-            >
-              Save changes
-            </Button>
+        <div className='mb-4 flex flex-wrap items-end justify-between gap-2'>
+          <div>
+            <h2 className='text-2xl font-bold tracking-tight'>
+              {isEdit ? 'Edit employee' : 'Add a new employee'}
+            </h2>
+            <p className='text-muted-foreground'>
+              {isEdit
+                ? "Update this employee's details."
+                : "Fill in the employee's details to add them."}
+            </p>
           </div>
         </div>
+
+        <Separator className='mb-6' />
+
+        <Form {...form}>
+          <form
+            id='employee-form'
+            onSubmit={form.handleSubmit(onSubmit, () =>
+              toast.error('Please complete the required fields.')
+            )}
+            className='max-w-3xl'
+          >
+            <EmployeeFields />
+
+            <div className='mt-8 flex justify-end gap-2'>
+              <Button type='button' variant='outline' asChild>
+                <Link to='/employees-list'>Cancel</Link>
+              </Button>
+              <Button type='submit'>
+                {isEdit ? 'Save changes' : 'Add employee'}
+              </Button>
+            </div>
+          </form>
+        </Form>
       </Main>
     </>
   )

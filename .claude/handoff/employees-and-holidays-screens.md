@@ -1,46 +1,53 @@
-# Handoff: employees / employees-list / official-holidays screens
+# Handoff: employees / employees-list screens
 
 Three screens pulled over from the sibling checkout
 `../schedule-feature` (same GitHub owner, different repo, branch
 `mahmoud-main`) on 2026-08-22.
 
+> **The `official-holidays` third of this file is superseded (2026-08-26).**
+> That feature was deleted and replaced by `public-holidays`, ported from
+> the same sibling repo's `mahmoud-branch`. Anything below about
+> `official-holidays` is history, not current state — see
+> `public-holidays-and-schedule-templates.md`. The `employees` /
+> `employees-list` halves are still accurate.
+
 ## Where things stand
 
-- **Ported and shipped `7e3450a`, pushed to `main`** — 29 files under `src/features/employees/`,
-  `src/features/employees-list/`, `src/features/official-holidays/` plus
-  three route files and two sidebar entries.
-- `npm run build` clean, new code eslint- and prettier-clean, tests
-  164 passed / 3 failed (only the pre-existing, unowned
-  `search-provider.test.tsx` failures).
+- **Ported and shipped `7e3450a`, pushed to `main`** (2026-08-22) — 29
+  files under `src/features/employees/`, `src/features/employees-list/`,
+  `src/features/official-holidays/` plus three route files and two
+  sidebar entries.
+- **Reworked and shipped `e99abb4`, pushed to `main`** (2026-08-27): the
+  employee form dropped its sidebar-tabbed Personal Info / Schedule /
+  Position layout for one flat form (`employee-fields.tsx` +
+  `employee-select-field.tsx`), and `employees-list` moved onto the
+  shared `DataTable` — see the flags below, both now resolved.
+- `npm run build` clean; full suite **174 passed / 3 failed** (only the
+  pre-existing, unowned `search-provider.test.tsx` failures).
 - **Nothing here has been opened in a real browser.**
 
 ## What each screen is
 
 | Feature | Route | State |
 |---|---|---|
-| `employees` | `/employees` | Add/edit form, sidebar tabs Personal Info / Schedule / Position. Only Personal Info is built out — `position.tsx` and `schedule.tsx` are the source's one-line placeholders. |
-| `employees-list` | `/employees-list` | Table over the 10 seeded records in `employees/data/data.json`. Row menu → `/employees?action=edit&employeeId=…`. |
-| `official-holidays` | `/official-holidays` | Per-year holiday records, "Open year" seeding from `createPredefinedHolidays()`, add/edit/delete + bulk delete, faceted Rigid filter, URL-synced paging. |
+| `employees` | `/employees` | Add/edit form — flat, Personal Info fields only (no more sidebar tabs; Schedule/Position were always the source's one-line placeholders and are gone, not just hidden). |
+| `employees-list` | `/employees-list` | Renders through the shared `DataTable` (see below), reading from `useEmployeesStore` — same 10 seeded records, now via a store instead of the raw JSON import. Row menu → `/employees?action=edit&employeeId=…`. |
+| ~~`official-holidays`~~ | ~~`/official-holidays`~~ | **Deleted 2026-08-26**, replaced by `public-holidays`. |
 
-## Flags — decide before building on these
+## Flags
 
-- **No persistence, and no zustand.** All three keep state in React
-  (`useState` + a context provider), unlike `schedules` / `shifts` /
-  `shift-policies`, which persist to `localStorage` through a zustand
-  store and re-validate against their zod schema on load. A holiday you
-  add or a year you open is gone on reload, and the employee form's
-  submit only calls `showSubmittedData` — there is no employees store at
-  all. Converting them to the store pattern used elsewhere is the obvious
-  next step if these are meant to be more than a UI demo.
-- **Both tables hand-roll their markup instead of using the shared
-  `components/data-table/data-table.tsx`.** That is deliberate for
-  `official-holidays`: the shared `DataTable` has no row selection and no
-  faceted filters, which that screen needs for bulk delete and the Rigid
-  filter. `employees-list` could plausibly move onto the shared shell —
-  it uses neither — but its columns have no `name` column, so the shared
-  default `globalFilterFn` (a contains-match on `name`) would need a
-  custom one passed in. Either extend the shared `DataTable` with
-  selection + filters and move both over, or leave them; don't half-do it.
+- **No persistence for creates/edits, still true.** `employees/stores/employees-store.ts`
+  (added 2026-08-27) is read-only — seeded from `data.json`, no
+  `addEmployee`/`updateEmployee` actions — deliberately, per its own
+  comment, since these are seed-only records today and caching a mutated
+  copy to `localStorage` would just shadow the seed (the footgun CLAUDE.md
+  calls out elsewhere). The employee form's submit still only calls
+  `showSubmittedData`. Wiring real add/update actions onto the store is
+  the obvious next step if this is meant to be more than a UI demo.
+- ~~`employees-list` hand-rolls its table markup~~ **Resolved 2026-08-27**
+  — `employees-list` now renders through the shared `DataTable`
+  (`employees-table.tsx`), same as `public-holidays`, with a custom
+  `globalFilterFn` since its columns have no single `name` column.
 
 ## Adaptations made while porting
 
@@ -48,6 +55,11 @@ The source copies do not typecheck under this repo's `tsc -b` (both repos
 have byte-identical tsconfigs, so they don't typecheck in the sibling
 either — that project is only ever run through `vite dev`, which skips
 type checking).
+
+> The three-tab layout (`form: any` props, one component per tab)
+> mentioned below is **gone as of 2026-08-27** — `/employees` is now a
+> single flat form. Kept as history of the original port, not a pointer
+> to current files.
 
 - `/employees` got a real `validateSearch` (`action`, `employeeId`)
   instead of `useSearch({ strict: false })`, which typed those two props
@@ -59,25 +71,30 @@ type checking).
   a `useEffect` keyed on `action` only). `employeeData.find(...)` returns
   a stable reference out of the imported JSON, so the remaining
   `form.reset` effect is safe to depend on it.
-- `form: any` props on the three tab components typed as
-  `UseFormReturn<Employee>`.
-- The `organization_unit` cell reads `row.original` — `row.getValue()`
-  returns `unknown`, so `.value` on it doesn't compile.
 - Debug `console.log`s dropped; the no-op submit routed through
   `showSubmittedData`, matching every other form in this repo.
 
 ## Things that came over as-is, on purpose
 
-- `employees-list/components/employees-list-provider.tsx` exports a
-  `useEmployeesList` hook that returns the **context object** rather than
-  `useContext(...)`'s value. It has no consumers today, so it's dead
-  either way — fix it if something starts using it.
-- The `organization_unit` column renders the option's `value`
-  (`information_technology`), not its `label`. That's what the source
-  does; it looks like a bug but it wasn't mine to decide.
-- `employees-list`'s route has no `validateSearch`, so its
-  `useTableUrlState` paging writes unvalidated search params. Works, but
-  it's the odd one out next to `/official-holidays`.
+Both items below were **resolved 2026-08-27** as part of the
+`employees-list` DataTable migration:
+
+- ~~`employees-list/components/employees-list-provider.tsx` exports a
+  `useEmployeesList` hook that returns the context object rather than
+  `useContext(...)`'s value~~ — the whole file is deleted; `employees-list`
+  no longer uses a context provider at all.
+- ~~The `organization_unit` column renders the option's `value`
+  (`information_technology`), not its `label`~~ — the rebuilt
+  `employeesColumns` renders `.label` in a `Badge`, matching every other
+  column that shows one of these value/label objects.
+- `employees-list`'s route still has no `validateSearch`, but this is now
+  moot rather than an open question: the shared `DataTable` keeps
+  filter/pagination state locally (not URL-synced), so `employees-list`
+  dropped `useTableUrlState` entirely when it moved onto it — same
+  resolution `public-holidays` took. `hooks/use-table-url-state` is now
+  only used by `users`/`tasks`, the template's demo boilerplate modules
+  (not one of the three real feature modules) — leave the hook in place
+  for them, nothing left to retire it for.
 
 ## No dependency work was needed
 
@@ -92,12 +109,16 @@ unchanged.
 
 ## Pick up here
 
-1. **Click through all three screens.** Highest-risk unverified pieces, in
-   order: the holiday action dialog's multi-date calendar popover (add /
-   remove / uniqueness), "Open year" on a year that isn't the current one,
-   and the `/employees-list` → `/employees?action=edit` round trip.
-2. Decide on persistence (see the first flag above).
-3. Decide whether `employees-list` moves onto the shared `DataTable`
-   (see the second flag).
-4. The Schedule and Position tabs on `/employees` are empty placeholders —
-   they render literal `"Schedule"` / `"position"` text.
+1. **Click through both remaining screens.** Highest-risk unverified
+   piece: the `/employees-list` → `/employees?action=edit` round trip.
+   *(The holiday-dialog items that used to head this list moved to
+   `public-holidays-and-schedule-templates.md`.)*
+2. Decide on persistence for `employees` / `employees-list` (see the flag
+   above) — now specifically means wiring `addEmployee`/`updateEmployee`
+   actions onto `useEmployeesStore`, since the store itself now exists.
+3. **The flat employee form only collects Personal Info** — `position` and
+   `organization_unit` are still required fields on `EmployeeSchema` (used
+   elsewhere: `employees-list`'s Position/Organization unit columns, and
+   `features/teams`' member picker shows a name only, not these), but
+   nothing in `EmployeeFields` lets you set them. Decide whether they need
+   inputs, get defaulted some other way, or should drop off the schema.

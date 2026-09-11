@@ -1,17 +1,12 @@
-export const employees = [
-  { value: 'emp-1', label: 'Olivia Martin' },
-  { value: 'emp-2', label: 'Liam Johnson' },
-  { value: 'emp-3', label: 'Emma Williams' },
-  { value: 'emp-4', label: 'Noah Brown' },
-  { value: 'emp-5', label: 'Ava Jones' },
-  { value: 'emp-6', label: 'Elijah Garcia' },
-  { value: 'emp-7', label: 'Sophia Miller' },
-  { value: 'emp-8', label: 'James Davis' },
-  { value: 'emp-9', label: 'Isabella Rodriguez' },
-  { value: 'emp-10', label: 'Benjamin Martinez' },
-  { value: 'emp-11', label: 'Mia Hernandez' },
-  { value: 'emp-12', label: 'Lucas Lopez' },
-  { value: 'emp-13', label: 'Charlotte Gonzalez' },
-  { value: 'emp-14', label: 'Henry Wilson' },
-  { value: 'emp-15', label: 'Amelia Anderson' },
-]
+import employeeData from '@/features/employees/data/data.json'
+import { type Employee } from '@/features/employees/data/schema'
+import { getEmployeeFullName } from '@/features/employees/utils'
+
+// The daily-schedule form's employee picker options. Derived from the one
+// employee directory rather than kept as a parallel hand-written list, so
+// the ids a saved schedule stores are the same ones every other feature
+// (shifts' "Assign to", teams, the rotation roster) references.
+export const employees = (employeeData as Employee[]).map((employee) => ({
+  value: employee.id as string,
+  label: getEmployeeFullName(employee),
+}))

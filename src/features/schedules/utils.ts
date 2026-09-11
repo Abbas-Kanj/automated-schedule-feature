@@ -508,3 +508,17 @@ export function getScheduleCalendarCycle(
     ),
   }
 }
+
+// The cycle day a crew starts on, in the units the pattern was written in. A
+// whole number of weeks is the common case for these rosters, and "week 2" is
+// the phrase the write-ups use, so it is said out loud rather than left as
+// arithmetic on a day number.
+//
+// Lives here rather than beside the controls that use it so both the schedule
+// form and the Schedule Rotation screen read a crew's start the same way.
+export function describeStartDay(day: number, cycleLength: number): string {
+  if (cycleLength > 7 && cycleLength % 7 === 0) {
+    return `Day ${day + 1} · week ${Math.floor(day / 7) + 1}`
+  }
+  return `Day ${day + 1}`
+}

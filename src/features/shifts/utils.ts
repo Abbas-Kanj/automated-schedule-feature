@@ -113,6 +113,8 @@ export function normalizeShiftFormValues(
     service_territory: values.assign_to_enabled
       ? values.service_territory
       : undefined,
+    employee_ids: values.assign_to_enabled ? values.employee_ids : [],
+    team_ids: values.assign_to_enabled ? values.team_ids : [],
   }
 }
 

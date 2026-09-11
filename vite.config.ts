@@ -22,9 +22,23 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
+    // react-select pulls its own React instance under vitest's browser mode
+    // otherwise, which makes its hooks throw on mount (see
+    // `schedule-assign-to-fields.test.tsx`).
+    dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  // Pre-bundled up front so a cold cache cannot discover them mid-run.
+  // When vitest optimizes a dep partway through a file it reloads the page,
+  // and the reload briefly resolves a second React — the same
+  // "Invalid hook call" the dedupe above exists to prevent, except it only
+  // shows on the *first* run after `node_modules/.vite` is cleared, then
+  // disappears. Anything a component test mounts that is not already reached
+  // from `src/main.tsx` belongs here.
+  optimizeDeps: {
+    include: ['@radix-ui/react-switch', '@radix-ui/react-popover'],
   },
   test: {
     silent: 'passed-only',

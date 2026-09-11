@@ -1,25 +1,14 @@
 import { z } from 'zod'
 import { create } from 'zustand'
+import { generateId } from '@/lib/id'
+import { readSeeded, writeSeeded } from '@/lib/seed-store'
 import { defaultSchedules } from '../data/schedules'
 import { type Schedule, scheduleSchema } from '../data/schema'
-import { generateId } from '@/lib/id'
 
 const STORAGE_KEY = 'schedules'
 
-function readStoredSchedules(): Schedule[] {
-  const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return defaultSchedules
-
-  try {
-    const result = z.array(scheduleSchema).safeParse(JSON.parse(raw))
-    return result.success ? result.data : defaultSchedules
-  } catch {
-    return defaultSchedules
-  }
-}
-
 function persist(schedules: Schedule[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(schedules))
+  writeSeeded(STORAGE_KEY, schedules)
 }
 
 interface SchedulesState {
@@ -30,10 +19,11 @@ interface SchedulesState {
   deleteSchedule: (id: string) => void
 }
 
-const initialSchedules = readStoredSchedules()
-if (!localStorage.getItem(STORAGE_KEY)) {
-  persist(initialSchedules)
-}
+const initialSchedules = readSeeded(
+  STORAGE_KEY,
+  z.array(scheduleSchema),
+  defaultSchedules
+)
 
 export const useSchedulesStore = create<SchedulesState>()((set) => ({
   schedules: initialSchedules,
