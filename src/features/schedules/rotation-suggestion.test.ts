@@ -7,6 +7,7 @@ import {
   type SuggestionCrew,
   type SuggestionSlot,
   analyzeDayCoverage,
+  crewDayLowerBound,
   crewRequirement,
   findQuickTurnarounds,
   placementsToCoverageCrews,
@@ -93,6 +94,9 @@ describe('crewRequirement', () => {
     expect(crewRequirement(slots, shifts)).toEqual({
       workDaysPerCrew: 5,
       cellsPerCycle: 14,
+      // The division a person does in their head, kept so the UI can account
+      // for the difference instead of printing both numbers side by side.
+      crewDayBound: 3,
       minimumCrews: 4,
       exact: true,
     })
@@ -146,6 +150,7 @@ describe('crewRequirement', () => {
     expect(crewRequirement(makeSlots([null, null]), ['a', 'b'])).toEqual({
       workDaysPerCrew: 0,
       cellsPerCycle: 4,
+      crewDayBound: 0,
       minimumCrews: 0,
       exact: false,
     })
@@ -775,5 +780,61 @@ describe('rest between one crew’s consecutive shifts', () => {
     })
 
     expect(uncoveredCells(result.coverage)).toBe(0)
+  })
+})
+
+// The gap between "cells divided by working days" and what it really takes.
+// That division is the sum a person does in their head, so wherever the two
+// disagree the UI has to account for the difference — it used to print the
+// division and a larger headline number side by side, which reads as a bug.
+describe('the crew-day bound against the real requirement', () => {
+  const ids = ['M', 'A']
+
+  it('is the plain division, nothing cleverer', () => {
+    // 7 days x 2 shifts = 14 cells, 5 working cards per crew -> 3.
+    const slots = makeSlots(['M', 'M', 'M', 'M', 'M', null, null])
+    expect(crewDayLowerBound(slots, ids)).toBe(3)
+    expect(crewRequirement(slots, ids).crewDayBound).toBe(3)
+  })
+
+  // Every crew walks the same cards offset in time. On a pattern naming one
+  // shift throughout, a crew never changes shift, so the three pairs of crews
+  // that share duty would all have to be on opposite shifts — impossible with
+  // two. Hence four, one more than the division suggests.
+  it('reports more than the bound when the pattern shape is the limit', () => {
+    const requirement = crewRequirement(
+      makeSlots(['M', 'M', 'M', 'M', 'M', null, null]),
+      ids
+    )
+    expect(requirement.minimumCrews).toBe(4)
+    expect(requirement.minimumCrews).toBeGreaterThan(requirement.crewDayBound)
+  })
+
+  // The block roster: 3 crews x 4 working days = 12 = 6 days x 2 shifts. An
+  // exact fit, and the bound is the answer.
+  it('meets the bound on a six-day two-block cycle', () => {
+    const requirement = crewRequirement(
+      makeSlots(['M', 'M', 'A', 'A', null, null]),
+      ids
+    )
+    expect(requirement.crewDayBound).toBe(3)
+    expect(requirement.minimumCrews).toBe(3)
+  })
+
+  // Two guards against ever re-deriving "alternate the shifts" as a general
+  // rule. It rescues the 7-day 5-2 and it wrecks the 6-day block roster, so
+  // neither layout wins on its own and no UI copy may promise one.
+  it('alternating rescues a seven-day 5-2', () => {
+    expect(
+      crewRequirement(makeSlots(['M', 'A', 'M', 'A', 'M', null, null]), ids)
+        .minimumCrews
+    ).toBe(3)
+  })
+
+  it('alternating ruins the six-day roster that blocks get right', () => {
+    expect(
+      crewRequirement(makeSlots(['M', 'A', 'M', 'A', null, null]), ids)
+        .minimumCrews
+    ).toBe(4)
   })
 })

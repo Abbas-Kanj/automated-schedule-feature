@@ -267,6 +267,13 @@ export type CrewRequirement = {
   // Cycle cards one crew actually works. Explains the number to the user.
   workDaysPerCrew: number
   cellsPerCycle: number
+  // What it would take if any crew could fill any gap — cells divided by the
+  // days one crew works, and nothing else. `minimumCrews` is often larger,
+  // and the gap between the two is the whole story the "Assign to" note has
+  // to tell: below it the limit is arithmetic (there are not enough
+  // crew-days), above it the limit is the *pattern's shape*, which is fixable
+  // by editing the pattern rather than by hiring.
+  crewDayBound: number
   minimumCrews: number
   // Did a probe actually reach full coverage? False means the probe budget
   // ran out, so `minimumCrews` is the lower bound rather than a demonstrated
@@ -343,6 +350,41 @@ function fullyCovered(coverage: CoverageDay[]): boolean {
   return coverage.every((day) => day.uncoveredShiftIds.length === 0)
 }
 
+// How many cards name each selected shift. Cards naming a shift nobody
+// selected are worked days that cover nothing — `shiftForCard` passes an
+// unknown id through unrotated — so they are deliberately left out.
+function cardsByShiftCount(
+  slots: SuggestionSlot[],
+  orderedShiftIds: string[]
+): number[] {
+  const shiftIndex = new Map(orderedShiftIds.map((id, index) => [id, index]))
+  const counts = new Array<number>(orderedShiftIds.length).fill(0)
+  slots.forEach((slot) => {
+    if (slot.isOff || !slot.shiftId) return
+    const index = shiftIndex.get(slot.shiftId)
+    if (index !== undefined) counts[index] += 1
+  })
+  return counts
+}
+
+// Cells divided by the days one crew works. A true lower bound, and the
+// number a person arrives at on their own — which is exactly why the gap
+// between it and the real answer has to be explained rather than left to look
+// like a mistake.
+export function crewDayLowerBound(
+  slots: SuggestionSlot[],
+  orderedShiftIds: string[]
+): number {
+  const cycleLength = slots.length
+  const n = orderedShiftIds.length
+  const coverableDays = cardsByShiftCount(slots, orderedShiftIds).reduce(
+    (sum, count) => sum + count,
+    0
+  )
+  if (cycleLength === 0 || n === 0 || coverableDays === 0) return 0
+  return Math.ceil((cycleLength * n) / coverableDays)
+}
+
 // The counting-only lower bound. Split out because it is what the probe
 // starts from, and what it falls back to if the budget runs out.
 function coverageLowerBound(
@@ -351,22 +393,12 @@ function coverageLowerBound(
 ): number {
   const cycleLength = slots.length
   const n = orderedShiftIds.length
-
-  // Cards naming a shift nobody selected are worked days that cover nothing —
-  // `shiftForCard` passes an unknown id through unrotated — so they are
-  // deliberately left out of the per-shift tally.
-  const shiftIndex = new Map(orderedShiftIds.map((id, index) => [id, index]))
-  const cardsByShift = new Array<number>(n).fill(0)
-  slots.forEach((slot) => {
-    if (slot.isOff || !slot.shiftId) return
-    const index = shiftIndex.get(slot.shiftId)
-    if (index !== undefined) cardsByShift[index] += 1
-  })
+  const cardsByShift = cardsByShiftCount(slots, orderedShiftIds)
 
   const coverableDays = cardsByShift.reduce((sum, count) => sum + count, 0)
   if (cycleLength === 0 || n === 0 || coverableDays === 0) return 0
 
-  const crewDayBound = Math.ceil((cycleLength * n) / coverableDays)
+  const crewDayBound = crewDayLowerBound(slots, orderedShiftIds)
   if (n > REQUIREMENT_EXACT_SHIFT_LIMIT) return crewDayBound
 
   // Giving every shift its own group of crews always satisfies the counting
@@ -388,13 +420,20 @@ export function crewRequirement(
     (slot) => !slot.isOff && slot.shiftId
   ).length
   const cellsPerCycle = slots.length * orderedShiftIds.length
+  const crewDayBound = crewDayLowerBound(slots, orderedShiftIds)
   const lowerBound = coverageLowerBound(slots, orderedShiftIds)
 
   // An all-off pattern, no selected shifts, or a pattern naming none of them:
   // nothing is coverable, so no crew count is enough. Reported as 0 rather
   // than as infinity, and the UI drops the note.
   if (lowerBound === 0) {
-    return { workDaysPerCrew, cellsPerCycle, minimumCrews: 0, exact: false }
+    return {
+      workDaysPerCrew,
+      cellsPerCycle,
+      crewDayBound,
+      minimumCrews: 0,
+      exact: false,
+    }
   }
 
   for (
@@ -411,6 +450,7 @@ export function crewRequirement(
       return {
         workDaysPerCrew,
         cellsPerCycle,
+        crewDayBound,
         minimumCrews: count,
         exact: true,
       }
@@ -420,6 +460,7 @@ export function crewRequirement(
   return {
     workDaysPerCrew,
     cellsPerCycle,
+    crewDayBound,
     minimumCrews: lowerBound,
     exact: false,
   }

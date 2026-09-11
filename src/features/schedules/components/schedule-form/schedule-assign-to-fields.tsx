@@ -535,6 +535,16 @@ type CrewRequirementNoteProps = {
 // Being under the minimum is a fact about the pattern, not a mistake — same
 // rule the warnings follow — so this never blocks anything and never uses the
 // destructive colour.
+//
+// The hard part is the *second* line. Crew-days over cells is the sum anyone
+// does in their head, and on a lot of patterns it lands one short of the real
+// answer — so the note used to state a number and then show arithmetic
+// disagreeing with it, which reads as a bug rather than as the constraint it
+// is. When the two differ, the gap is now named and attributed to the thing
+// that actually causes it: every crew walks the same cards, so two crews on
+// duty together can land on the same shift and leave the other empty. That is
+// fixable by editing the pattern, which is worth saying, because the number
+// on its own looks like it can only be fixed by hiring.
 function CrewRequirementNote({
   requirement,
   cycleLength,
@@ -542,7 +552,8 @@ function CrewRequirementNote({
   selectedCount,
   crewKind,
 }: CrewRequirementNoteProps) {
-  const { workDaysPerCrew, cellsPerCycle, minimumCrews } = requirement
+  const { workDaysPerCrew, cellsPerCycle, crewDayBound, minimumCrews } =
+    requirement
   // An all-off pattern or no selected shifts: there is no grid to size a pool
   // against, and the previous steps already say so.
   if (minimumCrews === 0 || shiftCount === 0) return null
@@ -570,6 +581,16 @@ function CrewRequirementNote({
         {plural(workDaysPerCrew, 'day')} of this pattern, and can only be on one
         shift a day.
       </p>
+      {requirement.exact && minimumCrews > crewDayBound && (
+        <p className='mt-1 text-muted-foreground'>
+          That division comes to {plural(crewDayBound, unit)}, and it would be
+          right if any crew could fill any gap — but every crew walks these same
+          cards, only started on a different day, so two crews on duty together
+          can land on the same shift and leave the other empty. Which shift each
+          working card names is what decides the real number, so editing the
+          pattern can lower it; this updates as you do.
+        </p>
+      )}
       <p
         className={cn(
           'mt-1.5 flex items-center gap-1.5 font-medium',

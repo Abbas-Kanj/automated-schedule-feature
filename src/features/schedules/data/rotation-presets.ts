@@ -114,7 +114,7 @@ export const ROTATION_PRESETS: RotationPreset[] = [
     label: '2 days / 2 nights / 2 off (DDNNOO)',
     group: 'Continuous coverage',
     description:
-      'Six-day cycle rotating days then nights. Three crews cover it end to end.',
+      'Six-day cycle: two on the first shift, two on the second, two off. Three crews cover every shift every day with nothing spare — an exact fit, and the usual answer when two shifts have to run round the clock.',
     minShifts: 2,
     suggestedCrews: 3,
     buildCards: () => [...on(2, 0), ...on(2, 1), ...off(2)],
