@@ -44,19 +44,9 @@ directory.
   Don't assume Clerk is wired into the main app shell.
 - **Vitest in real Chromium** via `@vitest/browser-playwright`, tests
   colocated as `*.test.ts(x)`.
-- **`bridge/`** — a file-based bridge for delegating tasks from Claude Code
-  to local OpenCode agents (cheaper/alternate models) and picking up results
-  async. Full protocol lives in the `opencode-agents-bridge` skill — confirmed
-  installed and loadable on this machine as of 2026-08-16 (see gotcha below).
 
 ## Known environment gotchas
 
-- **RESOLVED 2026-08-16: `opencode-agents-bridge` skill is installed.** The
-  2026-08-11 note below said it wasn't found under `~/.claude/skills/` or the
-  D:\skills backup; it's since confirmed present at
-  `~/.claude/skills/opencode-agents-bridge` (file-dated 2026-08-11 4:07 PM —
-  it landed later the same session, just after that note was written) and
-  loads normally. `bridge/` scripts should work as documented.
 - **The `D:\skills` backup drive can remount under a different letter —
   seen as `E:\skills` on 2026-08-16.** Same content (check
   `E:\skills\LAST-SYNC.txt` / `.sync-log.jsonl` for provenance — it's a
@@ -92,17 +82,14 @@ directory.
   fix is `--scope user`. Applies to any `winget install` from an automated
   context, not just `gh`.
 
-- **The `handoff-before-clear` skill describes machinery that is NOT
-  installed on this machine** (verified 2026-08-21). The skill documents a
-  global `/handoff` command plus a `SessionStart`/`matcher: "clear"`
-  staleness-warning hook. In reality: `~\.claude\commands\` **does not
-  exist at all** (so there is no `/handoff` command), there is no
-  `~\.claude\hooks\handoff-stale-on-clear.py`, and the `SessionStart`
-  hook actually wired in `~\.claude\settings.json` is
-  `bridge-session-start.py` with **no `matcher`**. Net effect: **nothing
-  warns you** if you `/clear` with a stale handoff file — do the handoff
-  update manually before clearing. Either install the two missing pieces or
-  correct the skill; don't trust its "Mechanism" section as-is.
+- **The `handoff-before-clear` skill's machinery may not be fully installed
+  on this machine** (last checked 2026-08-21, before later changes). The
+  skill documents a global `/handoff` command plus a
+  `SessionStart`/`matcher: "clear"` staleness-warning hook. Verify
+  `~\.claude\commands\` and `~\.claude\hooks\handoff-stale-on-clear.py`
+  actually exist and that the hook is wired in `~\.claude\settings.json`
+  before relying on it; if not, do the handoff update manually before
+  clearing.
 
 ## Working conventions
 
