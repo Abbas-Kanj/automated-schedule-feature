@@ -366,8 +366,10 @@ recur on 2026-09-06** — the new UI reuses primitives already in the list.
   *flow*; it does not look at anything.
   **Never-seen markup:** the coverage panel's two grids + warning list, and the
   day × shift manual grid.
-- **Uncommitted** at handoff time — now three sessions' worth (09-02, 09-03,
-  09-06).
+- **Committed and pushed.** The 09-02/09-03/09-06 batch landed as `3656eed`;
+  the follow-on work (crew start days, the rest guardrail, the crew-requirement
+  explanation) as `7c9cb5a` and `4531085`. Nothing from this topic is
+  uncommitted any more. Browser verification below is still outstanding.
 
 ## Open calls / follow-ups
 

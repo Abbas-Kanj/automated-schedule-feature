@@ -561,15 +561,37 @@ a genuine missing-import that `tsc -b` caught.
   fine and read as "set by hand". **`SEED_VERSION` not bumped.** The eight
   rotate seeds carry `[]` — their real offsets were never recorded, so **no
   seeded rotation demonstrates the start-day read-back yet**.
-- `npm run build` clean; `npm run test` **267 passed / 3 failed** (up from
+- **Shipped and pushed**, clearing four sessions' worth of uncommitted work:
+  `7c9cb5a` (crew start days, rest guardrail, three presets) and `4531085`
+  (the crew-requirement explanation below). Working tree clean.
+- **The "why does a 2-shift rotation need 4 teams?" question got a real
+  answer**, and it is worth not re-deriving. A plain 5-on/2-off needs ≥2 crews
+  on duty every day (14 crew-days) against 3 crews × 5 days = 15, so at most
+  one crew is off per day — which makes all three *pairs* of crews share duty,
+  and each pair must be on opposite shifts. A pattern naming one shift
+  throughout welds each crew to one shift, so that needs three pairwise-
+  different values out of two shifts. Impossible → 4. `five_two` is
+  single-shift by design; the shift count is not what forces it.
+- **Watch out: "just alternate the shifts" is not a rule.** A sweep over cycle
+  lengths 4-12 across 2 and 3 shifts found **55 counterexamples** — alternating
+  rescues the 7-day 5-2 (4 → 3) and *ruins* the 6-day two-block roster (3 → 4).
+  It had already been written into the UI copy as advice before being tested.
+  Two named tests pin both directions.
+- `npm run build` clean; `npm run test` **272 passed / 3 failed** (up from
   243/3 — the same unowned `search-provider.test.tsx` three); eslint **0
-  errors** / 3 pre-existing warnings. **Still uncommitted — now four sessions'
-  worth — and still not browser-verified.**
+  errors** / 3 pre-existing warnings. **Still not browser-verified — five
+  sessions now — and the crew-start editor, the Summary read-back and the
+  `/schedule-rotation` crew line are markup nobody has loaded.**
   → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
 
 ## Pick up here next session
 
-0. **Derive real `crew_placements` for the eight rotate seeds.** They all
+0. **Answer the open preset question** — offered and not yet answered: add
+   `M A M A M · ·` as a 7-day two-shift preset? It is the *only* true
+   5-on/2-off three crews can cover, so without it that roster has to be
+   hand-built. Worth pairing with `A A A · M M ·`, which avoids the daily
+   shift flip. → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
+1. **Derive real `crew_placements` for the eight rotate seeds.** They all
    carry `[]`, so every seeded rotation reads as "set by hand" and **nothing
    on `/schedule-rotation` demonstrates the new start-day read-back**.
    Mechanical: for each crew in a seed's `day_coverage`, search the
@@ -578,7 +600,7 @@ a genuine missing-import that `tsc -b` caught.
    Also confirm the healthcare preset's fourth week against the original
    write-up (the 09-08 notes transcribed it as 8 cards for a 28-day cycle).
    → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
-1. **Browser-verify the rotation coverage rework** — newest work, and the
+2. **Browser-verify the rotation coverage rework** — newest work, and the
    only item here with a written click-list. Start with the case that
    motivated it: schedule form → Rotate → select **Morning + Night** →
    **Pattern** → preset **5-2** (every card says Morning) → **Assign to** →
@@ -599,7 +621,7 @@ a genuine missing-import that `tsc -b` caught.
    Teams ⇄ Employees with the manual grid open must not put employee names
    in a team field. Full list in
    `.claude/handoff/rotation-suggestion.md`.
-2. **Click through the seven screens that have never been opened in a
+3. **Click through the seven screens that have never been opened in a
    browser here**: `/schedule-rotation` (**three** seeded rotations),
    `/public-holidays` and `/schedule-templates`, `/teams`, plus
    `/employees` and `/employees-list` (both reworked 2026-08-27 — flat
@@ -611,37 +633,39 @@ a genuine missing-import that `tsc -b` caught.
    drives the Schedule Rotation roster — that moved onto the schedule on
    2026-08-29 — so it is sample data only; worth a look, but a bug there
    is now cosmetic rather than load-bearing.
-3. **Click through the schedule form** — the `ToggleButton` conversions in
+4. **Click through the schedule form** — the `ToggleButton` conversions in
    the weekday / month-day / cycle-length / calendar grids shipped without
    a browser check (see `.claude/handoff/shift-policies.md`).
-4. **Teams and the shift Assign-to employees/teams pickers were never
+5. **Teams and the shift Assign-to employees/teams pickers were never
    documented anywhere** — built in an earlier, unrecorded session and
    only surfaced (then committed, `d808701` + `c8c333c`) on 2026-08-27
    when picking up a large batch of uncommitted work. See
    `.claude/handoff/teams-and-shift-assignment.md` for what's actually
    there.
-5. Decide on the repo-wide Prettier normalization — still open, and still
+6. Decide on the repo-wide Prettier normalization — still open, and still
    its own commit if it happens (running `prettier --write` on an
    untouched HEAD file reorders unrelated Tailwind classes).
-6. Authenticate mem0 with a **correct** key (`m0-...` format, from
+7. Authenticate mem0 with a **correct** key (`m0-...` format, from
    https://app.mem0.ai/dashboard/api-keys) via `mem0 init --api-key <key>`,
    then run the Step 1 cross-project search before other work.
-7. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
+8. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
    surfaced by graphify (`shadcn-admin.netlify.app` vs. the real GitHub
    Pages deploy target).
-8. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
+9. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
    remove the references to it in `ARCHITECTURE.md`/`FEATURE_MAPPING.md`.
    `docs/ARCHITECTURE.md` / `FEATURE_MAPPING.md` also predate
    `shift-policies` and the shared `DataTable`.
-9. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
+10. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
    work — not needed for anything done so far.
-10. **Decide on the duplicate sidebar entry** for `/schedule-rotation`
+11. **Decide on the duplicate sidebar entry** for `/schedule-rotation`
     (top-level button *and* the Time Track → Schedules leaf) — kept both
     rather than deleting from a hierarchy that was deliberate and recent.
-11. **`pattern-builder.tsx` week-count readout divides by a hardcoded `6`**
+12. **`pattern-builder.tsx` week-count readout divides by a hardcoded `6`**
     while `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is `7` — a 7-day
     weekly cycle renders as "1 week" correct by luck. Found, not fixed.
-12. **`eslint` now reports 11 errors / 3 warnings** (mostly
-    `react-hooks/set-state-in-effect`) in files untouched since the
-    2026-08-25 session recorded "eslint clean" — reconcile before
-    treating lint as a gate.
+13. **`eslint` reports 11 errors / 3 warnings repo-wide** — re-verified
+    2026-09-11, unchanged. `features/schedules` and `features/schedule-rotation`
+    are clean (0 errors); the errors are all elsewhere — mostly
+    `react-hooks/set-state-in-effect`, in files untouched since the
+    2026-08-25 session recorded "eslint clean". Reconcile before treating
+    lint as a gate.

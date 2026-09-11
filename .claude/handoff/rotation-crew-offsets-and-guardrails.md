@@ -1,225 +1,219 @@
-# Rotation crew offsets and guardrails
+# Rotation crew offsets, guardrails, and what a pattern really costs in crews
 
-**Status: built 2026-09-10.** The three scope questions parked here on
-2026-09-08 were answered and the work is done. Uncommitted.
+**Status: built and shipped.** Two commits, both pushed to `main`:
 
-## What this was
+- `7c9cb5a` (2026-09-10) — crew start days, the rest guardrail, three presets.
+- `4531085` (2026-09-11) — the crew-requirement explanation and `crewDayBound`.
 
-On 2026-09-08 the user pasted four real-world rotation write-ups and asked
-whether the repo's rotate model already implements them. The investigation
-found the patterns themselves already worked and four genuine gaps; the
-session closed before implementation with three scope questions unanswered.
+Working tree clean. Nothing here is in flight except the open calls at the
+bottom.
 
-The four write-ups:
+## Where this came from
 
-1. **4-crew 2-2-3 (Panama)**, 14-day cycle — "assign Team A to Day 1 of the
-   template, Team B to Day 8", pick an effective start date aligned to day one.
-2. **4-team / 3-shift forward rotation**, 28-day cycle — week-granular table
-   (Team A: M week → A week → N week → O week), assign by "team + start week
-   offset", "repeat indefinitely every 28 days".
-3. **7-week master rotation**, 7 crews / 49-day cycle — week rows with weekday
-   masks, assign a team to a start week.
-4. **Healthcare 5/2 rotating**, 4 teams / 28-day cycle, plus three guardrails:
-   no quick-turnaround (forward rotation only), weekend equity, skill mix.
+On 2026-09-08 four real-world rotation write-ups were checked against the
+rotate model. The patterns themselves already worked; four gaps were found and
+three scope questions were left unanswered. They were answered on 09-10:
 
-## The answers
+- **Crew offsets → persist + editable.**
+- **Guardrails → delegated.** Chosen: quick-turnaround warning, surfacing the
+  hidden alignment warnings, forward rotation as a scorer *tie-break only*.
+  **Weekend equity as a scoring term was deferred** — one write-up mentions it,
+  `weekend-imbalance` already warns, and stacking two new scoring terms makes a
+  regression unattributable.
+- **Presets → all three.**
 
-- **Q1 crew offsets → (a) persist + editable.**
-- **Q2 guardrails → delegated to Claude.** Chosen: the quick-turnaround
-  warning, surfacing the hidden alignment warnings, and forward rotation as a
-  *tie-break only* inside the scorer. **Weekend equity as a scoring term was
-  deferred** — only one write-up mentions it, the `weekend-imbalance` warning
-  already covers it, and stacking two new scoring terms at once makes a
-  regression impossible to attribute.
-- **Q3 presets → all three.**
+## Decisions locked
 
-## What was built
+- **`day_coverage` is the source of truth.** `crew_placements[]` is a
+  *generator record* stored beside it, never instead of it. Free cell editing
+  can produce a roster no pair of offsets describes, which is why 09-06 removed
+  offsets in the first place; they came back additively.
+- **Staleness is re-derived, never flagged.** `dayCoverageMatchesPlacements`
+  regenerates cells and compares. A `stale` boolean has to be cleared on every
+  path that touches a cell, and the one path that forgets makes the record lie.
+- **Rest is measured in clock hours, never in shift-list positions.** Ordered by
+  start time, Night → Morning steps one place *forward* while being the
+  textbook quick turnaround (off 06:00, back on 06:00). An index-based rule
+  waves through the one transition the check exists to catch.
+- **The scorer's rest term is gated on `shiftHours` being supplied**, so every
+  caller that does not pass it scores exactly as before. No test rebaselining
+  was needed and none was done.
+- **Warn, don't block.** Unchanged. An unstaffed shift is never a validation
+  error; the coverage panel carries the whole message.
 
-### 1. `crew_placements[]` — start days are a real field now
+## What exists now
 
-`rotateFieldsSchema` gained `crew_placements: { crew, day_offset, shift_step }[]`
-(`schedules/data/schema.ts`). `crew` is the same `team:<id>` / `employee:<id>`
-key the suggestion and the step's pool already use.
+### Crew start days
 
-**`day_coverage` is still the source of truth.** Placements are a *generator
-record* stored beside it, which is what the 2026-09-06 session's removal of
-offsets requires — free cell editing can produce a roster no pair of offsets
-describes.
+`rotateFieldsSchema` carries `crew_placements: { crew, day_offset, shift_step }[]`,
+`crew` being the `team:<id>` / `employee:<id>` key the pool already uses.
 
-**Staleness is re-derived, never flagged.** `dayCoverageMatchesPlacements`
-(`rotation-crews.ts`) regenerates cells from the placements and compares. A
-`stale` boolean would have to be cleared on every path that touches a cell,
-and the one path that forgets makes the record lie. Regenerating cannot drift.
-False means somebody hand-edited: every screen then shows the matrix and says
-the start days no longer describe it, and **nothing re-applies them**.
-
-New in `rotation-crews.ts`: `cellsFromCrewPlacements` (the stored shape in,
-cells out — `cellsFromPlacements` now delegates to it), `crewPlacementsToStored`,
+In `rotation-crews.ts`: `cellsFromCrewPlacements` (stored shape in, cells out —
+`cellsFromPlacements` delegates to it), `crewPlacementsToStored`,
 `dayCoverageMatchesPlacements`, `shiftHoursById`.
 
-**Where it surfaces:**
+Surfaces in three places:
 
-- **Assign to step** — `CrewStartEditor` in
-  `components/schedule-form/rotation-crew-starts.tsx`. One row per crew: a
-  "starts on day N · week M" select and a shift-track select. The shift-track
-  options are **labelled by the shift the crew actually opens on**, never by
-  the stored step number, which is a transposition through the shift list and
-  means nothing to anyone building a roster. Changing either regenerates the
-  whole matrix from every crew's offsets via `applyPlacements` — regenerated,
-  not patched, so nothing survives from the previous arrangement to
-  double-book a cell.
-- **Summary step** — `CrewStartSummary`, read-only. Reads each crew's opening
-  shift off the *stored matrix* rather than recomputing it, so it stays honest
-  after a hand edit.
-- **`/schedule-rotation`** — `RotationRow` gained `crewKey`/`crewLabel`/
-  `startDay`; the table shows "Team B · starts day 8 · week 2" under the
-  employee name. `startDay` is only filled in when the placements still
-  describe the matrix (checked once per table in `buildRotation`, not per row).
-  A crew that is a single picked employee shows no label — repeating their
-  name under their name says nothing.
+- **Assign to** — `CrewStartEditor` in `components/schedule-form/rotation-crew-starts.tsx`.
+  A "Day N · week M" select and a shift-track select per crew. Shift-track
+  options are labelled by **the shift the crew actually opens on**, never the
+  stored step number. Changing either regenerates the whole matrix via
+  `applyPlacements` — regenerated, not patched.
+- **Summary** — `CrewStartSummary`, read-only, reads the opening shift off the
+  *stored matrix* so it stays honest after a hand edit.
+- **`/schedule-rotation`** — `RotationRow.crewKey`/`crewLabel`/`startDay`;
+  "Team B · starts day 8 · week 2" under the employee name. `startDay` is only
+  filled when the placements still describe the matrix, checked once per table
+  in `buildRotation`.
 
 Both Radix `Select`s carry the `if (!value) return` guard from the
-`radix-select-bubble-select-wipes-programmatic-value` skill. Every value here
-is programmatically set (Suggest writes them), which is exactly the trigger.
+`radix-select-bubble-select-wipes-programmatic-value` skill — every value here
+is programmatically set, which is the trigger.
 
-### 2. Quick-turnaround guardrail
+### Quick-turnaround guardrail
 
-`findQuickTurnarounds` in `rotation-suggestion.ts`, plus a `quick-turnaround`
-warning code and two new `AnalysisOptions`: `shiftHours` and `minRestHours`
-(default 11, the EU Working Time Directive daily rest).
+`findQuickTurnarounds` + a `quick-turnaround` warning code + `shiftHours` /
+`minRestHours` (default 11) on `AnalysisOptions`. Wraps the cycle seam. Uses the
+tightest reading (latest finish into earliest start) where a hand edit
+double-books a day. **One warning line, not one per occurrence** — a list of
+near-identical paragraphs is how this panel stopped being read on 09-02.
 
-**Measured in hours, not list positions — this is the load-bearing decision.**
-Shifts are ordered by start time, so Night → Morning steps one place *forward*
-through the list while being the textbook quick turnaround: off at 06:00, back
-on at 06:00. Any rule written on `orderedShiftIds` indices waves through the
-one transition it exists to catch. `shiftHoursById` supplies real clock spans,
-pushing an overnight shift's end past 1440 so the arithmetic
-(`1440 + nextStart − prevEnd`) lands on zero instead of going negative.
+Does nothing without `shiftHours`; guessing would be worse than silence.
 
-Wraps the cycle seam, because the cycle repeats. Uses the tightest reading
-(latest finish into earliest start) where a hand edit has double-booked a day.
-**One warning line, not one per occurrence** — a list of near-identical
-paragraphs is how this panel stopped being read on 2026-09-02.
+### Alignment warnings are visible
 
-Without `shiftHours` the check does nothing at all. Guessing would be worse
-than staying quiet, and it keeps `crewRequirement`'s probes — which
-deliberately pass no options — scoring exactly as before.
+`SHOWN_INFO_CODES` in `rotation-coverage-panel.tsx` lets `weekday-anchor` and
+`weekday-drift` through alongside `uncovered-shift`. `schedule-summary.tsx` now
+passes `startDate` **and** `shiftHours`; it passed neither, so weekday, weekend
+and rest warnings were all silently absent there.
 
-### 3. Forward rotation in the scorer, as a tie-break
+### The crew-requirement explanation
 
-`QUICK_TURNAROUND_TIEBREAK = 1e-3` per offending transition, an order of
-magnitude above the spacing tie-break and far below anything the coverage
-score reaches. A 28-day roster with four crews tops out near 0.1, smaller than
-one misplaced crew-day's effect on the balance terms. **Gated on `shiftHours`
-being supplied**, so every pre-existing test scores identically by
-construction — no rebaselining was needed, and none was done.
+`CrewRequirement` gained **`crewDayBound`** — cells ÷ working-days-per-crew,
+the sum a person does in their head. Where it differs from `minimumCrews`, the
+"Assign to" note now accounts for the gap instead of printing a headline of 4
+above arithmetic that reads as 3.
 
-Threaded as an optional `PlacementContext` through `scorePlacements` →
-`localImprove` / `greedyPlacement` / `bestDayOffsetsFor` / `choosePlacement`.
+### Presets
 
-### 4. Alignment warnings are visible
+`weekly_forward_28`, `master_49`, `healthcare_five_two`, all "Named systems".
+`ddnnoo`'s description was rewritten: it is the exact-fit two-shift answer
+(3 crews, 12 crew-days, 12 cells) and was described in day/night terms that hid
+that.
 
-`rotation-coverage-panel.tsx`'s filter now allows `weekday-anchor` and
-`weekday-drift` through alongside `uncovered-shift` (a named
-`SHOWN_INFO_CODES` set). That anchor warning *is* the user's "align the
-effective start date with day one" rule, and it had been computed and thrown
-away.
+## The crew-count arithmetic — read this before touching `crewRequirement`
 
-`schedule-summary.tsx` now parses `start_date` and passes `startDate` **and**
-`shiftHours` into `analyzeDayCoverage`. It was passing neither, so weekday,
-weekend and rest warnings were all silently absent on Summary while showing on
-Assign-to. A summary that grades more leniently than the screen it summarises
-is worse than no summary.
+Reported as a bug ("why does a 2-shift rotation need 4 teams?"). It is not a
+bug, and the reasoning is worth keeping because it is easy to get wrong twice.
 
-### 5. Three presets
+**Why a plain 5-on/2-off over 2 shifts needs 4 crews.** Both shifts run daily
+and nobody works two at once → ≥2 crews on duty every day = 14 crew-days.
+Three crews × 5 working days = 15, so only one spare, so **at most one crew is
+off on any day**. Each crew is off 2 days → 6 off-days on 6 distinct days. On
+each, the two working crews must be on opposite shifts — so **all three pairs**
+(A,B), (A,C), (B,C) must be opposite at some point. On a pattern where every
+card names the same shift a crew never changes shift, so that needs three
+pairwise-different values out of two shifts. Impossible → 4.
 
-In `data/rotation-presets.ts`, all under "Named systems":
+**The `five_two` preset is single-shift by design** (office week, one crew, one
+shift). That is what forces the 4, not the shift count.
 
-- `weekly_forward_28` — `7×M 7×A 7×N 7×off` (minShifts 3, 4 crews).
-- `master_49` — `MMMMM OO / OO MMMMM / AAAAA OO / OO AAAAA / NNNNN OO /
-  OO NNNNN / OOOOOOO` (minShifts 3, 7 crews).
-- `healthcare_five_two` — `MMMMM OO / OO AAAAA / NNN OO NN / AA O MM OO`
-  (minShifts 3, 4 crews).
+**Verified by exhaustive enumeration** (all 2,187 seven-card patterns, plus
+every pattern up to 7 cards), for 2 shifts and 3 crews:
 
-**Two things to know about these:**
+| pattern | cycle | note |
+|---|---|---|
+| `M A ·` | 3 | exact fit, zero warnings — preset `per_shift_plus_rest` |
+| `M M A A · ·` | 6 | exact fit — preset `ddnnoo` |
+| `M A M A M · ·` | 7 | **the only** true 5-on/2-off that works (plus its mirror) |
+| `A A A · M M ·` | 7 | 5 on / 2 off with rest split into two singles; keeps shifts in blocks |
 
-- **The healthcare write-up's last week was transcribed as 8 cards**
-  (`AA O MM OOO`) in the 09-08 notes, which cannot be right for a 28-day /
-  4-week cycle. Built as `AA O MM OO` (7). Worth confirming against the
-  original source.
-- **`master_49` cannot meet the preset library's flatness invariant**, and it
-  is not the search's fault. Thirty working cards across seven crews is 210
-  crew-days over a 49-day cycle — mean 4.29, so some day *must* differ from
-  some other. The naive 0/7/…/42 stagger gives spread 3; the search gets it to
-  2. Recorded as an explicit, commented exception (`FLATNESS_EXCEPTIONS` in
-  `rotation-suggestion.test.ts`) rather than by loosening the rule for all
-  fifteen presets. **If a spread-1 placement does exist, the search is not
-  finding it** — that is the open question on this preset.
-
-## Deliberately not built
-
-**Skill-mix assignment** (healthcare guardrail 3). Employees carry `position`
-and teams carry `employee_ids`, so the data exists — but this is about how
-teams are *composed*, not how they rotate. Belongs to the teams feature.
-
-**Weekend equity as a scoring term.** See Q2 above.
-
-## No migration needed
-
-`crew_placements` is `.default([])`, so a stored schedule without the key gets
-an empty array on load and simply reports "set by hand". **`SEED_VERSION` was
-not bumped** and does not need to be.
-
-The eight rotate seeds carry `crew_placements: []` — their matrices were
-hand-authored and the real offsets behind them were never recorded. **This is
-the one visible gap:** no seeded rotation demonstrates the start-day read-back,
-so browser-verifying that part means building a rotation in the form first.
-Deriving each seed's true offsets by searching for the `(day_offset,
-shift_step)` pair per crew that reproduces its stored matrix is mechanical and
-would fix this.
+**Do not re-derive "just alternate the shifts" as a rule.** A sweep of cycle
+lengths 4–12 across 2 and 3 shifts found **55 counterexamples**: alternating
+rescues the 7-day 5-2 (4 → 3) and *ruins* the 6-day two-block roster (3 → 4).
+Neither blocks nor alternation wins on its own. This was caught only because
+the claim was tested before shipping — it had already been written into the UI
+copy as advice. Two tests now pin both directions
+(`rotation-suggestion.test.ts`, "the crew-day bound against the real
+requirement"), and **the note deliberately prescribes no layout**.
 
 ## Verification
 
 - `npm run build` clean (**not** `tsc --noEmit` — project references hide
   errors here).
-- `npm run test` — **267 passed / 3 failed**, up from 243/3. The 3 are the
-  unowned pre-existing `search-provider.test.tsx` failures.
+- `npm run test` — **272 passed / 3 failed**, up from 243/3 at session start.
+  The 3 are the unowned pre-existing `search-provider.test.tsx` failures.
 - `eslint` on `features/schedules` + `features/schedule-rotation` — **0 errors,
-  3 warnings**, the same three that were there before.
-- `prettier` — only touched files were formatted. `schedules/utils.ts` was
-  appended to and deliberately **not** run through prettier, because doing so
-  reorders imports and rewraps unrelated functions (the known repo-wide drift;
-  it fails `--check` at HEAD too).
-- **Not browser-verified.** No browser tooling in this session.
+  3 warnings**, the same three as before.
+- Prettier: touched files only. `schedules/utils.ts` was appended to and
+  deliberately **not** run through prettier — it reorders imports and rewraps
+  unrelated functions, and it fails `--check` at HEAD anyway (the known
+  repo-wide drift).
 
-Two of the three new test failures during development were bad fixtures of
-mine, worth knowing because both are easy to write again:
+**Not verified:** nothing in this work has been opened in a browser. The
+crew-start editor, the Summary read-back and the `/schedule-rotation` crew line
+are markup nobody has loaded. Build and tests being green is not the same
+thing.
 
-- A `[morning, afternoon, night]` crew on a **3-day** cycle wraps night
-  straight back into morning. The forward-rotation test needs a rest card.
-- Three crews working three of four cards is nine crew-days against twelve
-  cells. Any "no holes" assertion needs the crew count checked against
-  `cycleLength × shiftCount` first — the 09-02 arithmetic trap, again.
+## Bugs found, and what missed them
+
+- **The note contradicted itself** — headline "needs 4 teams" over arithmetic
+  implying 3, with no mention that the pattern's shape was the binding
+  constraint. Invisible to typecheck and tests; only a user reading the screen
+  found it. Fixed in `4531085`.
+- **Summary graded more leniently than the step it summarises** — no
+  `startDate`, no `shiftHours`, so three warning families silently vanished
+  there. Invisible to tests, which never asserted on Summary's warnings.
+- **Two of my own test fixtures were wrong**, and both are easy to rewrite by
+  accident: a `[morning, afternoon, night]` crew on a **3-day** cycle wraps
+  night into morning across the seam (the forward-rotation test needs a rest
+  card); and three crews working three of four cards is 9 crew-days against 12
+  cells, so a "no holes" assertion needs the crew count checked against
+  `cycleLength × shiftCount` first.
 
 ## Still load-bearing from earlier sessions
 
 - **The "understaffed" trap** (09-02): severity is decided by fixability
   (`crewDays >= cycleLength × shiftCount`, or `minimumCrews` when
-  `requirement.exact`), never by outcome. Unchanged by this work.
+  `requirement.exact`), never by outcome. Unchanged.
 - **The search needs its multiple starts** (09-06). Four tests cover it.
 - **`uncoveredCellPenalty` is a computed bound, not a magic number.**
 - Any `FormField` whose `name` comes from state needs a `key={…}` (09-03).
 
-## What to do next
+## What's left, in priority order
 
-1. **Browser-verify.** The click-list in
-   `.claude/handoff/rotation-suggestion.md` is still outstanding and the repo
-   has now gone five sessions without a browser check. Add to it: press
-   *Suggest*, then move a crew in the new **Crew start days** editor and check
-   the grid rebuilds; then flip to **Assign manually**, clear a cell, and check
-   the "edited by hand" note appears in the editor *and* on Summary. Then
-   `/schedule-rotation` for the per-employee crew line.
-2. **Derive real `crew_placements` for the seeds** (see "No migration needed").
-3. **Confirm the healthcare preset's fourth week** against the original
-   write-up.
-4. Decide whether `master_49` really has no spread-1 placement.
+1. **Browser-verify.** Nothing here has been seen. Use the click-list in
+   `.claude/handoff/rotation-suggestion.md` §"Open calls" #1, plus: press
+   *Suggest*, move a crew in **Crew start days**, confirm the grid rebuilds;
+   flip to **Assign manually**, clear a cell, confirm the "edited by hand" note
+   appears in the editor *and* on Summary; then `/schedule-rotation` for the
+   per-employee crew line.
+2. **Add a 7-day two-shift preset** — `M A M A M · ·`, the only true 5-on/2-off
+   that 3 crews can cover. **Offered to the user, not yet answered.** Without
+   it, the one-pick answer for "two shifts, a real weekend, three teams" does
+   not exist and has to be hand-built. Worth pairing with `A A A · M M ·`,
+   which is gentler on people (no daily shift flip, so it will not trip the new
+   quick-turnaround warning).
+3. **Derive real `crew_placements` for the eight rotate seeds.** All carry `[]`,
+   so every seeded rotation reads as "set by hand" and **nothing on
+   `/schedule-rotation` demonstrates the start-day read-back**. Mechanical: per
+   crew in a seed's `day_coverage`, search the `(day_offset, shift_step)` pair
+   whose `placementShifts` reproduces that crew's row; emit `[]` where they do
+   not all match.
+4. **Confirm `healthcare_five_two`'s fourth week** against the original
+   write-up. The 09-08 notes transcribed it as **8 cards** (`AA O MM OOO`),
+   impossible for a 28-day cycle; built as `AA O MM OO` (7).
+5. **Decide whether `master_49` really has no spread-1 placement.** It cannot
+   meet the library's ≤1 on-duty flatness invariant — 30 working cards × 7
+   crews = 210 crew-days over 49 days, mean 4.29 — so it is recorded as a
+   commented exception (`FLATNESS_EXCEPTIONS` in `rotation-suggestion.test.ts`)
+   rather than by loosening the rule for all seventeen presets. The naive
+   0/7/…/42 stagger gives spread 3; the search reaches 2. Whether 1 is
+   reachable at all is unknown.
+
+### Done
+
+- ~~Decide the three scope questions~~ — answered 09-10, see "Where this came
+  from".
+- ~~Ship crew offsets, guardrails, presets~~ — `7c9cb5a`, 09-10.
+- ~~Explain the crew requirement~~ — `4531085`, 09-11.
