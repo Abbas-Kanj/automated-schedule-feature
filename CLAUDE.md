@@ -574,6 +574,56 @@ a genuine missing-import that `tsc -b` caught.
   `/schedule-rotation` crew line are markup nobody has loaded.**
   → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
 
+## Session state (2026-09-11)
+
+- **Moved crew assignment out of the schedule wizard, onto Schedule
+  Rotation.** The wizard's "Assign to" step (step 4 of 6, rotate only) is
+  gone — rotate is now a 5-step wizard (`basics → shifts → pattern →
+  end-settings → summary`), and a new standalone page,
+  `/schedule-rotation/assign` (`schedule-rotation/pages/assign/
+  schedule-rotation-assign-page.tsx`), does the assignment instead: pick
+  any existing rotate schedule (assigned or not — same screen handles
+  first-time assignment and later re-edit) from a dropdown, then the exact
+  same `ScheduleAssignToFields` component, unchanged, mounted in its own
+  small form. Reached via a new "Assign crews" button on
+  `/schedule-rotation`. **Why**: staffing a schedule no longer has to
+  happen *during* creation, before the record even exists, and this
+  feature already existed purely to *display* the roster — the natural
+  place to *set* it too.
+- **Also added "Start & End" (start date + end frequency) to that same new
+  page**, reusing `schedule-start-end-fields.tsx` unchanged — so it's now
+  the one place to fully manage an existing rotate schedule's roster and
+  scheduling window without going back through the wizard.
+- **Wizard Summary + the read-only View page** both used to show the full
+  coverage panel for a rotate schedule; both now show a one-line status
+  note ("Not yet assigned…" / "N crews assigned…") pointing at Schedule
+  Rotation, via a new shared `assign-to-status-note.tsx`. The View page
+  needed its own small carve-out for this, since it renders every wizard
+  section via a `disabled ||` pattern but `ScheduleSummary` (which carries
+  the note) doesn't render at all in disabled mode.
+- **No schema/data migration** — `day_coverage`/`crew_placements` already
+  defaulted to `[]` and are validated as optional/warning-only, so nothing
+  about stored shape changed; `SEED_VERSION` not bumped.
+- `schedule-form.test.tsx` (nothing but the wizard-seam rotate-assignment
+  suite) **deleted outright**; its 3 seam tests moved to a new colocated
+  `schedule-rotation-assign-page.test.tsx` driving "Save" instead of
+  "Next"; its 4th test was already redundant with `scenario.test.ts`'s
+  general loop and wasn't re-added. Two more tests added for the new
+  Start & End fields.
+- New vitest gotcha hit and fixed the same way as before: the new page's
+  test mounting `ScheduleStartEndFields`'s date picker for the first time
+  discovered `react-day-picker` mid-run — added to `vite.config.ts`'s
+  `optimizeDeps.include`.
+- `npm run build` clean; `npx eslint .` unchanged from the documented
+  baseline (11 errors / 3 warnings, none in touched files); `npm run test`
+  **273 passed / 3 failed** (up from 272/3 — same unowned
+  `search-provider.test.tsx` three). **Still not browser-verified** — the
+  new page and its "Save" round-trip are the newest, least-verified
+  markup; see the updated click-path in
+  `.claude/handoff/rotation-suggestion.md`'s Open calls.
+  → `.claude/handoff/schedule-rotation-screen.md`,
+  `.claude/handoff/rotation-suggestion.md`
+
 ## Pick up here next session
 
 0. **Answer the open preset question** — offered and not yet answered: add
@@ -591,26 +641,35 @@ a genuine missing-import that `tsc -b` caught.
    write-up (the 09-08 notes transcribed it as 8 cards for a 28-day cycle).
    → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
 2. **Browser-verify the rotation coverage rework** — newest work, and the
-   only item here with a written click-list. Start with the case that
-   motivated it: schedule form → Rotate → select **Morning + Night** →
-   **Pattern** → preset **5-2** (every card says Morning) → **Assign to** →
-   pool of **4** → *Suggest*: the shift rows must read `1` for Morning
-   *and* Night on all seven days, **no red `0`**. Before the rework Night
-   was `0` on all seven. Then preset **2-2-3 Panama**, 2 shifts, 4 crews →
-   one crew on each shift all 14 days.
+   only item here with a written click-list. **As of 2026-09-11 this is
+   reached from `/schedule-rotation` → "Assign crews", not a wizard step**
+   — see the click-path in `.claude/handoff/rotation-suggestion.md`'s Open
+   calls (updated for the new location). Start with the case that
+   motivated it: create a rotate schedule selecting **Morning + Night**,
+   preset **5-2** on the Pattern step, save it, then from
+   `/schedule-rotation` → **Assign crews** → pick it → pool of **4** →
+   *Suggest*: the shift rows must read `1` for Morning *and* Night on all
+   seven days, **no red `0`**. Before the 09-06 rework Night was `0` on all
+   seven. Then preset **2-2-3 Panama**, 2 shifts, 4 crews → one crew on
+   each shift all 14 days.
    Then flip **Assign manually** on — each day card lists **one picker per
    selected shift** — and clear one: a red `0` must appear immediately
-   *and* a warning naming that shift, and **Next must still advance**
+   *and* a warning naming that shift, and **Save must still succeed**
    (warn, don't block). Under-crew it (3 shifts, 2 crews) → the warning
    must read structural ("N crews would cover every shift every day"), not
-   as something done wrong. Then **Next → Next → Summary**: the coverage
-   grid there must match the one on the step. Then `/schedule-rotation` →
+   as something done wrong. Then edit the new **Start & End** section on
+   that same page and Save → both the roster and the start/end settings
+   must persist; re-opening "Assign crews" for that schedule must show
+   "N crews assigned" and load the saved roster back into the grid. Then
+   check a newly-created, not-yet-assigned schedule's wizard Summary step
+   and its read-only View page both show the new "Not yet assigned…" note
+   rather than a coverage panel. Then `/schedule-rotation` →
    *Plant Coverage (2-2-3)* → **Daily** tab.
    **Never-seen markup:** the coverage panel's two grids + warning list,
-   and the day × shift manual grid. Also re-check the 09-03 fix — toggling
-   Teams ⇄ Employees with the manual grid open must not put employee names
-   in a team field. Full list in
-   `.claude/handoff/rotation-suggestion.md`.
+   the day × shift manual grid, and the whole `/schedule-rotation/assign`
+   page. Also re-check the 09-03 fix — toggling Teams ⇄ Employees with the
+   manual grid open must not put employee names in a team field. Full list
+   in `.claude/handoff/rotation-suggestion.md`.
 3. **Click through the seven screens that have never been opened in a
    browser here**: `/schedule-rotation` (**three** seeded rotations),
    `/public-holidays` and `/schedule-templates`, `/teams`, plus

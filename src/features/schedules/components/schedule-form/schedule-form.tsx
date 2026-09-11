@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { format } from 'date-fns'
 import { type Control, type Resolver, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -25,14 +25,15 @@ import { SCHEDULE_TYPES } from '../../data/data'
 import {
   type DailySchedule,
   type RegularType,
+  type RotateDayCoverage,
   type Schedule,
   type ScheduleType,
   scheduleSchema,
 } from '../../data/schema'
+import { AssignToStatusNote } from './assign-to-status-note'
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
 import { PatternBuilder } from './pattern-builder'
-import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 import { ScheduleBasicsFields } from './schedule-basics-fields'
 import { ScheduleStartEndFields } from './schedule-start-end-fields'
 import { ScheduleSummary } from './schedule-summary'
@@ -57,18 +58,18 @@ function getSteps(
     ]
   }
 
-  // rotate gets its own pattern step (cycle/pattern config), then the
-  // "Assign to" step that names the crew on each position of the pattern it
-  // just built — that pairing is the whole roster the Schedule Rotation
-  // screen reads (see `schedule-assign-to-fields.tsx`). PLUS the same
-  // shared "Start & End" step as fixed/flexible (start date + end
-  // frequency) — see `schedule-start-end-fields.tsx`.
+  // rotate gets its own pattern step (cycle/pattern config) — the template
+  // one crew's journey follows — PLUS the same shared "Start & End" step as
+  // fixed/flexible (start date + end frequency; see
+  // `schedule-start-end-fields.tsx`). Naming the crew on each position of
+  // that pattern (`day_coverage`/`crew_placements`) no longer happens here:
+  // it moved to `/schedule-rotation/assign`, which the Schedule Rotation
+  // screen reads from — see `schedule-rotation/pages/assign/`.
   if (regularType === 'rotate') {
     return [
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'pattern', label: 'Pattern' },
-      { id: 'assign-to', label: 'Assign to' },
       { id: 'end-settings', label: 'Start & End' },
       { id: 'summary', label: 'Summary' },
     ]
@@ -195,14 +196,6 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   if (stepId === 'pattern') {
     return ['cycle_type', 'cycle_length', 'pattern', 'shift_repeat']
   }
-  // Coverage is optional — an unstaffed shift stays valid, so this step never
-  // blocks "Next" (whether a hole is fixable depends on the crew count, not
-  // the data; the coverage panel warns instead). It still re-validates
-  // `pattern` so anything wrong carried over from the previous step surfaces
-  // here too.
-  if (stepId === 'assign-to') {
-    return ['pattern', 'day_coverage', 'crew_placements']
-  }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
     if (type === 'weekly_one') return ['type', 'days']
@@ -239,10 +232,6 @@ export function ScheduleForm({
   // open — locks all step navigation so the user can't jump away from
   // underneath it. See `ShiftPickerField`'s `onDialogOpenChange`.
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
-  // Set by the "Assign to" step while it is mounted, so "Next" can accept the
-  // crew assignment it is showing before moving on — see
-  // `schedule-assign-to-fields.tsx#commitPendingSuggestion`.
-  const assignToCommitRef = useRef<(() => void) | null>(null)
 
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
@@ -251,6 +240,12 @@ export function ScheduleForm({
   const regularType = useWatch({ control: looseControl, name: 'type' }) as
     | RegularType
     | undefined
+  // Only read for the disabled/View-page status note below — the wizard
+  // itself never edits this field anymore (see `AssignToStatusNote`).
+  const dayCoverage = useWatch({
+    control: looseControl,
+    name: 'day_coverage',
+  }) as RotateDayCoverage[] | undefined
 
   const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
@@ -261,10 +256,6 @@ export function ScheduleForm({
   }
 
   const handleNext = async () => {
-    // Before validating, not after: the commit writes crew into `pattern[]`,
-    // and `trigger` has to see the values the user is actually advancing with.
-    if (currentStepId === 'assign-to') assignToCommitRef.current?.()
-
     const valid = await form.trigger(
       getStepFields(currentStepId, parentType, type)
     )
@@ -439,14 +430,17 @@ export function ScheduleForm({
                 <PatternBuilder disabled={disabled} />
               )}
 
-            {(disabled || currentStepId === 'assign-to') &&
-              parentType === 'regular' &&
-              regularType === 'rotate' && (
-                <ScheduleAssignToFields
-                  disabled={disabled}
-                  commitRef={assignToCommitRef}
-                />
-              )}
+            {/* Crew assignment itself lives at `/schedule-rotation/assign`
+                now (see `AssignToStatusNote`) — this never shows as a
+                wizard step, only as a status line on the read-only View
+                page, since `ScheduleSummary` (which carries the same note)
+                doesn't render in disabled mode. */}
+            {disabled && parentType === 'regular' && regularType === 'rotate' && (
+              <div className='space-y-1.5'>
+                <FormLabel>Assign to</FormLabel>
+                <AssignToStatusNote dayCoverage={dayCoverage} />
+              </div>
+            )}
 
             {(disabled || currentStepId === 'end-settings') &&
               parentType === 'regular' && (

@@ -50,6 +50,7 @@ import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenti
 import { Route as AuthenticatedShiftsNewIndexRouteImport } from './routes/_authenticated/shifts/new/index'
 import { Route as AuthenticatedSchedulesNewIndexRouteImport } from './routes/_authenticated/schedules/new/index'
 import { Route as AuthenticatedSchedulesScheduleIdIndexRouteImport } from './routes/_authenticated/schedules/$scheduleId/index'
+import { Route as AuthenticatedScheduleRotationAssignIndexRouteImport } from './routes/_authenticated/schedule-rotation/assign/index'
 import { Route as AuthenticatedSchedulesScheduleIdEditIndexRouteImport } from './routes/_authenticated/schedules/$scheduleId/edit/index'
 
 const ClerkRouteRoute = ClerkRouteRouteImport.update({
@@ -274,6 +275,12 @@ const AuthenticatedSchedulesScheduleIdIndexRoute =
     path: '/schedules/$scheduleId/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedScheduleRotationAssignIndexRoute =
+  AuthenticatedScheduleRotationAssignIndexRouteImport.update({
+    id: '/schedule-rotation/assign/',
+    path: '/schedule-rotation/assign/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSchedulesScheduleIdEditIndexRoute =
   AuthenticatedSchedulesScheduleIdEditIndexRouteImport.update({
     id: '/schedules/$scheduleId/edit/',
@@ -317,6 +324,7 @@ export interface FileRoutesByFullPath {
   '/tasks/': typeof AuthenticatedTasksIndexRoute
   '/teams/': typeof AuthenticatedTeamsIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
+  '/schedule-rotation/assign/': typeof AuthenticatedScheduleRotationAssignIndexRoute
   '/schedules/$scheduleId/': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/schedules/new/': typeof AuthenticatedSchedulesNewIndexRoute
   '/shifts/new/': typeof AuthenticatedShiftsNewIndexRoute
@@ -357,6 +365,7 @@ export interface FileRoutesByTo {
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/teams': typeof AuthenticatedTeamsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/schedule-rotation/assign': typeof AuthenticatedScheduleRotationAssignIndexRoute
   '/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/schedules/new': typeof AuthenticatedSchedulesNewIndexRoute
   '/shifts/new': typeof AuthenticatedShiftsNewIndexRoute
@@ -402,6 +411,7 @@ export interface FileRoutesById {
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/teams/': typeof AuthenticatedTeamsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
+  '/_authenticated/schedule-rotation/assign/': typeof AuthenticatedScheduleRotationAssignIndexRoute
   '/_authenticated/schedules/$scheduleId/': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/_authenticated/schedules/new/': typeof AuthenticatedSchedulesNewIndexRoute
   '/_authenticated/shifts/new/': typeof AuthenticatedShiftsNewIndexRoute
@@ -445,6 +455,7 @@ export interface FileRouteTypes {
     | '/tasks/'
     | '/teams/'
     | '/users/'
+    | '/schedule-rotation/assign/'
     | '/schedules/$scheduleId/'
     | '/schedules/new/'
     | '/shifts/new/'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/tasks'
     | '/teams'
     | '/users'
+    | '/schedule-rotation/assign'
     | '/schedules/$scheduleId'
     | '/schedules/new'
     | '/shifts/new'
@@ -529,6 +541,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tasks/'
     | '/_authenticated/teams/'
     | '/_authenticated/users/'
+    | '/_authenticated/schedule-rotation/assign/'
     | '/_authenticated/schedules/$scheduleId/'
     | '/_authenticated/schedules/new/'
     | '/_authenticated/shifts/new/'
@@ -838,6 +851,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSchedulesScheduleIdIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/schedule-rotation/assign/': {
+      id: '/_authenticated/schedule-rotation/assign/'
+      path: '/schedule-rotation/assign'
+      fullPath: '/schedule-rotation/assign/'
+      preLoaderRoute: typeof AuthenticatedScheduleRotationAssignIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/schedules/$scheduleId/edit/': {
       id: '/_authenticated/schedules/$scheduleId/edit/'
       path: '/schedules/$scheduleId/edit'
@@ -889,6 +909,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedTeamsIndexRoute: typeof AuthenticatedTeamsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
+  AuthenticatedScheduleRotationAssignIndexRoute: typeof AuthenticatedScheduleRotationAssignIndexRoute
   AuthenticatedSchedulesScheduleIdIndexRoute: typeof AuthenticatedSchedulesScheduleIdIndexRoute
   AuthenticatedSchedulesNewIndexRoute: typeof AuthenticatedSchedulesNewIndexRoute
   AuthenticatedShiftsNewIndexRoute: typeof AuthenticatedShiftsNewIndexRoute
@@ -915,6 +936,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedTeamsIndexRoute: AuthenticatedTeamsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
+  AuthenticatedScheduleRotationAssignIndexRoute:
+    AuthenticatedScheduleRotationAssignIndexRoute,
   AuthenticatedSchedulesScheduleIdIndexRoute:
     AuthenticatedSchedulesScheduleIdIndexRoute,
   AuthenticatedSchedulesNewIndexRoute: AuthenticatedSchedulesNewIndexRoute,

@@ -1,11 +1,8 @@
-import { type ReactNode, useMemo } from 'react'
-import { parse } from 'date-fns'
+import { type ReactNode } from 'react'
 import { type Control, useWatch } from 'react-hook-form'
 import { useTimeFormat } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useEmployeesStore } from '@/features/employees/stores/employees-store'
-import { getEmployeeFullName } from '@/features/employees/utils'
 import { ShiftDaysTable } from '@/features/shifts/components/shift-days-table'
 import {
   SHIFT_BADGE_COLOR_OPTIONS,
@@ -13,29 +10,14 @@ import {
 } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
-import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import {
   CYCLE_TYPE_OPTIONS,
   MONTHS,
   REGULAR_TYPE_OPTIONS,
   SCHEDULE_TYPES,
 } from '../../data/data'
-import {
-  type RotateCrewPlacement,
-  type RotateDayCoverage,
-  type RotatePatternEntry,
-} from '../../data/schema'
-import {
-  crewsFromDayCoverage,
-  dayCoverageMatchesPlacements,
-  orderShiftIdsByStart,
-  patternToSlots,
-  shiftHoursById,
-} from '../../rotation-crews'
-import { analyzeDayCoverage, crewRequirement } from '../../rotation-suggestion'
 import { calculateHours, formatTimes } from '../../utils'
-import { RotationCoveragePanel } from './rotation-coverage-panel'
-import { CrewStartSummary } from './rotation-crew-starts'
+import { AssignToStatusNote } from './assign-to-status-note'
 import { ScheduleCalendarPreview } from './schedule-calendar-preview'
 
 function SummarySection({
@@ -273,141 +255,14 @@ function ShiftsSummary({ values }: { values: any }) {
   )
 }
 
-// Rotate only: the roster, read back the way the "Assign to" step showed it.
-//
-// It is the same coverage grid rather than a list, because a list of who works
-// where under-reports a rotation badly — the interesting fact is whether every
-// selected shift is covered on every day of the cycle, and that is a grid-
-// shaped fact. Below it, each crew's own cycle is spelled out in one line.
+// Rotate only. Crew assignment moved out of this wizard entirely — see
+// `AssignToStatusNote` — so this is just that same status line, not a
+// recap of a step that no longer exists here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AssignToSummary({ values }: { values: any }) {
-  const shifts = useShiftsStore((s) => s.shifts)
-  const employees = useEmployeesStore((s) => s.employees)
-  const teams = useTeamsStore((s) => s.teams)
-  const pattern = useMemo(
-    () => (values.pattern ?? []) as RotatePatternEntry[],
-    [values.pattern]
-  )
-  const dayCoverage = useMemo(
-    () => (values.day_coverage ?? []) as RotateDayCoverage[],
-    [values.day_coverage]
-  )
-  const crewPlacements = useMemo(
-    () => (values.crew_placements ?? []) as RotateCrewPlacement[],
-    [values.crew_placements]
-  )
-  const shiftIds = useMemo(
-    () => (values.shift_ids ?? []) as string[],
-    [values.shift_ids]
-  )
-  // The weekday and weekend checks are the reason this is parsed here: they
-  // are the only part of the analysis that depends on real dates, and without
-  // a start date they are silently skipped — which is how this screen used to
-  // drop them while the "Assign to" step showed them.
-  const startDate = useMemo(() => {
-    const raw = values.start_date as string | undefined
-    if (!raw) return undefined
-    const parsed = parse(raw, 'yyyy-MM-dd', new Date())
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed
-  }, [values.start_date])
-
-  const employeeLabels = useMemo(
-    () =>
-      new Map(
-        employees
-          .filter((employee) => employee.id)
-          .map((employee) => [
-            employee.id as string,
-            getEmployeeFullName(employee),
-          ])
-      ),
-    [employees]
-  )
-
-  const orderedShiftIds = useMemo(
-    () => orderShiftIdsByStart(shiftIds, shifts),
-    [shiftIds, shifts]
-  )
-  const crews = useMemo(
-    () => crewsFromDayCoverage(dayCoverage, teams, employeeLabels),
-    [dayCoverage, teams, employeeLabels]
-  )
-  const shiftLabels = useMemo(
-    () => new Map(shifts.map((shift) => [shift.id, shift.name])),
-    [shifts]
-  )
-  const shiftHours = useMemo(() => shiftHoursById(shifts), [shifts])
-  // Same requirement the "Assign to" step computes, so the panel repeated
-  // here grades the roster identically instead of calling a structural hole
-  // fixable on one screen and not the other.
-  const requirement = useMemo(
-    () => crewRequirement(patternToSlots(pattern), orderedShiftIds),
-    [pattern, orderedShiftIds]
-  )
-  // Every option the step passes, for the same reason: a summary that grades
-  // more leniently than the screen it summarises is worse than no summary.
-  const analysis = useMemo(
-    () =>
-      analyzeDayCoverage(crews, orderedShiftIds, pattern.length, {
-        startDate,
-        shiftLabels,
-        shiftHours,
-        minimumCrews: requirement.exact ? requirement.minimumCrews : undefined,
-      }),
-    [
-      crews,
-      orderedShiftIds,
-      pattern.length,
-      startDate,
-      shiftLabels,
-      shiftHours,
-      requirement,
-    ]
-  )
-  const placementsDescribeCoverage = useMemo(
-    () =>
-      dayCoverageMatchesPlacements(
-        patternToSlots(pattern),
-        crewPlacements,
-        orderedShiftIds,
-        dayCoverage
-      ),
-    [pattern, crewPlacements, orderedShiftIds, dayCoverage]
-  )
-
   return (
     <SummarySection title='Assign to'>
-      {pattern.length === 0 && (
-        <p className='text-sm text-muted-foreground'>No pattern to assign</p>
-      )}
-      {pattern.length > 0 && crews.length === 0 && (
-        <p className='text-sm text-muted-foreground'>
-          Nobody is on this rotation yet
-        </p>
-      )}
-      {crews.length > 0 && (
-        <>
-          <CrewStartSummary
-            placements={crewPlacements}
-            crews={crews}
-            cycleLength={pattern.length}
-            shifts={shifts}
-            describesCoverage={placementsDescribeCoverage}
-          />
-          <RotationCoveragePanel
-            crews={crews}
-            analysis={analysis}
-            orderedShiftIds={orderedShiftIds}
-            cycleLength={pattern.length}
-            shifts={shifts}
-          />
-          <p className='text-xs text-muted-foreground'>
-            The cycle repeats from its start date, so each crew works the row
-            above over and over. A shift showing 0 on a day is nobody covering
-            it that day.
-          </p>
-        </>
-      )}
+      <AssignToStatusNote dayCoverage={values.day_coverage} />
     </SummarySection>
   )
 }
