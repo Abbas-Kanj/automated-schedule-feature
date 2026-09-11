@@ -1,10 +1,12 @@
+import { SHIFT_BADGE_COLOR_OPTIONS } from '@/features/shifts/data/data'
 import { type ShiftBadgeColor } from '@/features/shifts/data/schema'
-import { type RotationPeriodType } from './utils'
+import { type TimelineSpan } from './timeline'
 
-export const PERIOD_OPTIONS: { value: RotationPeriodType; label: string }[] = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
+// How much calendar the screen shows at once — the only thing it asks the
+// user to choose. Both views on the page read this one range.
+export const SPAN_OPTIONS: { value: TimelineSpan; label: string }[] = [
+  { value: 'week', label: 'Weekly' },
+  { value: 'month', label: 'Monthly' },
 ]
 
 // Soft, theme-aware pill classes for each shift badge color — the "Assigned
@@ -38,3 +40,18 @@ export const SHIFT_SOFT_BADGE_CLASSES: Record<ShiftBadgeColor, string> = {
 
 // The muted look for an "Off" period — no shift color to draw from.
 export const OFF_BADGE_CLASS = 'bg-muted text-muted-foreground dark:bg-muted/50'
+
+// Solid fills for the timeline's per-day dots. Derived from the shift form's
+// own color swatches rather than spelled out a third time — the whole point of
+// the dot is that it is the same color the shift wears everywhere else.
+export const SHIFT_DOT_CLASSES = Object.fromEntries(
+  SHIFT_BADGE_COLOR_OPTIONS.map((option) => [
+    option.value,
+    option.swatchClassName,
+  ])
+) as Record<ShiftBadgeColor, string>
+
+// An off day is drawn as an empty ring, not a grey disc: the row should read
+// as "colored where somebody is working", so rest has to recede rather than
+// compete with the shifts for attention.
+export const OFF_DOT_CLASS = 'border-2 border-muted-foreground/35'

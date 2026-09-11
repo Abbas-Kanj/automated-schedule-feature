@@ -8,12 +8,16 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { describeStartDay } from '@/features/schedules/utils'
-import { type RotationPeriodType, type RotationRow } from '../utils'
+import { type RotationRow } from '../utils'
 import { ShiftBadge } from './shift-badge'
 
 type ScheduleRotationTableProps = {
   rows: RotationRow[]
-  periodType: RotationPeriodType
+  // What the last column is showing, spelled out by the caller — the table
+  // reads one specific day of the range on screen, so naming that day is the
+  // only honest header. A period word ("this week") would be a lie the moment
+  // a rotation advances daily and a person works three shifts inside it.
+  assignedHeading: string
   cycleLength: number
 }
 
@@ -71,7 +75,7 @@ function SequenceChips({ row }: { row: RotationRow }) {
 
 export function ScheduleRotationTable({
   rows,
-  periodType,
+  assignedHeading,
   cycleLength,
 }: ScheduleRotationTableProps) {
   return (
@@ -81,11 +85,7 @@ export function ScheduleRotationTable({
           <TableRow className='hover:bg-transparent'>
             <TableHead className='ps-4'>Employee Name</TableHead>
             <TableHead>Current Schedule Sequence</TableHead>
-            <TableHead className='pe-4 text-end'>
-              {periodType === 'daily'
-                ? 'Assigned Shift Today'
-                : `Assigned Shift This ${periodType === 'weekly' ? 'Week' : 'Month'}`}
-            </TableHead>
+            <TableHead className='pe-4 text-end'>{assignedHeading}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
