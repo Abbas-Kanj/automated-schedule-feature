@@ -131,11 +131,8 @@ export function ScheduleRotation() {
         <div className='flex flex-wrap items-end justify-between gap-3'>
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>
-              Schedule Rotation
+              Rotating Work Schedule
             </h2>
-            <p className='text-muted-foreground'>
-              Automated shift sequencing across a schedule&apos;s rotation.
-            </p>
           </div>
 
           <div className='flex flex-wrap items-center gap-2'>
