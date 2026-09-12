@@ -3,8 +3,8 @@ import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { defaultSchedules } from '@/features/schedules/data/schedules'
 import { type Schedule } from '@/features/schedules/data/schema'
-import { isRotateSchedule } from '../../utils'
-import { AssignToPanel } from './schedule-rotation-assign-page'
+import { type RotateSchedule, isRotateSchedule } from '../utils'
+import { AssignCrewsDialog, AssignToPanel } from './assign-crews-dialog'
 
 // Covers the seam between "Save" and the assignment UI it wraps, now that
 // crew assignment lives here instead of on the wizard's "Next" button — see
@@ -18,17 +18,17 @@ if (!isRotateSchedule(seed)) throw new Error('Seed is not a rotate schedule')
 const rotation = seed
 
 const updateSchedule = vi.hoisted(() => vi.fn())
-const navigate = vi.hoisted(() => vi.fn())
+// Mutable so a test can decide what the picker has to choose between.
+const store = vi.hoisted(() => ({ schedules: [] as unknown[] }))
 
 vi.mock('@/features/schedules/stores/schedules-store', () => ({
-  useSchedulesStore: (selector: (state: { updateSchedule: typeof updateSchedule }) => unknown) =>
-    selector({ updateSchedule }),
+  useSchedulesStore: (
+    selector: (state: {
+      updateSchedule: typeof updateSchedule
+      schedules: typeof defaultSchedules
+    }) => unknown
+  ) => selector({ updateSchedule, schedules: store.schedules as never }),
 }))
-
-vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  return { ...actual, useNavigate: () => navigate }
-})
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
 
@@ -150,5 +150,57 @@ describe('AssignToPanel', () => {
       end_type: 'after_occurrences',
       end_occurrences: 5,
     })
+  })
+})
+
+
+// The dialog around that panel. Its whole reason to exist is steering whoever
+// opened it toward a schedule nobody has staffed yet, so that is what these
+// pin down. Note every seeded rotate schedule *is* staffed — an unstaffed one
+// has to be built here rather than found.
+describe('AssignCrewsDialog', () => {
+  const staffed = rotation
+  const unstaffed: RotateSchedule = {
+    ...rotation,
+    id: 'sched-unstaffed',
+    name: 'Aaa Unstaffed Rotation',
+    day_coverage: [],
+    crew_placements: [],
+  }
+
+  beforeEach(() => {
+    store.schedules = [staffed, unstaffed]
+  })
+
+  it('opens on the unassigned schedule, not the one the screen was showing', async () => {
+    const screen = await render(
+      <AssignCrewsDialog open onOpenChange={vi.fn()} scheduleId={staffed.id} />
+    )
+
+    await expect
+      .element(screen.getByRole('combobox').first())
+      .toHaveTextContent(unstaffed.name)
+  })
+
+  it('falls back to the schedule the screen was showing once all are staffed', async () => {
+    store.schedules = [staffed]
+
+    const screen = await render(
+      <AssignCrewsDialog open onOpenChange={vi.fn()} scheduleId={staffed.id} />
+    )
+
+    await expect
+      .element(screen.getByRole('combobox').first())
+      .toHaveTextContent(staffed.name)
+  })
+
+  it('labels each schedule with whether it is assigned yet', async () => {
+    const screen = await render(
+      <AssignCrewsDialog open onOpenChange={vi.fn()} scheduleId={staffed.id} />
+    )
+
+    await expect
+      .element(screen.getByRole('combobox').first())
+      .toHaveTextContent('Not yet assigned')
   })
 })

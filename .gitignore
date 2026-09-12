@@ -46,3 +46,6 @@ graphify-out
 
 # TanStack Router plugin scratch output (generated)
 .tanstack
+
+# OpenCode bridge runtime state (task inboxes/outboxes, alerts, hook state)
+bridge/

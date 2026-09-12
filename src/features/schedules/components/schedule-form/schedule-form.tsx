@@ -63,8 +63,8 @@ function getSteps(
   // fixed/flexible (start date + end frequency; see
   // `schedule-start-end-fields.tsx`). Naming the crew on each position of
   // that pattern (`day_coverage`/`crew_placements`) no longer happens here:
-  // it moved to `/schedule-rotation/assign`, which the Schedule Rotation
-  // screen reads from — see `schedule-rotation/pages/assign/`.
+  // it moved to the "Assign crews" dialog on the Schedule Rotation screen
+  // — see `schedule-rotation/components/assign-crews-dialog.tsx`.
   if (regularType === 'rotate') {
     return [
       { id: 'basics', label: 'Basics' },
@@ -430,8 +430,9 @@ export function ScheduleForm({
                 <PatternBuilder disabled={disabled} />
               )}
 
-            {/* Crew assignment itself lives at `/schedule-rotation/assign`
-                now (see `AssignToStatusNote`) — this never shows as a
+            {/* Crew assignment itself lives in the "Assign crews" dialog on
+                Schedule Rotation now (see `AssignToStatusNote`) — this
+                never shows as a
                 wizard step, only as a status line on the read-only View
                 page, since `ScheduleSummary` (which carries the same note)
                 doesn't render in disabled mode. */}

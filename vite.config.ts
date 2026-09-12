@@ -41,6 +41,7 @@ export default defineConfig({
     include: [
       '@radix-ui/react-switch',
       '@radix-ui/react-popover',
+      '@radix-ui/react-dialog',
       'react-day-picker',
     ],
   },

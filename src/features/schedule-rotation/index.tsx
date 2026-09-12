@@ -1,6 +1,5 @@
 import { type ReactNode, useMemo, useState } from 'react'
 import { format, isWithinInterval, parse } from 'date-fns'
-import { Link } from '@tanstack/react-router'
 import {
   CalendarDays,
   ChevronLeft,
@@ -27,6 +26,7 @@ import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { useSchedulesStore } from '@/features/schedules/stores/schedules-store'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
+import { AssignCrewsDialog } from './components/assign-crews-dialog'
 import { RotationTimelineGrid } from './components/rotation-timeline'
 import { ScheduleRotationTable } from './components/schedule-rotation-table'
 import { ShiftBadge } from './components/shift-badge'
@@ -64,6 +64,7 @@ export function ScheduleRotation() {
   // else it used to ask for was either a consequence of this or a property of
   // the schedule itself (see `advanceType`).
   const [span, setSpan] = useState<TimelineSpan>('month')
+  const [assignOpen, setAssignOpen] = useState(false)
 
   const schedule =
     rotateSchedules.find((s) => s.id === scheduleId) ?? rotateSchedules[0]
@@ -149,14 +150,13 @@ export function ScheduleRotation() {
               </SelectContent>
             </Select>
 
-            <Button variant='outline' size='sm' asChild>
-              <Link
-                to='/schedule-rotation/assign'
-                search={schedule ? { scheduleId: schedule.id } : {}}
-              >
-                <Users className='me-1 size-4' />
-                Assign crews
-              </Link>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => setAssignOpen(true)}
+            >
+              <Users className='me-1 size-4' />
+              Assign crews
             </Button>
 
             <Tabs
@@ -258,6 +258,16 @@ export function ScheduleRotation() {
           </div>
         )}
       </Main>
+
+      {/* Mounted only while open so the picker re-seeds its default (the
+          first unstaffed schedule) on every open, without an effect. */}
+      {assignOpen && (
+        <AssignCrewsDialog
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+          scheduleId={schedule?.id}
+        />
+      )}
     </>
   )
 }

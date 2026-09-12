@@ -10,9 +10,9 @@ type AssignToStatusNoteProps = {
 }
 
 // Crew assignment for a rotate schedule no longer happens in this form — it
-// moved to `/schedule-rotation/assign` (see
-// `schedule-rotation/pages/assign/schedule-rotation-assign-page.tsx`), which
-// is the only place `day_coverage`/`crew_placements` get edited now. This is
+// moved to the "Assign crews" dialog on `/schedule-rotation` (see
+// `schedule-rotation/components/assign-crews-dialog.tsx`), which is the only
+// place `day_coverage`/`crew_placements` get edited now. This is
 // just a status line pointing there, sized from whatever the schedule
 // already holds — shown both in the wizard's Summary step and on the
 // read-only View page.
