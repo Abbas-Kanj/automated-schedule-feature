@@ -677,6 +677,66 @@ a genuine missing-import that `tsc -b` caught.
   → `.claude/handoff/schedule-rotation-screen.md`,
   `.claude/handoff/rotation-suggestion.md`
 
+## Session state (2026-09-12)
+
+- **Reconciled a real divergence first.** The local checkout was **5 commits
+  behind `origin/main`** (which is what GitHub Pages serves) while holding the
+  whole uncommitted 09-11 cleanup batch. Both sides had moved rotate's crew
+  assignment in **opposite directions**: local dropped the wizard's
+  "Start & End" step and kept "Assign to"; the remote dropped "Assign to" and
+  kept "Start & End", moving assignment to `/schedule-rotation/assign`. The
+  remote won — `schedule-form.tsx`, `schedule-summary.tsx` and
+  `schedule-rotation/index.tsx` were taken wholesale, `schedule-form.test.tsx`
+  stayed deleted, and the local `rotation-dates-dialog` was deleted as
+  superseded. Only 8 files conflicted. `bridge/` is now **gitignored** — it is
+  pure runtime state and got swept into a commit by `git add -A` once.
+- **Crew assignment is a dialog, not a screen.** `/schedule-rotation/assign`
+  and `pages/assign/` are gone; `components/assign-crews-dialog.tsx` holds the
+  same `AssignToPanel` (unchanged apart from closing instead of navigating).
+  The picker groups schedules "Not assigned" / "Assigned" and **defaults to the
+  first unassigned one**, falling back to the schedule being viewed.
+  **Watch out: every rotate seed is staffed**, so with seed data the dialog
+  always opens on the fallback — a test asserted otherwise and correctly failed
+  until it built its own unstaffed schedule.
+- **The timeline starts where the schedule and each crew do.** Days before
+  `start_date` are dropped, Previous is disabled at that boundary, and each
+  crew row is blank until its own first working day — an **empty spacer, not
+  the off-day ring**, since "not on this rotation yet" and "rostered and
+  resting" are different statements. `daysOn` no longer credits a late crew for
+  time before it existed. Each crew's start date reads under its name.
+  Crew start dates are found by **walking forward through `getPeriodIndex`**
+  rather than re-deriving the date arithmetic — duplicating it is how the two
+  would drift.
+- **Each view owns its period tabs**, both seeded from `getDefaultSpan`
+  (`cycle_length.unit`, falling back to pattern length for `custom_days`) and
+  re-seeded when the schedule changes. Over the Employees table they filter
+  rows to people working that week/month; somebody the matrix never mentions
+  stays listed rather than vanishing.
+- **New `FilterableMultiSelect`** — an A-Z strip over `MultiSelect`, on both
+  assign-flow pickers. It narrows `options` only: react-select takes `value`
+  separately, so a chip already picked survives a letter that excludes it
+  (named test). `onLetterChange` is there for a future server-side query.
+- **Shift form trimmed** to General / Shift times / Shift policy, and Shift
+  times lost its Start date field. Nothing deleted from the schema; the tab
+  components stay parked. Corrected two comments that still claimed Schedule
+  Rotation reads a shift's `employee_ids`/`team_ids` — it has not since
+  2026-08-29.
+- **Watch out: the React Compiler rejects manual `useMemo`** in
+  `schedule-rotation/index.tsx` (`react-hooks/preserve-manual-memoization`,
+  reported as an *error*). Two derivations there are plain functions on
+  purpose. Do not "optimize" them back.
+- **BROWSER-VERIFIED AT LAST** — the first time in this repo. Drove the real
+  dev server with Playwright directly (no Claude-in-Chrome in the session):
+  both tables and their tab pairs, crew start dates with a genuinely blank
+  leading cell, Previous disabled at the start and re-enabled after stepping
+  forward, the dialog opening without navigation, the A-Z strip, and the
+  trimmed shift form. Also disproved a worry: these pickers **do not portal**
+  their menu, so the `onInteractOutside` guard is inert today, and the menu
+  flips upward near the bottom rather than being clipped by the dialog's
+  scroll container.
+- `npm run build` clean; `npm run test` **362 passed / 0 failed** (from 349);
+  eslint clean on every touched file.
+
 ## Pick up here next session
 
 0. **Answer the open preset question** — offered and not yet answered: add
