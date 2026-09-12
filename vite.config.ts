@@ -38,7 +38,11 @@ export default defineConfig({
   // disappears. Anything a component test mounts that is not already reached
   // from `src/main.tsx` belongs here.
   optimizeDeps: {
-    include: ['@radix-ui/react-switch', '@radix-ui/react-popover'],
+    include: [
+      '@radix-ui/react-switch',
+      '@radix-ui/react-popover',
+      'react-day-picker',
+    ],
   },
   test: {
     silent: 'passed-only',

@@ -13,6 +13,23 @@ either way.
 > matrix** records who covers it. Details throughout — this file was rewritten,
 > not appended to.
 
+> **Relocated 2026-09-11:** the "Assign to" step no longer lives in the
+> schedule wizard. It moved to a standalone page,
+> `/schedule-rotation/assign` (`schedule-rotation/pages/assign/
+> schedule-rotation-assign-page.tsx`) — pick an existing rotate schedule from
+> a dropdown, then assign its crew there, instead of it being wizard step 4
+> between Pattern and Start & End. The rotate wizard is now 5 steps, not 6.
+> **`schedule-assign-to-fields.tsx` itself is unchanged** — same component,
+> same props (`disabled`, `commitRef`), same suggestion/manual-grid/coverage-
+> panel behaviour described below; only *where it's mounted* changed, so
+> everything in this file about the step's mechanics still applies verbatim.
+> What changed around it: "Save" on the new page now plays the role
+> "Next" used to (calling `commitRef` before reading final values), the
+> wizard's Summary step shows a one-line status note instead of a full
+> recap, and the new page also picked up the "Start & End" fields
+> (start date + end frequency) alongside assignment. Full detail in
+> `.claude/handoff/schedule-rotation-screen.md`.
+
 Companion to `.claude/handoff/schedule-rotation-screen.md`, which covers the
 screen those assignments drive.
 
@@ -211,6 +228,11 @@ crew** — the broadest guard that the search generalises.
 
 ## The "Assign to" step — `schedule-assign-to-fields.tsx`
 
+> Mounted at `/schedule-rotation/assign` since 2026-09-11, not in the
+> wizard — see the callout at the top of this file. Everything below still
+> describes the component itself accurately; read "the step" as "wherever
+> this component is mounted."
+
 Two cards. **Suggesting is the default path; hand-assignment is an escape hatch
 behind a toggle.**
 
@@ -244,7 +266,7 @@ behind a toggle.**
 **Nothing here blocks Next**, by decision: whether a hole is fixable depends on
 the crew count, not the data.
 
-### "Next" accepts the step (2026-09-03, still true)
+### "Next" (now "Save") accepts the step (2026-09-03, still true)
 
 `commitPendingSuggestion` compares the pool against the crews actually on the
 matrix and re-runs the suggestion only when they differ, so straight after
@@ -254,8 +276,11 @@ pool and never pressing Suggest, and changing the pool after pressing it.
 crew would destroy the exact work the toggle exists to allow.
 
 Plumbed as a `commitRef` filled from an effect with **no dependency list** (the
-callback closes over live pool state), called from `handleNext` **before**
-`form.trigger`. Fires on **Next only**, not the vertical-tab rail.
+callback closes over live pool state). **Since 2026-09-11** it's called from
+the assign page's "Save assignment" button, before reading `form.getValues()`
+— the exact same ordering `handleNext` used before `form.trigger`, just a
+different caller. The wizard no longer has an "assign-to" step to fire it
+from at all.
 
 ### ⚠️ Flipping Teams/Employees used to copy ids into the wrong field
 
@@ -348,6 +373,36 @@ recur on 2026-09-06** — the new UI reuses primitives already in the list.
 **Anything a component test mounts that is not already reached from
 `src/main.tsx` belongs there.**
 
+## Status (2026-09-11)
+
+> Supersedes the numbers below for build/test/lint; the mechanics they
+> describe (algorithm, coverage panel, warnings) are unchanged.
+
+- **Relocated** the "Assign to" step out of the schedule wizard onto a new
+  standalone page — see the callout at the top of this file and
+  `.claude/handoff/schedule-rotation-screen.md` for the full change.
+  `schedule-assign-to-fields.tsx` itself was not touched.
+- Also added the "Start & End" fields (start date + end frequency) to the
+  new page, reusing `schedule-start-end-fields.tsx` as-is — so the new page
+  now covers everything the old wizard step *and* the old "Start & End"
+  step did for an existing rotate schedule, minus creating a brand-new one.
+- `npm run build` **clean**. `npx eslint .` — same pre-existing baseline as
+  before (11 errors / 3 warnings, all in files this work didn't touch).
+- `npm run test` — **273 passed / 3 failed**, still only the pre-existing
+  unowned `search-provider.test.tsx` three. The wizard-seam tests that used
+  to live in `schedule-form.test.tsx` (now deleted — the file was nothing
+  but that suite) moved to a new
+  `schedule-rotation/pages/assign/schedule-rotation-assign-page.test.tsx`,
+  driving "Save" instead of "Next"; its 4th test ("staffs every shift…")
+  was already redundant with `scenario.test.ts`'s general loop and wasn't
+  re-added.
+- New vitest gotcha hit and fixed: the assign page's first test to mount
+  `ScheduleStartEndFields`'s date picker discovered `react-day-picker`
+  mid-run (the same `optimizeDeps.include` class of issue documented below
+  — added there).
+- **Still not browser-verified by hand.** The click-path in the open call
+  below is updated for the new location.
+
 ## Status (2026-09-06)
 
 - `npm run build` **clean**.
@@ -373,18 +428,28 @@ recur on 2026-09-06** — the new UI reuses primitives already in the list.
 
 ## Open calls / follow-ups
 
-1. **Browser-verify.** The motivating case first: Rotate → select **Morning +
-   Night** → Pattern → preset **5-2** (every card Morning) → **Assign to** →
-   pool of **4** → *Suggest* → the shift rows must read `1` for Morning *and*
-   Night on all seven days, no red `0`. Before this rework Night was `0` on all
-   seven. Then: preset **2-2-3 Panama**, 2 shifts, 4 crews → one crew on each
-   shift all 14 days. Then flip **Assign manually** on → each day card lists
-   Morning and Night with its own picker; clear one → red `0` appears
-   immediately *and a warning naming that shift*, and **Next still advances**.
-   Then under-crew it (3 shifts, 2 crews) → the warning must read structural
-   ("N crews would cover every shift every day"), not as something done wrong.
-   Then **Next → Next → Summary** → grid matches the step's. Then
-   `/schedule-rotation` → *Plant Coverage (2-2-3)* → **Daily** tab.
+1. **Browser-verify.** The motivating case first, now reached via
+   `/schedule-rotation` → **Assign crews** rather than a wizard step: create
+   a rotate schedule (Basics → Shifts, select **Morning + Night** → Pattern,
+   preset **5-2**, every card Morning → Start & End → Summary → save it),
+   then from `/schedule-rotation` click **Assign crews**, pick that
+   schedule, pool of **4** → *Suggest* → the shift rows must read `1` for
+   Morning *and* Night on all seven days, no red `0`. Before the 09-06
+   rework Night was `0` on all seven. Then: preset **2-2-3 Panama**, 2
+   shifts, 4 crews → one crew on each shift all 14 days. Then flip **Assign
+   manually** on → each day card lists Morning and Night with its own
+   picker; clear one → red `0` appears immediately *and a warning naming
+   that shift*, and **Save still succeeds**. Then under-crew it (3 shifts,
+   2 crews) → the warning must read structural ("N crews would cover every
+   shift every day"), not as something done wrong. Then edit the "Start &
+   End" section below it and Save → confirm both the roster and the new
+   start/end settings persisted. Then re-open the same schedule from
+   **Assign crews** → the picker must show "N crews assigned" and the
+   saved roster must load back into the grid. Then check the wizard's own
+   Summary step for a newly-created but not-yet-assigned schedule shows
+   "Not yet assigned…", and the read-only View page shows the same style
+   of note. Then `/schedule-rotation` → *Plant Coverage (2-2-3)* → **Daily**
+   tab.
    Also: toggling Teams ⇄ Employees with the manual grid open must not put
    employee names in a team field.
 2. **The manual grid is `L × N` pickers** — 84 for a 28-day 3-shift cycle. Fine

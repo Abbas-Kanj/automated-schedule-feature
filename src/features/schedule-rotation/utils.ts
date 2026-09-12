@@ -25,6 +25,7 @@ import {
   orderShiftIdsByStart,
   patternToSlots,
 } from '@/features/schedules/rotation-crews'
+import { getScheduleCycleLength } from '@/features/schedules/utils'
 import { type Shift, type ShiftBadgeColor } from '@/features/shifts/data/schema'
 import { type Team } from '@/features/teams/data/schema'
 
@@ -96,7 +97,7 @@ export type Rotation = {
 
 const OFF_LETTER = 'O'
 
-function toPosition(
+export function toPosition(
   index: number,
   shift: Shift | undefined,
   forcedOff = false
@@ -208,6 +209,27 @@ export function getRotationRoster(
           getEmployeeFullName(b.employee)
         )
     )
+}
+
+// How fast a schedule's cycle advances on the calendar. A fact about the
+// schedule rather than something to ask the user: a rotate `pattern` is a list
+// of day cards, so one card is one day and the cycle steps daily — that is
+// what makes a 14-card 2-2-3 a fortnight rather than fourteen weeks.
+//
+// The exception is a `custom_shifts` card whose shift repeats weekly. It spans
+// a real week on the calendar (see `expandRotatePatternDays` in
+// `schedules/utils.ts`), so the cards are not days and the cycle steps one
+// card per week instead. Detected by asking whether the schedule's cycle is as
+// many days long as it has cards — if it is longer, some card is covering more
+// than a day.
+export function getAdvanceType(schedule: RotateSchedule): RotationPeriodType {
+  const cycleDays = getScheduleCycleLength({
+    type: schedule.type,
+    start_date: schedule.start_date,
+    pattern: schedule.pattern,
+    shift_repeat: schedule.shift_repeat,
+  })
+  return cycleDays === schedule.pattern.length ? 'daily' : 'weekly'
 }
 
 export function getPeriodStart(

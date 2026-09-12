@@ -37,11 +37,20 @@ supplied.
 > **reworked again 2026-09-06**: the roster moved off the pattern onto its own
 > stored matrix. Both are noted inline below; the full account is in
 > `.claude/handoff/rotation-suggestion.md`.
+>
+> **Relocated 2026-09-11**: producing the matrix (the "Assign to" step) moved
+> *out* of the schedule wizard entirely, onto a new page owned by **this**
+> feature — `/schedule-rotation/assign`
+> (`schedule-rotation/pages/assign/schedule-rotation-assign-page.tsx`). See
+> "The 2026-09-11 relocation" below. This screen's own read-only display
+> (everything above "## Model") is unaffected — it still only ever reads
+> `day_coverage`.
 
 - **The crew is stored on the schedule as a matrix.** `schedule.day_coverage`
   is a sparse list of `{ day, shift_id, employee_ids, team_ids }` cells — a
-  (cycle day × shift) → crews grid — set on the schedule form's **"Assign to"**
-  step. `getRotationRoster` reads that and **nothing else**.
+  (cycle day × shift) → crews grid — set via the **"Assign crews"** flow at
+  `/schedule-rotation/assign` (moved off the schedule wizard 2026-09-11; see
+  below). `getRotationRoster` reads that and **nothing else**.
   **Superseded 2026-09-06:** it used to read `pattern[].employee_ids` /
   `team_ids`, treating a crew's card index as its offset. Those fields are
   **gone from the schema**, along with `crew_shift_id` — one offset cannot name
@@ -81,8 +90,80 @@ against the real seeds in `scenario.test.ts`. `applyCrewShift` was **deleted**
 2026-09-06 with `crew_shift_id`.
 
 Producing the matrix in the first place lives elsewhere and is pure too —
-`src/features/schedules/rotation-suggestion.ts`, driven from the form's
-"Assign to" step. This screen only ever *reads* the result.
+`src/features/schedules/rotation-suggestion.ts`, driven from the "Assign
+to" UI (`schedule-assign-to-fields.tsx`), which since 2026-09-11 is mounted
+on `/schedule-rotation/assign` rather than the schedule wizard — see below.
+This screen only ever *reads* the result.
+
+## The 2026-09-11 relocation — "Assign to" moved into this feature
+
+**Why.** Crew assignment used to be wizard step 4 of 6, wedged between
+Pattern and Start & End — meaning a rotate schedule had to be staffed
+*during creation*, before it even existed as a saved record, and the
+heaviest, most interactive step in an otherwise light wizard sat in the
+middle of it. `day_coverage`/`crew_placements` are just fields on the
+`Schedule` record (optional, default `[]`, coverage gaps are warnings not
+schema errors), and this feature already existed purely to *display* that
+roster — so the natural home for *doing* the assignment is here too, on its
+own schedule, independent of creation.
+
+**What changed.**
+
+- The wizard (`schedules/components/schedule-form/schedule-form.tsx`) lost
+  the `assign-to` step entirely. Rotate's step list is now `basics → shifts
+  → pattern → end-settings → summary` (5 steps, was 6). Its `assignToCommitRef`
+  plumbing and the `getStepFields('assign-to')` branch went with it.
+- New page: `schedule-rotation/pages/assign/schedule-rotation-assign-page.tsx`,
+  routed at `/schedule-rotation/assign` (optional `?scheduleId=` search
+  param to deep-link past the picker). Two parts: a `Select` over **every**
+  rotate schedule (assigned or not — same screen serves first-time
+  assignment and re-edit), each option labelled with a crew-count status
+  (`crewKeysFromDayCoverage`); then, once picked, a small local `useForm`
+  (no `zodResolver` — the fields it touches are optional/warning-only at
+  the schema level, so there's nothing to validate) seeded from that
+  schedule's `pattern`/`shift_ids`/`start_date`/`end_settings`/
+  `day_coverage`/`crew_placements`, mounting **`ScheduleAssignToFields`
+  unchanged** plus (**new**) `ScheduleStartEndFields` unchanged, under one
+  "Save assignment" button. Save calls `commitRef` (same ordering the
+  wizard's "Next" used), then `updateSchedule(schedule.id, { ...schedule,
+  pattern, day_coverage, crew_placements, start_date, end_settings })`.
+- **Entry point**: an "Assign crews" button next to this screen's own
+  schedule `Select`, deep-linking to the schedule currently selected here.
+  The "No employees on this rotation" empty-state copy was updated to
+  point at it instead of the old wizard step.
+- **Wizard Summary + View page**: both used to show the full coverage
+  panel for a rotate schedule; both now show a one-line status note
+  ("Not yet assigned…" / "N crews assigned…") via a new shared
+  `assign-to-status-note.tsx`, pointing at Schedule Rotation for the real
+  UI. The View page needed its own small carve-out for this — it renders
+  every wizard section at once via a `disabled ||` pattern, and
+  `ScheduleSummary` (which carries the note) doesn't render in disabled
+  mode at all, so the note is rendered directly in `schedule-form.tsx`
+  too, gated on `disabled` alone.
+- **Tests**: `schedule-form.test.tsx` (nothing but the wizard-seam
+  rotate-assignment suite) was deleted outright. Its 3 seam tests moved to
+  a new colocated `schedule-rotation-assign-page.test.tsx`, driving "Save"
+  instead of "Next" against an `AssignToPanel` component exported for
+  testing, with `useSchedulesStore`/`useNavigate`/`sonner` mocked rather
+  than hitting the real store. Its 4th test was already redundant with
+  `scenario.test.ts`'s general "every seeded cycle" loop and wasn't
+  re-added. Two more tests added for the new Start & End fields
+  (round-trips unedited; saves an edited end frequency).
+- **No schema or data migration.** `day_coverage`/`crew_placements` already
+  defaulted to `[]`; a schedule created via the now-5-step wizard just
+  starts unassigned until visited via the new page. `SEED_VERSION` not
+  bumped — nothing about stored shape changed.
+- **New `optimizeDeps.include` entry**: `react-day-picker`, discovered
+  mid-run by the new page's test mounting `ScheduleStartEndFields`'s date
+  picker for the first time — same class of issue as the `@radix-ui/*`
+  entries already there (see the gotcha section below).
+
+**Not done / still open:** no browser verification (see Status below);
+`/schedule-rotation`'s own `Select` and this new page's `Select` are two
+separate, un-synced pieces of state — picking a schedule on one doesn't
+carry over to the other except via the explicit `?scheduleId=` deep-link
+on the "Assign crews" button. Full click-path in the companion file's
+Status/Open-calls sections.
 
 ## The 2026-08-29 rework — assignment moved onto the schedule
 
@@ -108,6 +189,9 @@ starts where".
   `schedule-form/schedule-assign-to-fields.tsx`. One row per cycle position,
   each with Employees + Teams multi-selects, built from the same `MultiSelect`
   the shift form's own Assign-to tab uses.
+  **Superseded 2026-09-11**: that step no longer exists in the wizard at
+  all — the same component moved onto this feature's own
+  `/schedule-rotation/assign` page. See "The 2026-09-11 relocation" above.
 - `getRotationRoster` now reads the schedule, not the shifts. **No schema
   restriction was added** — an unassigned position stays valid and the step
   never blocks "Next", a call that still holds today.
@@ -181,6 +265,21 @@ Design constraints that shaped these (worth knowing before editing them):
   is asserted in `scenario.test.ts`, not in the schema.
 
 ## Status
+
+> **2026-09-11 supersedes every number below.** Build/test/lint numbers
+> aside, the substantive change is the relocation described above — read
+> that section first.
+>
+> - `npm run build` **clean**. `npx eslint .` — same pre-existing baseline
+>   (11 errors / 3 warnings, none in files this touched).
+> - `npm run test` — **273 passed / 3 failed**, still only the pre-existing
+>   unowned `search-provider.test.tsx` three.
+> - **Still not browser-verified by hand** — this session had no browser
+>   tooling either. The click-path to verify is in
+>   `.claude/handoff/rotation-suggestion.md`'s Open calls #1, updated for
+>   the new location.
+>
+> *(The 2026-09-06 line this replaces read 243 passed / 3 failed.)*
 
 > **2026-09-06 supersedes every number below**: `npm run build` clean;
 > `npm run test` **243 passed / 3 failed** (same three unowned
