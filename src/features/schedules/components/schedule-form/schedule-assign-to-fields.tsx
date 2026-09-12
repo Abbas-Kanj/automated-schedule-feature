@@ -6,7 +6,7 @@ import { plural } from '@/lib/plural'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { MultiSelect } from '@/components/multi-select'
+import { FilterableMultiSelect } from '@/components/multi-select/filterable-multi-select'
 import { ToggleButton } from '@/components/toggle-button'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { getEmployeeFullName } from '@/features/employees/utils'
@@ -405,7 +405,7 @@ export function ScheduleAssignToFields({
               />
               <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
                 <div className='flex-1'>
-                  <MultiSelect
+                  <FilterableMultiSelect
                     options={poolOptions}
                     value={poolOptions.filter((option) =>
                       poolIds.includes(option.value)
@@ -670,7 +670,7 @@ function ManualDayCard({
                   Teams/Employees while the grid is open leaves the picker
                   holding the other kind's ids and writes them to the wrong
                   field. Remounting reads the new one instead. */}
-              <MultiSelect
+              <FilterableMultiSelect
                 key={crewKind}
                 options={crewOptions}
                 value={crewOptions.filter((option) =>
