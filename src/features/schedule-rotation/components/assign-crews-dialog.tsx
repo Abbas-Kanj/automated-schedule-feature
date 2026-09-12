@@ -155,9 +155,13 @@ export function AssignCrewsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className='sm:max-w-4xl'
-        // `MultiSelect` portals its menu outside the dialog, so without this
-        // every click on an employee reads as an outside-click and closes the
-        // whole dialog. Same guard as `team-form-dialog.tsx`.
+        // These pickers render their menu inline today, so Radix already
+        // counts a click on an option as inside. The guard is here for the
+        // moment one of them is given `menuPortalTarget` — the menu then
+        // moves out of the dialog's DOM and every pick reads as an
+        // outside-click, which is what happened to `team-form-dialog.tsx`
+        // (fixed in 1fed0b6). Verified inline-and-unclipped in Chromium,
+        // including the bottom-most picker of the manual grid.
         onInteractOutside={(event) => {
           const target = event.detail.originalEvent.target as HTMLElement | null
           if (target?.closest('.multi-select-menu-portal'))
