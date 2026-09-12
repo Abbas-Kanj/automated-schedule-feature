@@ -37,7 +37,6 @@ import {
   getBreakSpanMinutes,
   parseDurationHM,
 } from '../../utils'
-import { DateField } from './date-field'
 import { IconPickerField } from './icon-picker-field'
 
 const DEFAULT_TIME: TimeRangeEntry = {
@@ -623,27 +622,11 @@ export function ShiftTimesTab() {
         </div>
       </div>
 
-      {/* The day this shift starts applying — free-standing like the day
-          durations above, not derived from anything else on the tab. */}
-      <FormField
-        control={form.control}
-        name='start_date'
-        render={({ field }) => (
-          <FormItem className='space-y-1.5'>
-            <FormLabel className='text-base font-semibold'>
-              Start date
-            </FormLabel>
-            <FormControl>
-              <DateField
-                value={field.value}
-                onChange={field.onChange}
-                placeholder='Pick a start date'
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      {/* No "Start date" field here any more. `start_date` stays on the
+          shift schema — optional, and referenced by no validation rule — but
+          a shift definition is reusable without one, and the date that
+          actually decides when work happens is the schedule's, not the
+          shift's. */}
 
       <FormField
         control={form.control}

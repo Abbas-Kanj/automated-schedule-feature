@@ -255,12 +255,16 @@ const shiftFieldsSchema = z
     work_type_group: z.string().optional(),
     service_resource: z.string().optional(),
     service_territory: z.string().optional(),
-    // The people this shift is worked by — individual employees (by id,
-    // against the `employees` directory) and/or whole teams (by id, against
-    // `features/teams`, whose members resolve to employees). These are what
-    // the Schedule Rotation screen reads to auto-derive who rotates through a
-    // schedule's shifts (see `features/schedule-rotation`), so unlike the
-    // freeform picks above they now actually drive downstream behaviour.
+    // Who *may* work this shift — individual employees (by id, against the
+    // `employees` directory) and/or whole teams (by id, against
+    // `features/teams`, whose members resolve to employees).
+    //
+    // Sample data only, and no UI offers them any more (see
+    // `shift-form-tabs.tsx`). They do NOT decide who rotates through a
+    // schedule's shifts: that moved onto the schedule's own `day_coverage`
+    // matrix on 2026-08-29, and `schedule-rotation/scenario.test.ts` pins it
+    // by stripping every shift's picks and asserting the roster is
+    // unchanged.
     employee_ids: z.array(z.string()).default([]),
     team_ids: z.array(z.string()).default([]),
   })
