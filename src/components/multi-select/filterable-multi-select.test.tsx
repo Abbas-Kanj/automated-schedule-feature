@@ -15,7 +15,11 @@ const OPTIONS: Option[] = [
 
 // A controlled host, because the thing under test is what happens to an
 // already-made selection when the option list narrows underneath it.
-function Host({ onLetterChange }: { onLetterChange?: (l: string | null) => void }) {
+function Host({
+  onLetterChange,
+}: {
+  onLetterChange?: (l: string | null) => void
+}) {
   const [value, setValue] = useState<Option[]>([])
   return (
     <FilterableMultiSelect
@@ -74,7 +78,9 @@ describe('FilterableMultiSelect', () => {
   it('disables letters no option starts with', async () => {
     const screen = await render(<Host />)
 
-    await expect.element(screen.getByRole('button', { name: 'Q' })).toBeDisabled()
+    await expect
+      .element(screen.getByRole('button', { name: 'Q' }))
+      .toBeDisabled()
     // `exact` matters: without it "A" also matches the "All" button.
     await expect
       .element(screen.getByRole('button', { name: 'A', exact: true }))

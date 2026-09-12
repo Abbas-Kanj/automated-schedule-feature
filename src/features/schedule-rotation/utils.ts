@@ -232,6 +232,18 @@ export function getAdvanceType(schedule: RotateSchedule): RotationPeriodType {
   return cycleDays === schedule.pattern.length ? 'daily' : 'weekly'
 }
 
+// Which span a schedule should open on: the one its own cycle is written in.
+// A monthly cycle read a week at a time never closes on screen, and a weekly
+// one read a month at a time buries the stepping bands in noise. Custom-day
+// cycles go by length, since that is all they say about themselves.
+//
+// A starting point, not a lock — the tabs stay clickable afterwards.
+export function getDefaultSpan(schedule: RotateSchedule): 'week' | 'month' {
+  if (schedule.cycle_length.unit === 'monthly') return 'month'
+  if (schedule.cycle_length.unit === 'weekly') return 'week'
+  return schedule.pattern.length > 7 ? 'month' : 'week'
+}
+
 export function getPeriodStart(
   date: Date,
   periodType: RotationPeriodType

@@ -202,7 +202,9 @@ describe('buildRotationTimeline', () => {
       }
     })
     // Sep 1-4 are before this crew exists.
-    expect(late.cells.slice(0, 4).every((cell) => cell === undefined)).toBe(true)
+    expect(late.cells.slice(0, 4).every((cell) => cell === undefined)).toBe(
+      true
+    )
   })
 
   it('excludes blanked days from the days-on count', () => {

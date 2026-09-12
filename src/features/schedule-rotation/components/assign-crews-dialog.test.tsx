@@ -49,9 +49,7 @@ async function pickTeams(screen: Screen, names: string[]) {
 }
 
 async function save(screen: Screen) {
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Save assignment' })
-  )
+  await userEvent.click(screen.getByRole('button', { name: 'Save assignment' }))
 }
 
 // Everyone the saved coverage matrix names, once each, sorted.
@@ -152,7 +150,6 @@ describe('AssignToPanel', () => {
     })
   })
 })
-
 
 // The dialog around that panel. Its whole reason to exist is steering whoever
 // opened it toward a schedule nobody has staffed yet, so that is what these

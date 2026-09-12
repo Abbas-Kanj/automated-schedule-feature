@@ -139,7 +139,9 @@ export function AssignCrewsDialog({
     const byName = (a: RotateSchedule, b: RotateSchedule) =>
       a.name.localeCompare(b.name)
     return {
-      unassigned: rotateSchedules.filter((s) => crewCount(s) === 0).sort(byName),
+      unassigned: rotateSchedules
+        .filter((s) => crewCount(s) === 0)
+        .sort(byName),
       assigned: rotateSchedules.filter((s) => crewCount(s) > 0).sort(byName),
     }
   }, [rotateSchedules])

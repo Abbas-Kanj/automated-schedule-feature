@@ -1,5 +1,11 @@
 import { type ReactNode, useMemo, useState } from 'react'
-import { format, isWithinInterval, parse } from 'date-fns'
+import {
+  eachDayOfInterval,
+  format,
+  isBefore,
+  isWithinInterval,
+  parse,
+} from 'date-fns'
 import {
   CalendarDays,
   ChevronLeft,
@@ -25,6 +31,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { useSchedulesStore } from '@/features/schedules/stores/schedules-store'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
+import { type Team } from '@/features/teams/data/schema'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import { AssignCrewsDialog } from './components/assign-crews-dialog'
 import { RotationTimelineGrid } from './components/rotation-timeline'
@@ -33,10 +40,14 @@ import { ShiftBadge } from './components/shift-badge'
 import { SPAN_OPTIONS } from './data'
 import { type TimelineSpan, buildRotationTimeline } from './timeline'
 import {
+  type RotateSchedule,
   type RotationPeriodType,
   buildRotation,
   getAdvanceType,
+  getAssignedIndex,
+  getDefaultSpan,
   getPeriodEnd,
+  getPeriodIndex,
   getPeriodStart,
   isRotateSchedule,
   shiftPeriod,
@@ -44,6 +55,29 @@ import {
 
 function scheduleStartDate(startDate: string): Date {
   return parse(startDate, 'yyyy-MM-dd', new Date())
+}
+
+// Which cycle days each employee works, read off the schedule's own coverage
+// matrix. Teams resolve to their members, since the table lists people.
+function buildWorkDays(
+  schedule: RotateSchedule | undefined,
+  teams: Team[]
+): Map<string, Set<number>> {
+  const map = new Map<string, Set<number>>()
+  if (!schedule) return map
+  const members = new Map(teams.map((team) => [team.id, team.employee_ids]))
+  for (const cell of schedule.day_coverage) {
+    const ids = [
+      ...cell.employee_ids,
+      ...cell.team_ids.flatMap((id) => members.get(id) ?? []),
+    ]
+    for (const id of ids) {
+      const days = map.get(id) ?? new Set<number>()
+      days.add(cell.day)
+      map.set(id, days)
+    }
+  }
+  return map
 }
 
 export function ScheduleRotation() {
@@ -60,10 +94,18 @@ export function ScheduleRotation() {
   const [scheduleId, setScheduleId] = useState<string>(
     () => rotateSchedules[0]?.id ?? ''
   )
-  // The one control on this screen: how much calendar is on it. Everything
-  // else it used to ask for was either a consequence of this or a property of
-  // the schedule itself (see `advanceType`).
-  const [span, setSpan] = useState<TimelineSpan>('month')
+  // How much calendar each of the two views shows. They are separate because
+  // they answer different questions — the grid is "how does this rotation
+  // look", the table is "who is on" — and somebody comparing a month of bands
+  // against this week's roster should not have to give one up for the other.
+  // Both open on the span the schedule's own cycle is written in
+  // (`getDefaultSpan`) and stay clickable afterwards.
+  const [span, setSpan] = useState<TimelineSpan>(() =>
+    rotateSchedules[0] ? getDefaultSpan(rotateSchedules[0]) : 'month'
+  )
+  const [employeeSpan, setEmployeeSpan] = useState<TimelineSpan>(() =>
+    rotateSchedules[0] ? getDefaultSpan(rotateSchedules[0]) : 'month'
+  )
   const [assignOpen, setAssignOpen] = useState(false)
 
   const schedule =
@@ -85,7 +127,8 @@ export function ScheduleRotation() {
   // The grid draws nothing before the schedule starts, so stepping further
   // back would only ever land on an empty range.
   const atStart = schedule
-    ? rangeStart <= getPeriodStart(scheduleStartDate(schedule.start_date), stepType)
+    ? rangeStart <=
+      getPeriodStart(scheduleStartDate(schedule.start_date), stepType)
     : true
 
   // Which single day the employee table reads. Today when today is on screen —
@@ -115,10 +158,59 @@ export function ScheduleRotation() {
     ? buildRotation(schedule, shifts, employees, teams, anchorDate, advanceType)
     : null
 
+  // Which cycle days the employees table's own period covers. The table is a
+  // roster, so the useful filter is "who is actually on during this" — a
+  // rotation long enough to have people idle for a whole week is exactly when
+  // reading the full list stops being useful.
+  const employeeStepType: RotationPeriodType =
+    employeeSpan === 'week' ? 'weekly' : 'monthly'
+
+  // Which cycle days each employee works, read off the schedule's own matrix.
+  // Teams resolve to their members, since the table lists people.
+  // Not memoized: the React Compiler is on, and a manual useMemo here is one
+  // it declines to preserve.
+  const workDaysByEmployee = buildWorkDays(schedule, teams)
+
+  const employeeRows = (() => {
+    if (!schedule || !rotation) return []
+    const cycleLength = schedule.pattern.length
+    if (!cycleLength) return rotation.rows
+
+    const scheduleStart = scheduleStartDate(schedule.start_date)
+    const covered = new Set(
+      eachDayOfInterval({
+        start: getPeriodStart(viewDate, employeeStepType),
+        end: getPeriodEnd(viewDate, employeeStepType),
+      })
+        // Days before the rotation began are not part of any cycle yet, the
+        // same clamp the timeline applies.
+        .filter((date) => !isBefore(date, scheduleStart))
+        .map((date) =>
+          getAssignedIndex(
+            0,
+            getPeriodIndex(schedule, date, advanceType),
+            cycleLength
+          )
+        )
+    )
+
+    return rotation.rows.filter((row) => {
+      const worked = workDaysByEmployee.get(row.employeeId)
+      // Somebody the matrix does not mention is left in rather than hidden —
+      // an unexplained disappearance is worse than an extra row.
+      if (!worked) return true
+      return [...worked].some((day) => covered.has(day))
+    })
+  })()
+
   function selectSchedule(id: string) {
     setScheduleId(id)
     const next = rotateSchedules.find((s) => s.id === id)
-    if (next) setViewDate(scheduleStartDate(next.start_date))
+    if (next) {
+      setViewDate(scheduleStartDate(next.start_date))
+      setSpan(getDefaultSpan(next))
+      setEmployeeSpan(getDefaultSpan(next))
+    }
   }
 
   function resetView() {
@@ -164,19 +256,6 @@ export function ScheduleRotation() {
               <Users className='me-1 size-4' />
               Assign crews
             </Button>
-
-            <Tabs
-              value={span}
-              onValueChange={(value) => setSpan(value as TimelineSpan)}
-            >
-              <TabsList>
-                {SPAN_OPTIONS.map((option) => (
-                  <TabsTrigger key={option.value} value={option.value}>
-                    {option.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
           </div>
         </div>
 
@@ -227,7 +306,16 @@ export function ScheduleRotation() {
               />
             ) : (
               <>
-                <RotationTimelineGrid timeline={timeline} />
+                <section className='flex flex-col gap-3'>
+                  <div className='flex flex-wrap items-baseline justify-between gap-2'>
+                    <h3 className='text-lg font-semibold tracking-tight'>
+                      Timeline
+                    </h3>
+                    <SpanTabs value={span} onChange={setSpan} />
+                  </div>
+
+                  <RotationTimelineGrid timeline={timeline} />
+                </section>
 
                 {/* The same roster read the other way round — per person
                     rather than per crew, for one day of the range above. */}
@@ -251,14 +339,26 @@ export function ScheduleRotation() {
                           <ShiftBadge position={position} />
                         </span>
                       ))}
+                      <SpanTabs
+                        value={employeeSpan}
+                        onChange={setEmployeeSpan}
+                        className='ms-2'
+                      />
                     </div>
                   </div>
 
-                  <ScheduleRotationTable
-                    rows={rotation.rows}
-                    assignedHeading={`Assigned Shift · ${format(anchorDate, 'EEE, MMM d')}`}
-                    cycleLength={rotation.cycleLength}
-                  />
+                  {employeeRows.length === 0 ? (
+                    <p className='rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground'>
+                      Nobody on this rotation works during{' '}
+                      {employeeSpan === 'week' ? 'this week' : 'this month'}.
+                    </p>
+                  ) : (
+                    <ScheduleRotationTable
+                      rows={employeeRows}
+                      assignedHeading={`Assigned Shift · ${format(anchorDate, 'EEE, MMM d')}`}
+                      cycleLength={rotation.cycleLength}
+                    />
+                  )}
                 </section>
               </>
             )}
@@ -276,6 +376,35 @@ export function ScheduleRotation() {
         />
       )}
     </>
+  )
+}
+
+// The Weekly/Monthly control. Rendered per view rather than once for the page:
+// the grid and the table are asking different questions and are allowed to be
+// set to different spans while you compare them.
+function SpanTabs({
+  value,
+  onChange,
+  className,
+}: {
+  value: TimelineSpan
+  onChange: (span: TimelineSpan) => void
+  className?: string
+}) {
+  return (
+    <Tabs
+      value={value}
+      onValueChange={(next) => onChange(next as TimelineSpan)}
+      className={className}
+    >
+      <TabsList>
+        {SPAN_OPTIONS.map((option) => (
+          <TabsTrigger key={option.value} value={option.value}>
+            {option.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   )
 }
 

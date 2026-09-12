@@ -62,7 +62,11 @@ export function FilterableMultiSelect({
     <div className={cn('space-y-2', className)}>
       <MultiSelect options={filtered} isDisabled={isDisabled} {...props} />
 
-      <div className='flex flex-wrap gap-1' role='group' aria-label='Filter by first letter'>
+      <div
+        className='flex flex-wrap gap-1'
+        role='group'
+        aria-label='Filter by first letter'
+      >
         <ToggleButton
           size='sm'
           selected={letter === null}
