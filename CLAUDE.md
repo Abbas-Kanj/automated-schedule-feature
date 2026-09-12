@@ -147,6 +147,13 @@ a genuine missing-import that `tsc -b` caught.
   is X / what depends on Y" question — `graphify query "<question>"` (needs
   `graphify-out/.graphify_python` present; PATH note below).
 
+- **`react-compiler-rejects-manual-usememo`** (global skill) — extracted
+  2026-09-12. With the React Compiler on, a hand-written `useMemo` can trip
+  `react-hooks/preserve-manual-memoization`, which is an **error** and makes
+  the compiler skip optimizing the **whole component**. Delete the memo rather
+  than tuning its deps or disabling the rule; `eslint` is the only thing that
+  catches it. Bit `schedule-rotation/index.tsx`.
+
 - **`radix-select-bubble-select-wipes-programmatic-value`** (global skill) —
   extracted 2026-08-21 from a real bug in this repo's rotate
   "Custom alternate" step. A Radix `Select` whose value is set *by code*
@@ -722,9 +729,9 @@ a genuine missing-import that `tsc -b` caught.
   Rotation reads a shift's `employee_ids`/`team_ids` — it has not since
   2026-08-29.
 - **Watch out: the React Compiler rejects manual `useMemo`** in
-  `schedule-rotation/index.tsx` (`react-hooks/preserve-manual-memoization`,
-  reported as an *error*). Two derivations there are plain functions on
-  purpose. Do not "optimize" them back.
+  `schedule-rotation/index.tsx`. Two derivations there are plain functions on
+  purpose — do not "optimize" them back. Extracted to the
+  `react-compiler-rejects-manual-usememo` skill.
 - **BROWSER-VERIFIED AT LAST** — the first time in this repo. Drove the real
   dev server with Playwright directly (no Claude-in-Chrome in the session):
   both tables and their tab pairs, crew start dates with a genuinely blank

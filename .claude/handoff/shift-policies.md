@@ -154,5 +154,7 @@ MissedPunchRule  = { id, policy_type: 'missed_punch_error', name,
    `schedules/schedule-form/` (`badge-color-field.tsx`,
    `icon-picker-field.tsx`) and two unused deps
    (`@radix-ui/react-accordion`, `@radix-ui/react-collapsible`).
-5. `search-provider.test.tsx` has 3 pre-existing, unowned failures —
-   unrelated to this feature.
+5. ~~`search-provider.test.tsx` has 3 pre-existing, unowned failures.~~
+   **Fixed 2026-09-11** — they asserted nav entries that had been commented
+   out of `sidebar-data.ts`, and fixing them surfaced a real `command-menu.tsx`
+   bug. The suite has **0 failures** as of 2026-09-12.

@@ -41,12 +41,35 @@ Now:
   `normalizeShiftFormValues` (cleared to `[]` when Assign-to is toggled
   off).
 
-**These two fields are not decorative** — they're what the Schedule
-Rotation screen (`features/schedule-rotation`, already documented in its
-own handoff) reads to derive a rotation's roster: the union of every
-employee assigned to a pattern shift, with `team_ids` resolved to members.
-See `.claude/handoff/schedule-rotation-screen.md` for that consumer side;
-this file covers the producer side only.
+> ### ⚠️ Two corrections — this section described the tab as load-bearing
+>
+> **These fields drive nothing.** The claim that the Schedule Rotation screen
+> reads them to derive a rotation's roster was true only until **2026-08-29**,
+> when the roster moved onto the schedule's own `day_coverage` matrix.
+> `schedule-rotation/scenario.test.ts` pins it: strip every shift's
+> `employee_ids`/`team_ids` and the roster is unchanged. They are sample data
+> saying who *may* work a shift.
+>
+> **And the tab is no longer rendered.** As of **2026-09-12** the shift form
+> offers General / Shift times / Shift policy only — the Repeat and Assign-to
+> triggers were removed from `shift-form-tabs.tsx`, and Shift times lost its
+> **Start date** field too.
+>
+> Nothing was deleted: `assign-to-tab.tsx`, `repeat-tab.tsx` and every schema
+> field stay. That is safe because each field is optional or defaulted, the
+> repeat refine block is gated behind `repeat_enabled` (false by default and in
+> all 8 seeds), `assign_to_enabled` gates no validation at all, and
+> `start_date` appears in no refine. **`normalizeShiftFormValues` only blanks a
+> field when its own toggle reads false**, and nothing changes a toggle now, so
+> editing a shift that already carries these values keeps them —
+> **do not force either toggle to `false` in `defaultValues`**, which would
+> destroy stored data on every save.
+>
+> **Known edge, unfixed:** a shift persisted in `localStorage` with
+> `repeat_enabled: true` and a partly-filled `repeat` would now fail validation
+> with **no reachable UI and no visible error** — the form would just refuse to
+> submit. No seed is in that state, so it was left alone rather than fixed
+> speculatively. If a shift mysteriously won't save, look here first.
 
 ## Dependency order (why this mattered for committing)
 

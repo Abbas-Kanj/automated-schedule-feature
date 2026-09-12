@@ -16,15 +16,49 @@ supplied.
 
 - **Schedule dropdown** — lists **rotate schedules only** (`parent_type ==
   'regular' && type == 'rotate'`), the only kind carrying a shift `pattern`.
-- **Daily / Weekly / Monthly** toggle (shadcn `Tabs` used as a segmented control
-  — no `TabsContent`, intentional). **Daily added 2026-09-02**; it is disabled
-  when one pattern card is not one real calendar day (see the Model section).
+- **"Assign crews" button** — opens the assignment **dialog** (2026-09-12; it
+  was a separate page for one day, and a wizard step before that). See "Where
+  assignment lives" below.
 - **Date navigator** — prev / range label / next / **Reset**. Reset returns to
-  the schedule's `start_date` period (which is rotation period 0).
-- **Cycle legend** — decodes the sequence letters (`M = Morning`, …, `O = Off`).
-- **Table** — Employee Name · Current Schedule Sequence · Assigned Shift This
-  Week/Month. The sequence is the cycle rotated so the employee's current
-  position is first and emphasized (Amir `M A N O`, Bilal `A N O M`).
+  the schedule's `start_date` period (rotation period 0). **Prev is disabled
+  once the visible range reaches the schedule's start** (2026-09-12) — the grid
+  draws nothing before then, so stepping back could only land somewhere empty.
+- **Two views, each with its own Weekly / Monthly tabs** (2026-09-12; one
+  shared control before that, and a Daily/Weekly/Monthly one before *that*).
+  Both are seeded from `getDefaultSpan(schedule)` — `cycle_length.unit`,
+  falling back to pattern length for `custom_days` — and re-seeded when the
+  schedule picker changes. They are separate because the two views answer
+  different questions, and comparing a month of bands against this week's
+  roster should not cost you one or the other. A starting point, not a lock:
+  both stay clickable.
+  - **Timeline** (`components/rotation-timeline.tsx`, built from
+    `timeline.ts`) — one row per **crew**, one coloured dot per calendar day,
+    days blocked in sevens. Its own legend decodes the dots. Each row shows
+    headcount, days-on, and **the date that crew starts**.
+  - **Employees** (`components/schedule-rotation-table.tsx`) — Employee Name ·
+    Current Schedule Sequence · Assigned Shift · *one named day*. The sequence
+    is the cycle rotated so the employee's current position is first and
+    emphasized (Amir `M A N O`, Bilal `A N O M`). Its tabs **filter rows** to
+    people working at least one day of the selected week/month; somebody the
+    matrix never mentions stays listed rather than vanishing.
+- **Cycle legend** — decodes the sequence letters (`M = Morning`, …, `O = Off`),
+  now sitting in the Employees section header.
+
+### Where the grid starts (2026-09-12)
+
+Two clamps, both previously absent — the grid drew a whole week or month
+regardless of when the rotation began.
+
+- **Schedule-wide**: calendar days before `start_date` are dropped outright.
+- **Per crew**: a crew's row is blank until its own first working day, rendered
+  as an **empty spacer, not the off-day ring** — "not on this rotation yet" and
+  "rostered and resting" are different statements, and the ring already means
+  the second. `daysOn` counts only real days, so a late crew is no longer
+  credited for time before it existed.
+
+A crew's start date is found by **walking forward from `start_date` through
+`getPeriodIndex`**, not by re-deriving the date arithmetic locally —
+duplicating it is how the two would drift apart.
 
 ## Model
 
@@ -38,19 +72,17 @@ supplied.
 > stored matrix. Both are noted inline below; the full account is in
 > `.claude/handoff/rotation-suggestion.md`.
 >
-> **Relocated 2026-09-11**: producing the matrix (the "Assign to" step) moved
-> *out* of the schedule wizard entirely, onto a new page owned by **this**
-> feature — `/schedule-rotation/assign`
-> (`schedule-rotation/pages/assign/schedule-rotation-assign-page.tsx`). See
-> "The 2026-09-11 relocation" below. This screen's own read-only display
-> (everything above "## Model") is unaffected — it still only ever reads
-> `day_coverage`.
+> **Relocated 2026-09-11, then again 2026-09-12**: producing the matrix (the
+> "Assign to" step) moved *out* of the schedule wizard onto a page owned by
+> this feature, and that page then became a **dialog** —
+> `components/assign-crews-dialog.tsx`. The route and `pages/assign/` are
+> **deleted**. See "Where assignment lives" below. This screen's own read-only
+> display is unaffected — it still only ever reads `day_coverage`.
 
 - **The crew is stored on the schedule as a matrix.** `schedule.day_coverage`
   is a sparse list of `{ day, shift_id, employee_ids, team_ids }` cells — a
-  (cycle day × shift) → crews grid — set via the **"Assign crews"** flow at
-  `/schedule-rotation/assign` (moved off the schedule wizard 2026-09-11; see
-  below). `getRotationRoster` reads that and **nothing else**.
+  (cycle day × shift) → crews grid — set via the **"Assign crews"** dialog on
+  this screen. `getRotationRoster` reads that and **nothing else**.
   **Superseded 2026-09-06:** it used to read `pattern[].employee_ids` /
   `team_ids`, treating a crew's card index as its offset. Those fields are
   **gone from the schema**, along with `crew_shift_id` — one offset cannot name
@@ -76,9 +108,11 @@ supplied.
   does span a week.
 - **`cycleLength === pattern.length`**, regardless of `cycle_type`. This
   screen never reads `cycle_length.days` or `shift_repeat`.
-- **Shifts keep their own "Assign to" tab**, and their `employee_ids` /
-  `team_ids` are kept as sample data. They say who *may* work a shift; they no
-  longer decide who holds which slot of a rotation.
+- **A shift's own `employee_ids` / `team_ids` are sample data only.** They say
+  who *may* work a shift; they have not decided who holds a rotation slot since
+  2026-08-29, and **as of 2026-09-12 the shift form no longer offers the tab
+  that sets them** (the fields and the component stay; see
+  `.claude/handoff/teams-and-shift-assignment.md`).
 - A crew hand-placed on **two shifts the same day** renders as the first one
   here rather than flickering; the form warns about it in place
   (`crew-double-booked`).
@@ -89,13 +123,19 @@ Core logic is pure in `src/features/schedule-rotation/utils.ts`
 against the real seeds in `scenario.test.ts`. `applyCrewShift` was **deleted**
 2026-09-06 with `crew_shift_id`.
 
-Producing the matrix in the first place lives elsewhere and is pure too —
-`src/features/schedules/rotation-suggestion.ts`, driven from the "Assign
-to" UI (`schedule-assign-to-fields.tsx`), which since 2026-09-11 is mounted
-on `/schedule-rotation/assign` rather than the schedule wizard — see below.
-This screen only ever *reads* the result.
+The crew-by-day view is a **separate** pure module,
+`src/features/schedule-rotation/timeline.ts` (`buildRotationTimeline`), tested
+in `timeline.test.ts`. It answers a different question from `buildRotation`:
+per *crew* across consecutive days, rather than per *employee* for one day.
+Both read `day_coverage` through `crewsFromDayCoverage`, so they cannot
+disagree about a cell.
 
-## The 2026-09-11 relocation — "Assign to" moved into this feature
+Producing the matrix lives elsewhere and is pure too —
+`src/features/schedules/rotation-suggestion.ts`, driven from
+`schedule-assign-to-fields.tsx`, which since 2026-09-12 is mounted inside this
+feature's **assign dialog**. This screen only ever *reads* the result.
+
+## Where assignment lives — a page (2026-09-11), now a dialog (2026-09-12)
 
 **Why.** Crew assignment used to be wizard step 4 of 6, wedged between
 Pattern and Start & End — meaning a rotate schedule had to be staffed
@@ -113,11 +153,15 @@ own schedule, independent of creation.
   the `assign-to` step entirely. Rotate's step list is now `basics → shifts
   → pattern → end-settings → summary` (5 steps, was 6). Its `assignToCommitRef`
   plumbing and the `getStepFields('assign-to')` branch went with it.
-- New page: `schedule-rotation/pages/assign/schedule-rotation-assign-page.tsx`,
-  routed at `/schedule-rotation/assign` (optional `?scheduleId=` search
-  param to deep-link past the picker). Two parts: a `Select` over **every**
-  rotate schedule (assigned or not — same screen serves first-time
-  assignment and re-edit), each option labelled with a crew-count status
+- **It is a dialog, not a page** (2026-09-12).
+  `components/assign-crews-dialog.tsx` holds it; the route
+  `/schedule-rotation/assign` and the whole `pages/assign/` directory are
+  **deleted**, along with the `?scheduleId=` search param — the dialog takes
+  the currently-viewed schedule as a prop instead. Staffing a rotation no
+  longer costs a navigation away from the grid showing the result.
+  Two parts: a `Select` over **every** rotate schedule (assigned or not — the
+  same dialog serves first-time assignment and re-edit), grouped into
+  **"Not assigned"** / **"Assigned"** with a crew-count status per option
   (`crewKeysFromDayCoverage`); then, once picked, a small local `useForm`
   (no `zodResolver` — the fields it touches are optional/warning-only at
   the schema level, so there's nothing to validate) seeded from that
@@ -126,11 +170,23 @@ own schedule, independent of creation.
   unchanged** plus (**new**) `ScheduleStartEndFields` unchanged, under one
   "Save assignment" button. Save calls `commitRef` (same ordering the
   wizard's "Next" used), then `updateSchedule(schedule.id, { ...schedule,
-  pattern, day_coverage, crew_placements, start_date, end_settings })`.
+  pattern, day_coverage, crew_placements, start_date, end_settings })`, then
+  closes the dialog.
+- **The picker defaults to the first *unassigned* schedule** (2026-09-12),
+  falling back to the one being viewed — opening this is almost always an
+  attempt to staff something that is not staffed yet.
+  **⚠️ Every rotate seed is staffed**, so with seed data the dialog always
+  opens on the fallback. A test asserted the unassigned-first behaviour
+  against the seeds and correctly failed until it built its own unstaffed
+  schedule. Do not "fix" that test by loosening it.
 - **Entry point**: an "Assign crews" button next to this screen's own
-  schedule `Select`, deep-linking to the schedule currently selected here.
-  The "No employees on this rotation" empty-state copy was updated to
-  point at it instead of the old wizard step.
+  schedule `Select`. The dialog is mounted only while open
+  (`{assignOpen && <AssignCrewsDialog …/>}`) so its default selection
+  re-seeds on every open without an effect — which also keeps the React
+  Compiler quiet (see the gotcha below).
+- **Both pickers inside it carry an A-Z first-letter filter** (2026-09-12) —
+  `components/multi-select/filterable-multi-select.tsx`. See
+  `.claude/handoff/rotation-suggestion.md` for how it behaves.
 - **Wizard Summary + View page**: both used to show the full coverage
   panel for a rotate schedule; both now show a one-line status note
   ("Not yet assigned…" / "N crews assigned…") via a new shared
@@ -141,11 +197,13 @@ own schedule, independent of creation.
   mode at all, so the note is rendered directly in `schedule-form.tsx`
   too, gated on `disabled` alone.
 - **Tests**: `schedule-form.test.tsx` (nothing but the wizard-seam
-  rotate-assignment suite) was deleted outright. Its 3 seam tests moved to
-  a new colocated `schedule-rotation-assign-page.test.tsx`, driving "Save"
-  instead of "Next" against an `AssignToPanel` component exported for
-  testing, with `useSchedulesStore`/`useNavigate`/`sonner` mocked rather
-  than hitting the real store. Its 4th test was already redundant with
+  rotate-assignment suite) was deleted outright. Its 3 seam tests now live in
+  `components/assign-crews-dialog.test.tsx`, driving "Save" instead of "Next"
+  against an `AssignToPanel` component exported for testing, with
+  `useSchedulesStore`/`sonner` mocked rather than hitting the real store
+  (the `useNavigate` mock went with the page). Three dialog-level tests were
+  added 2026-09-12 for the picker's default and its status labels. Its 4th
+  test was already redundant with
   `scenario.test.ts`'s general "every seeded cycle" loop and wasn't
   re-added. Two more tests added for the new Start & End fields
   (round-trips unedited; saves an edited end frequency).
@@ -153,17 +211,15 @@ own schedule, independent of creation.
   defaulted to `[]`; a schedule created via the now-5-step wizard just
   starts unassigned until visited via the new page. `SEED_VERSION` not
   bumped — nothing about stored shape changed.
-- **New `optimizeDeps.include` entry**: `react-day-picker`, discovered
-  mid-run by the new page's test mounting `ScheduleStartEndFields`'s date
-  picker for the first time — same class of issue as the `@radix-ui/*`
-  entries already there (see the gotcha section below).
+- **New `optimizeDeps.include` entries**: `react-day-picker` (2026-09-11,
+  from `ScheduleStartEndFields`'s date picker) and `@radix-ui/react-dialog`
+  (2026-09-12, for the dialog test) — same class of issue as the
+  `@radix-ui/*` entries already there (see the gotcha section below).
 
-**Not done / still open:** no browser verification (see Status below);
-`/schedule-rotation`'s own `Select` and this new page's `Select` are two
-separate, un-synced pieces of state — picking a schedule on one doesn't
-carry over to the other except via the explicit `?scheduleId=` deep-link
-on the "Assign crews" button. Full click-path in the companion file's
-Status/Open-calls sections.
+**Still open:** this screen's `Select` and the dialog's `Select` remain two
+separate pieces of state — the dialog deliberately does *not* follow the
+screen's selection, since it prefers an unassigned schedule. Saving does not
+switch the screen to the schedule that was just staffed.
 
 ## The 2026-08-29 rework — assignment moved onto the schedule
 
@@ -183,15 +239,14 @@ starts where".
 **The change.**
 
 - New **"Assign to" step** in the schedule form, rotate only, sitting between
-  **Pattern** and **Start & End** (**as of 2026-09-12 rotate has no "Start &
-  End" step at all** — it moved to the Schedule Rotation screen, so "Assign
-  to" now sits between **Pattern** and **Summary**) —
+  **Pattern** and **Start & End** —
   `schedule-form/schedule-assign-to-fields.tsx`. One row per cycle position,
-  each with Employees + Teams multi-selects, built from the same `MultiSelect`
-  the shift form's own Assign-to tab uses.
-  **Superseded 2026-09-11**: that step no longer exists in the wizard at
-  all — the same component moved onto this feature's own
-  `/schedule-rotation/assign` page. See "The 2026-09-11 relocation" above.
+  each with Employees + Teams multi-selects, built from the same picker the
+  shift form's own Assign-to tab used.
+  **Superseded 2026-09-11/12**: that step no longer exists in the wizard at
+  all — the same component now mounts in this feature's **"Assign crews"
+  dialog**. See "Where assignment lives" above. (The shift form's Assign-to
+  tab is itself no longer rendered, as of 2026-09-12.)
 - `getRotationRoster` now reads the schedule, not the shifts. **No schema
   restriction was added** — an unassigned position stays valid and the step
   never blocks "Next", a call that still holds today.
@@ -264,59 +319,48 @@ Design constraints that shaped these (worth knowing before editing them):
   empty; more and the extras never enter the cycle. Nothing enforces this — it
   is asserted in `scenario.test.ts`, not in the schema.
 
-## Status
+## Status — 2026-09-12
 
-> **2026-09-11 supersedes every number below.** Build/test/lint numbers
-> aside, the substantive change is the relocation described above — read
-> that section first.
->
-> - `npm run build` **clean**. `npx eslint .` — same pre-existing baseline
->   (11 errors / 3 warnings, none in files this touched).
-> - `npm run test` — **273 passed / 3 failed**, still only the pre-existing
->   unowned `search-provider.test.tsx` three.
-> - **Still not browser-verified by hand** — this session had no browser
->   tooling either. The click-path to verify is in
->   `.claude/handoff/rotation-suggestion.md`'s Open calls #1, updated for
->   the new location.
->
-> *(The 2026-09-06 line this replaces read 243 passed / 3 failed.)*
+- `npm run build` **clean**. `npm run test` — **362 passed / 0 failed**
+  (349 before this session's feature work; 273/3 at the end of 09-11).
+  **The three long-standing `search-provider.test.tsx` failures are gone** —
+  fixed 2026-09-11, they were never flaky, they asserted nav entries that had
+  been commented out of `sidebar-data.ts`. Any note elsewhere still calling
+  them "pre-existing, unowned" is stale.
+- `npx eslint` — **clean on every file this feature owns**. Repo baseline is
+  11 errors / 3 warnings in five files none of this touched.
+- **BROWSER-VERIFIED 2026-09-12 — the first time in this repo.** Driven with
+  Playwright against the real dev server (there was no Claude-in-Chrome in the
+  session; `playwright` resolves from `node_modules`, but the script has to
+  live **inside the project** or node cannot resolve it). Confirmed:
+  - Both views render with their own Weekly/Monthly tab pairs.
+  - Crew start dates read under each name, and a crew starting a day late has
+    a genuinely blank leading cell.
+  - Prev is disabled at the schedule start and re-enables after stepping
+    forward.
+  - "Assign crews" opens a dialog with **no navigation** (URL unchanged).
+  - The A-Z strip renders, with letters nobody's name starts with disabled.
+  - The shift form shows three tabs and no Start date field.
+- **Disproved a worry while verifying**: these pickers do **not** portal their
+  menu (only `team-form-dialog.tsx` passes `menuPortalTarget`), so the
+  dialog's `onInteractOutside` guard is **inert today**. It was kept — adding
+  a portal later would reintroduce the bug `1fed0b6` fixed — but the comment
+  was corrected to stop claiming it fixes something live. Also checked: the
+  inline menu is **not clipped** by the dialog's `max-h-[70vh] overflow-y-auto`
+  even for the bottom-most picker of the manual grid; react-select flips it
+  upward.
+- **Committed, not pushed.** Eight commits sit on local `main`.
 
-> **2026-09-06 supersedes every number below**: `npm run build` clean;
-> `npm run test` **243 passed / 3 failed** (same three unowned
-> `search-provider.test.tsx` failures); `npx eslint` **0 errors**, 3 warnings,
-> all pre-existing. `utils.test.ts` and `scenario.test.ts` were rewritten onto
-> `day_coverage` and now also assert every seeded cycle staffs every selected
-> shift on every day. Still **not browser-verified**, and **uncommitted** —
-> three sessions' worth (09-02, 09-03, 09-06).
->
-> *(The 2026-09-02 line this replaces read 221 passed / 3 failed.)*
+### ⚠️ The 2026-09-12 merge — read before trusting any older claim here
 
-### As of 2026-08-29
-
-- `npm run build` **clean**.
-- `npm run test` — **192 passed / 3 failed**, the 3 being the pre-existing
-  unowned `search-provider.test.tsx` failures.
-- `npx eslint` on every touched file — **0 errors**; 3 warnings, all
-  pre-existing (two `exhaustive-deps` in `pattern-builder.tsx`, one
-  `incompatible-library` in `schedule-form.tsx`).
-- **Automated coverage of the new step**: `schedule-assign-to-fields.test.tsx`
-  renders it in real Chromium — one row per position including Off, seeded crew
-  resolved to full names, and a typed pick on the **off** position landing in
-  the roster. *(Rewritten 2026-09-06 for the day × shift grid: one picker per
-  selected shift per day, a free cell edit disturbing nothing else, and a cell
-  dropped once its last crew is removed.)*
-- `scenario.test.ts` locks both rotations week by week, and asserts the roster
-  is unchanged when every shift's `employee_ids`/`team_ids` are stripped —
-  i.e. proves the schedule is the only source.
-- **Still NOT browser-verified by hand.** No browser tooling was connected in
-  the 08-25 → 08-29 sessions. The component test covers the new step's
-  mechanics but not the wizard flow around it (stepping Pattern → Assign to →
-  Start & End, or the read-only view).
-- Prettier: the files this session created or rewrote are clean.
-  `schedule-form.tsx`, `pattern-builder.tsx` and `schedule-rotation/index.tsx`
-  still fail `prettier --check`, but **already failed at HEAD** — that's the
-  repo-wide drift CLAUDE.md tracks as an open call, left alone deliberately so
-  this diff stays readable.
+The local checkout was **5 commits behind `origin/main`** (what GitHub Pages
+serves) while holding an uncommitted cleanup batch. **Both sides had moved
+rotate's crew assignment in opposite directions**: local dropped the wizard's
+"Start & End" step and kept "Assign to"; the remote dropped "Assign to" and
+kept "Start & End". **The remote won.** Rotate's wizard is
+`basics → shifts → pattern → end-settings → summary`, and **rotate does have a
+"Start & End" step**. A claim in this file that it does not was left over from
+the losing branch and has been deleted. `bridge/` is now gitignored.
 
 ## ⚠️ Environment gotchas
 
@@ -345,13 +389,31 @@ resolves a second React, throwing `Invalid hook call` — then passes on every
 subsequent run, so it only shows against a cold `node_modules/.vite`.
 
 ```ts
-optimizeDeps: { include: ['@radix-ui/react-switch'] },
+optimizeDeps: {
+  include: [
+    '@radix-ui/react-switch',   // 09-02
+    '@radix-ui/react-popover',  // 09-03
+    'react-day-picker',         // 09-11
+    '@radix-ui/react-dialog',   // 09-12
+  ],
+},
 ```
 
 Same signature as the `dedupe` case above, which makes it easy to wave off as
 already handled. **Anything a component test mounts that is not already reached
 from `src/main.tsx` belongs in that list.** Reproduce with
 `rm -rf node_modules/.vite` before trusting a green run.
+
+### ⚠️ The React Compiler rejects manual `useMemo` in `index.tsx`
+
+Found 2026-09-12. `buildWorkDays` and `employeeRows` are deliberately plain
+functions/IIFEs, not `useMemo` — **do not "optimize" them back.** The
+`useMemo`s in `assign-crews-dialog.tsx` are fine; the rule fires on some
+shapes and not others, so check with eslint rather than by analogy.
+
+Full write-up in the global skill **`react-compiler-rejects-manual-usememo`**
+(why it is an error, why it de-optimizes the whole component, and why an
+eslint-disable is the wrong fix).
 
 ### Seed changes no longer need localStorage hand-clearing
 
@@ -407,8 +469,16 @@ npx vitest run --browser.enabled=false --environment=node <files>
    crews are transposed onto other shifts (every rotation, since 2026-09-06 —
    this is how full coverage is reached) the legend and the rows disagree. Not
    wrong, but more likely to be seen now than when it needed an explicit
-   `crew_shift_id` pin. Worth a look.
-5. **The shift Assign-to tab is now decorative for rotations.** Kept
-   deliberately ("leave the assign to data in the shift for later use"), but
-   `/shifts` will show assignments that don't drive anything — worth a label or
-   a hint there eventually.
+   `crew_shift_id` pin. Worth a look. **Note the timeline has its own legend**
+   keyed off `shift_ids` in clock order, which does *not* have this problem —
+   only the Employees section's legend does.
+6. ~~**The shift Assign-to tab is decorative for rotations** — worth a label or
+   a hint.~~ **Resolved 2026-09-12** by removing the tab from the shift form
+   entirely (fields and component kept).
+7. **Saving the assign dialog does not re-point the screen** at the schedule
+   just staffed. Minor, but the dialog can now leave you looking at a different
+   rotation than the one you edited.
+8. **No seeded rotation demonstrates the start-date clamp.** All eight seeds
+   start `2026-08-31`, so both the schedule-wide and per-crew clamps are
+   invisible on seed data — the timeline tests build their own mid-month
+   schedules to exercise them. Consider a seed that starts mid-week.

@@ -40,8 +40,11 @@ empty string back out through `onValueChange` and wipes the default.
 
 **Fix** (`src/components/recurrence-frequency-fields.tsx`): ignore empty
 values in `onValueChange`. A real user pick is never empty — Radix Select
-has no clear affordance — so nothing legitimate is dropped. This also
-protects the `shifts` feature's own Repeat tab, which shares the component.
+has no clear affordance — so nothing legitimate is dropped. It also protected
+the `shifts` feature's own Repeat tab, which shares the component — though
+**that tab is no longer rendered as of 2026-09-12** (see
+`.claude/handoff/teams-and-shift-assignment.md`), so the schedule form is the
+only live consumer of the guard today.
 
 Extracted to a global skill: **`radix-select-bubble-select-wipes-programmatic-value`**
 (sibling of the existing `radix-radio-group-bubble-input-reopens-dialog` —
@@ -118,5 +121,9 @@ commit is still open, and is Kanj's call.
    normalized wholesale; only touched files were formatted, and only
    where doing so didn't churn unrelated lines (see the gotcha above).
 3. ~~Decide whether "Shift policies" gets a real page~~ — **it did.**
-4. The 3 pre-existing `search-provider.test.tsx` failures are **still
-   unowned** and still failing. Unrelated to this task.
+4. ~~The 3 pre-existing `search-provider.test.tsx` failures are still unowned
+   and still failing.~~ **Fixed 2026-09-11.** They were never flaky: they
+   asserted `Dashboard`, `Tasks` and `Settings Account`, all commented out of
+   `sidebar-data.ts`. Fixing them surfaced a real bug in `command-menu.tsx`
+   (it walked two levels of a three-deep nav, so nested palette entries
+   navigated to `undefined`). The suite has **0 failures** as of 2026-09-12.
