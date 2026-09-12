@@ -31,10 +31,25 @@ function ShiftDot({
   day,
   span,
 }: {
-  position: RotationPosition
+  // Absent for a day before this crew joined the rotation — the column still
+  // has to hold its width, or every row below would slip out of step with the
+  // dates in the header.
+  position: RotationPosition | undefined
   day: TimelineDay
   span: RotationTimeline['span']
 }) {
+  if (!position) {
+    return (
+      <div
+        className={cn(
+          'flex shrink-0 items-center justify-center',
+          DAY_COLUMN[span]
+        )}
+        aria-hidden
+      />
+    )
+  }
+
   return (
     <div
       className={cn(
@@ -114,6 +129,12 @@ function CrewRow({
           {row.headcount === 1 ? '1 person' : `${row.headcount} people`}
           {' · '}
           {row.daysOn === 1 ? '1 day on' : `${row.daysOn} days on`}
+        </div>
+        {/* The day this crew joins the rotation. A staggered roster is
+            written as "Team B starts on week 2", so the date that sentence
+            resolves to belongs next to the name. */}
+        <div className='text-xs text-muted-foreground'>
+          Starts {format(row.startDate, 'MMM d, yyyy')}
         </div>
       </div>
       {timeline.blocks.map((block, blockIndex) => (

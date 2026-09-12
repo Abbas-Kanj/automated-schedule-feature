@@ -73,7 +73,7 @@ describe('buildRotationTimeline', () => {
     expect(timeline.rows.length).toBeGreaterThan(0)
     timeline.rows.forEach((row) => {
       expect(row.cells).toHaveLength(timeline.days.length)
-      expect(row.daysOn).toBe(row.cells.filter((c) => !c.isOff).length)
+      expect(row.daysOn).toBe(row.cells.filter((c) => c && !c.isOff).length)
     })
   })
 
@@ -96,7 +96,7 @@ describe('buildRotationTimeline', () => {
 
     expect(new Set(timeline.days.map((d) => d.cycleDay)).size).toBe(1)
     timeline.rows.forEach((row) => {
-      expect(new Set(row.cells.map((c) => c.label)).size).toBe(1)
+      expect(new Set(row.cells.map((c) => c?.label)).size).toBe(1)
     })
   })
 
@@ -136,5 +136,84 @@ describe('buildRotationTimeline', () => {
         'daily',
       ])
     })
+  })
+
+  // Every seeded rotation starts 2026-08-31, so the clamp is invisible on the
+  // seeds — it has to be given a schedule that starts mid-view to show up.
+  it('draws no column before the schedule has started', () => {
+    const midMonth: RotateSchedule = { ...panama, start_date: '2026-09-10' }
+    const timeline = build(midMonth, '2026-09-15', 'daily', 'month')
+
+    expect(timeline.days[0].date.getDate()).toBe(10)
+    expect(timeline.days).toHaveLength(21)
+    expect(timeline.rows.every((row) => row.cells.length === 21)).toBe(true)
+  })
+
+  it('still labels the range when the whole span precedes the start', () => {
+    const future: RotateSchedule = { ...panama, start_date: '2027-01-01' }
+    const timeline = build(future, '2026-09-15', 'daily', 'month')
+
+    expect(timeline.days).toHaveLength(0)
+    expect(timeline.rangeLabel).toBeTruthy()
+  })
+
+  // A staggered roster is the whole point of the per-crew start: the second
+  // crew does not exist on the grid until its own first working day.
+  const [first, second] = employees.filter((e) => e.id).slice(0, 2)
+  const staggered: RotateSchedule = {
+    ...panama,
+    day_coverage: [
+      {
+        day: 0,
+        shift_id: panama.shift_ids[0],
+        employee_ids: [first.id as string],
+        team_ids: [],
+      },
+      {
+        day: 5,
+        shift_id: panama.shift_ids[0],
+        employee_ids: [second.id as string],
+        team_ids: [],
+      },
+    ],
+    crew_placements: [],
+  }
+
+  it('starts each crew on its own first working day', () => {
+    const timeline = build(staggered, '2026-09-15', 'daily', 'month')
+
+    // Schedule starts 2026-08-31 (cycle day 0), so day 5 is 2026-09-05.
+    expect(timeline.rows).toHaveLength(2)
+    expect(timeline.rows[0].startDate.getDate()).toBe(31)
+    expect(timeline.rows[0].startDate.getMonth()).toBe(7)
+    expect(timeline.rows[1].startDate.getDate()).toBe(5)
+    expect(timeline.rows[1].startDate.getMonth()).toBe(8)
+  })
+
+  it('blanks a crew cell before that crew starts, rather than calling it off', () => {
+    const timeline = build(staggered, '2026-09-15', 'daily', 'month')
+    const late = timeline.rows[1]
+
+    timeline.days.forEach((day, i) => {
+      if (day.date < late.startDate) {
+        expect(late.cells[i]).toBeUndefined()
+      } else {
+        expect(late.cells[i]).toBeDefined()
+      }
+    })
+    // Sep 1-4 are before this crew exists.
+    expect(late.cells.slice(0, 4).every((cell) => cell === undefined)).toBe(true)
+  })
+
+  it('excludes blanked days from the days-on count', () => {
+    const timeline = build(staggered, '2026-09-15', 'daily', 'month')
+
+    timeline.rows.forEach((row) => {
+      expect(row.daysOn).toBe(
+        row.cells.filter((cell) => cell && !cell.isOff).length
+      )
+    })
+    // The late crew cannot have worked more days than the early one.
+    expect(timeline.rows[1].daysOn).toBeLessThanOrEqual(timeline.rows[0].daysOn)
   })
 })

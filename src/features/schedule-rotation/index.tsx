@@ -82,6 +82,12 @@ export function ScheduleRotation() {
   const rangeStart = getPeriodStart(viewDate, stepType)
   const rangeEnd = getPeriodEnd(viewDate, stepType)
 
+  // The grid draws nothing before the schedule starts, so stepping further
+  // back would only ever land on an empty range.
+  const atStart = schedule
+    ? rangeStart <= getPeriodStart(scheduleStartDate(schedule.start_date), stepType)
+    : true
+
   // Which single day the employee table reads. Today when today is on screen —
   // that is the question somebody opening this screen is usually asking — and
   // otherwise the first day of whatever range they navigated to, so the table
@@ -189,6 +195,7 @@ export function ScheduleRotation() {
                 size='icon'
                 className='size-8'
                 onClick={() => setViewDate((d) => shiftPeriod(d, stepType, -1))}
+                disabled={atStart}
                 aria-label='Previous period'
               >
                 <ChevronLeft className='size-4' />
