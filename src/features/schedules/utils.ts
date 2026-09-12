@@ -7,13 +7,37 @@ import {
   parse,
   startOfMonth,
 } from 'date-fns'
-import { CYCLE_TYPE_OPTIONS } from './data/data'
-import { type DayOfWeek, type Schedule, type TimeRange } from './data/schema'
 import {
   type DayOfWeek as ShiftDayOfWeek,
   type Shift,
 } from '@/features/shifts/data/schema'
 import { getShiftTimeRange } from '@/features/shifts/utils'
+import { CYCLE_TYPE_OPTIONS } from './data/data'
+import {
+  type DayOfWeek,
+  type EndSettings,
+  type Schedule,
+  type TimeRange,
+} from './data/schema'
+
+// "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line —
+// the three end-settings shapes never coexist, so they don't need three
+// separate rows. Shared by the wizard's Summary step and the Schedule
+// Rotation screen, which is where a rotation's end is now edited.
+export function formatEndSettings(
+  endSettings: EndSettings | undefined
+): string | undefined {
+  if (!endSettings?.end_type) return undefined
+  if (endSettings.end_type === 'after_occurrences') {
+    return endSettings.end_occurrences
+      ? `After ${endSettings.end_occurrences} occurrence(s)`
+      : undefined
+  }
+  if (endSettings.end_type === 'on_date') {
+    return endSettings.end_date ? `On ${endSettings.end_date}` : undefined
+  }
+  return 'Never ends'
+}
 
 export function deriveShortCode(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
@@ -69,11 +93,25 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
-// Shared "09:00–17:00, 18:00–20:00" formatter for a list of time ranges —
-// used by the Summary step's per-day listings and its calendar preview
-// (`schedule-calendar-preview.tsx`) alike. `formatTime` is the caller's
-// bound `useTimeFormat()` formatter (12h/24h is a user display
-// preference, not something this pure function decides).
+// The schedule's own shifts, resolved and in its own order. Ids with no shift
+// behind them are dropped — a since-deleted shift contributes no hours.
+function resolveShifts(shiftIds: string[], shifts: Shift[]): Shift[] {
+  const byId = new Map(shifts.map((shift) => [shift.id, shift]))
+  return shiftIds.flatMap((id) => {
+    const shift = byId.get(id)
+    return shift ? [shift] : []
+  })
+}
+
+function enabledDayHours(shift: Shift): number {
+  return shift.days
+    .filter((day) => day.enabled)
+    .reduce((sum, day) => sum + calculateHours(day.times), 0)
+}
+
+// Shared "09:00–17:00, 18:00–20:00" formatter for a list of time ranges.
+// `formatTime` is the caller's bound `useTimeFormat()` formatter — 12h/24h is a
+// display preference, not something this pure function decides.
 export function formatTimes(
   times: { from_time: string; to_time: string }[] | undefined,
   formatTime: (time: string) => string
@@ -84,36 +122,25 @@ export function formatTimes(
     .join(', ')
 }
 
-export function getScheduleTotalHours(schedule: Schedule, shifts: Shift[]): number {
+export function getScheduleTotalHours(
+  schedule: Schedule,
+  shifts: Shift[]
+): number {
   if (schedule.parent_type === 'regular') {
     if (schedule.type === 'rotate') {
-      // Each pattern day now points at one of the schedule's own selected
-      // shifts (`shift_id`) rather than a hand-authored block — total hours
-      // come from that shift's own enabled-day hours instead.
-      const activeHours = schedule.pattern.reduce((sum, p) => {
-        if (p.is_off || !p.shift_id) return sum
-        const shift = shifts.find((s) => s.id === p.shift_id)
-        if (!shift) return sum
-        return (
-          sum +
-          shift.days
-            .filter((d) => d.enabled)
-            .reduce((daySum, d) => daySum + calculateHours(d.times), 0)
-        )
+      // A pattern card points at one of the schedule's own selected shifts, so
+      // the hours are that shift's, averaged over the cycle.
+      const byId = new Map(shifts.map((shift) => [shift.id, shift]))
+      const activeHours = schedule.pattern.reduce((sum, entry) => {
+        if (entry.is_off || !entry.shift_id) return sum
+        const shift = byId.get(entry.shift_id)
+        return shift ? sum + enabledDayHours(shift) : sum
       }, 0)
       return Math.round((activeHours / schedule.cycle_length.days) * 100) / 100
     }
 
-    const resolvedShifts = schedule.shift_ids
-      .map((id) => shifts.find((s) => s.id === id))
-      .filter((s): s is Shift => s !== undefined)
-
-    return resolvedShifts.reduce(
-      (shiftSum, shift) =>
-        shiftSum +
-        shift.days
-          .filter((d) => d.enabled)
-          .reduce((daySum, d) => daySum + calculateHours(d.times), 0),
+    return resolveShifts(schedule.shift_ids, shifts).reduce(
+      (sum, shift) => sum + enabledDayHours(shift),
       0
     )
   }
@@ -129,7 +156,10 @@ export function getScheduleTotalHours(schedule: Schedule, shifts: Shift[]): numb
   )
 }
 
-export function getScheduleSummary(schedule: Schedule, shifts: Shift[]): string {
+export function getScheduleSummary(
+  schedule: Schedule,
+  shifts: Shift[]
+): string {
   if (schedule.parent_type === 'regular') {
     if (schedule.type === 'rotate') {
       const cycleLabel = CYCLE_TYPE_OPTIONS.find(
@@ -138,10 +168,7 @@ export function getScheduleSummary(schedule: Schedule, shifts: Shift[]): string 
       return `${cycleLabel} · ${schedule.cycle_length.days}-day cycle`
     }
 
-    const resolvedShifts = schedule.shift_ids
-      .map((id) => shifts.find((s) => s.id === id))
-      .filter((s): s is Shift => s !== undefined)
-
+    const resolvedShifts = resolveShifts(schedule.shift_ids, shifts)
     const shiftCount = resolvedShifts.length
     const dayCount = resolvedShifts.reduce(
       (sum, shift) => sum + shift.days.filter((d) => d.enabled).length,
@@ -168,12 +195,10 @@ export function getScheduleSummary(schedule: Schedule, shifts: Shift[]): string 
 
 // --- regular schedules' real-date calendar preview (Summary step) ---
 //
-// Maps a fixed/flexible/rotate schedule onto actual calendar dates, one
-// "cycle" (page) at a time, for `schedule-calendar-preview.tsx`. A cycle is
-// the schedule's own natural repeat unit: rotate's pattern length, or a
-// plain calendar week for fixed/flexible (their selected shifts' own
-// `days` just repeat every 7 days indefinitely — there's no pattern to
-// cycle through).
+// Maps a fixed/flexible/rotate schedule onto actual calendar dates, one cycle
+// (page) at a time. A cycle is the schedule's own repeat unit: rotate's pattern
+// length, or a plain calendar week for fixed/flexible, whose selected shifts'
+// `days` simply repeat every 7 days with no pattern to cycle through.
 
 export type ScheduleCalendarEntry = {
   shift: Shift
@@ -183,10 +208,8 @@ export type ScheduleCalendarEntry = {
 export type ScheduleCalendarDay = {
   date: Date
   date_str: string
-  // Monday-first index (0 = Monday .. 6 = Sunday) — matches the weekday
-  // chip ordering used elsewhere in the app (shifts' own `DAYS_OF_WEEK`,
-  // see `shifts/data/schema.ts`), not this file's own Sunday-first
-  // `DAYS_OF_WEEK`.
+  // Monday-first (0 = Monday .. 6 = Sunday), matching the weekday chips
+  // elsewhere in the app — not this file's own Sunday-first `DAYS_OF_WEEK`.
   weekdayIndex: number
   isOff: boolean
   entries: ScheduleCalendarEntry[]
@@ -200,19 +223,17 @@ export type ScheduleCalendarCycle = {
   canGoToNextCycle: boolean
 }
 
-// Loose shape accepted below — the Summary step reads these off the live
-// (possibly still-incomplete) form values via `useWatch`, not a fully
-// validated `Schedule`, so every field stays optional/defensive rather
-// than requiring the real discriminated union — same reasoning as this
-// file's other `Summary*` components in `schedule-summary.tsx`.
+// Loose shape on purpose: the Summary step reads these off the live, possibly
+// still-incomplete form values via `useWatch` rather than a validated
+// `Schedule`, so every field stays optional.
 export type CalendarScheduleInput = {
   type?: 'fixed' | 'flexible' | 'rotate'
   start_date?: string
   shift_ids?: string[]
   pattern?: { position: number; shift_id?: string; is_off: boolean }[]
-  // custom_shifts' per-shift repeat rules — only present for that cycle
-  // type. See `expandRotatePatternDays` below for how `frequency`/
-  // `weekdays` now actually shape the calendar (weekly only, for now).
+  // custom_shifts' per-shift repeat rules — only present for that cycle type.
+  // See `expandRotatePatternDays` for how `frequency`/`weekdays` shape the
+  // calendar (weekly only, for now).
   shift_repeat?: {
     shift_id: string
     frequency: string
@@ -225,12 +246,10 @@ export type CalendarScheduleInput = {
   }
 }
 
-// A single pattern card's real-day span: 7 for a card whose shift has a
-// matching `weekly`-frequency `shift_repeat` entry, 1 for everything else
-// (off cards, daily/monthly-frequency cards, or — critically — cards with
-// no matching `shift_repeat` entry at all, which is what keeps
-// `pattern_shifts` mode, which never populates `shift_repeat`, on today's
-// plain one-card-one-day behavior with no special-casing needed).
+// A pattern card's real-day span: 7 for a card whose shift has a matching
+// `weekly`-frequency repeat entry, 1 for everything else — off cards,
+// daily/monthly cards, and cards with no repeat entry at all, which is what
+// keeps `pattern_shifts` mode on one-card-one-day with no special case.
 function getCardDayCount(
   entry: { shift_id?: string; is_off: boolean },
   shiftRepeatByShiftId: Map<string, { frequency: string }>
@@ -248,10 +267,9 @@ function buildShiftRepeatMap(
   return new Map(shiftRepeat.map((r) => [r.shift_id, r]))
 }
 
-// Total real calendar days one full pass through a rotate pattern spans.
-// Weekday content is irrelevant to the count (a weekly card always
-// contributes exactly 7 regardless of which weekdays end up active within
-// it), so this needs no date/weekday input at all.
+// Total real calendar days one full pass through a rotate pattern spans. A
+// weekly card always contributes 7 whatever weekdays are active inside it, so
+// this needs no date input.
 function getRotatePatternDayCount(
   pattern: { position: number; shift_id?: string; is_off: boolean }[],
   shiftRepeat: { shift_id: string; frequency: string; weekdays?: string[] }[]
@@ -259,30 +277,27 @@ function getRotatePatternDayCount(
   const shiftRepeatByShiftId = buildShiftRepeatMap(shiftRepeat)
   return [...pattern]
     .sort((a, b) => a.position - b.position)
-    .reduce((sum, entry) => sum + getCardDayCount(entry, shiftRepeatByShiftId), 0)
+    .reduce(
+      (sum, entry) => sum + getCardDayCount(entry, shiftRepeatByShiftId),
+      0
+    )
 }
 
-// Expands a custom_shifts pattern (fixed-count, auto-populated cards) into
-// real calendar-day units. A `daily`-frequency card (or an off card, or a
-// card with no matching `shift_repeat` entry — see `getCardDayCount`) stays
-// exactly 1 day, always active if it has a shift — bit-for-bit today's
-// behavior. A `weekly`-frequency card instead spans 7 real days, active
-// only on that shift's own selected weekdays; the other days in that card's
-// week are unassigned/off. `monthly` is explicitly out of scope for now and
-// falls through the same 1-day path as `daily`.
+// Expands a custom_shifts pattern into real calendar-day units. A daily card
+// (or an off card, or one with no repeat entry) stays a single day, always
+// active if it has a shift. A weekly card spans 7 real days, active only on
+// that shift's own selected weekdays. `monthly` is out of scope for now and
+// takes the same 1-day path as `daily`.
 //
-// `startDate` only determines which real weekday each expanded day within a
-// weekly card lands on — the running day-offset from `startDate` is read
-// off the output array's own length as it's built, since every prior card
-// has already pushed its exact day-contribution by the time a later card is
-// expanded.
+// `startDate` only decides which real weekday each expanded day lands on; the
+// running offset is read off the output array's length as it is built, since
+// every prior card has already pushed its exact contribution.
 type ExpandedRotateDay = {
   shiftId: string | undefined
   isOff: boolean
-  // True when this day came from a weekly-frequency card's 7-day
-  // expansion — the real weekday is then meaningful (consistent across
-  // cycles), so the caller can read the shift's actual per-weekday hours
-  // instead of falling back to a generic summary.
+  // True when this day came from a weekly card's 7-day expansion, which is when
+  // the real weekday is meaningful — the caller can then read the shift's
+  // actual per-weekday hours instead of a generic summary.
   fromWeeklyCard: boolean
 }
 
@@ -327,10 +342,11 @@ function expandRotatePatternDays(
   return days
 }
 
-// Rotate's own real-day pattern length (see `getRotatePatternDayCount` —
-// weekly cards expand to 7 real days each), or a plain calendar week for
-// fixed/flexible.
-export function getScheduleCycleLength(schedule: CalendarScheduleInput): number {
+// Rotate's real-day pattern length (weekly cards expand to 7 days each), or a
+// plain calendar week for fixed/flexible.
+export function getScheduleCycleLength(
+  schedule: CalendarScheduleInput
+): number {
   if (schedule.type === 'rotate') {
     return getRotatePatternDayCount(
       schedule.pattern ?? [],
@@ -340,12 +356,10 @@ export function getScheduleCycleLength(schedule: CalendarScheduleInput): number 
   return 7
 }
 
-// True once `cycleIndex`'s cycle is the last one the schedule's own
-// `end_settings` allows — "never ends" never caps it. `after_occurrences`
-// reads as "N repeats of the cycle" (N weeks for fixed/flexible, N pattern
-// repeats for rotate) since that's the only unit that stays meaningful
-// across both — there's no per-day occurrence count anywhere else in the
-// schema to match instead.
+// True once `cycleIndex`'s cycle is the last one `end_settings` allows.
+// `after_occurrences` reads as "N repeats of the cycle" — N weeks for
+// fixed/flexible, N pattern repeats for rotate — the only unit meaningful to
+// both.
 function isLastAllowedCycle(
   schedule: CalendarScheduleInput,
   cycleIndex: number,
@@ -369,37 +383,21 @@ function isLastAllowedCycle(
   return false
 }
 
-// The calendar preview never renders more than one page's worth of days at
-// once, even if the schedule's own cycle (e.g. a long rotate pattern) is
-// longer than this — `cycleLength` (used for "Next cycle" paging and
-// `end_settings` capping) stays the real, uncapped length regardless; only
-// the materialized `days` array is capped.
+// The preview never renders more than one page of days, however long the cycle
+// is. `cycleLength` stays the real, uncapped length — only `days` is capped.
 const MAX_CALENDAR_PREVIEW_DAYS = 28
 
-// Builds one page ("cycle") of a regular schedule's real-date calendar —
-// `cycleIndex` 0 is the cycle starting at `start_date` itself, 1 is the
-// next `cycleLength`-day block after that, etc. (never before `start_date`).
+// Builds one page ("cycle") of a regular schedule's real-date calendar.
+// `cycleIndex` 0 is the cycle starting at `start_date`, 1 the next
+// `cycleLength`-day block, and so on — never before `start_date`.
 //
-// - rotate: `pattern`'s own card order is exactly what shows up on the
-//   calendar, in that order, starting at `start_date` — but a card's real
-//   calendar-day span now depends on its shift's own `shift_repeat` rule
-//   (see `expandRotatePatternDays`): a `daily`-frequency card (or an off
-//   card, or a card whose shift has no `shift_repeat` entry — which is
-//   exactly `pattern_shifts` mode, since it never populates `shift_repeat`)
-//   is still a single day, always active, same as before. A
-//   `weekly`-frequency card instead spans a real calendar week, active only
-//   on that shift's own selected weekdays — the other days of that card's
-//   week are off. `monthly` is explicitly out of scope for now and stays
-//   1-day-per-card, same as `daily`. A shift's displayed time range uses
-//   its real per-weekday hours when the active day came from a
-//   weekly-expanded card (we know the specific weekday); otherwise it falls
-//   back to a representative summary (`getShiftTimeRange`, the same helper
-//   the shifts table uses for its Start/End columns), since a daily/monthly
-//   card still places a whole shift on an arbitrary cycle day, not a
-//   specific weekday.
-// - fixed/flexible: every selected shift's own `days` entry for that real
-//   weekday is used directly (its exact hours, not a summary), and more
-//   than one shift can be active the same day.
+// - rotate: the pattern's card order is what shows on the calendar, starting at
+//   `start_date`, each card spanning the days `expandRotatePatternDays` gives
+//   it. A weekly-expanded day shows the shift's real per-weekday hours, since
+//   the weekday is known; anything else falls back to `getShiftTimeRange`,
+//   because a daily card places a shift on a cycle day, not a weekday.
+// - fixed/flexible: each selected shift's own `days` entry for that weekday,
+//   with its exact hours, and more than one shift may be active the same day.
 export function getScheduleCalendarCycle(
   schedule: CalendarScheduleInput,
   shifts: Shift[],
@@ -424,8 +422,7 @@ export function getScheduleCalendarCycle(
     .map((id) => shifts.find((s) => s.id === id))
     .filter((s): s is Shift => s !== undefined)
 
-  // Computed once per call (not per date) — the same expanded sequence
-  // repeats every full cycle, so there's no need to re-derive it per day.
+  // Once per call, not per date: the same expanded sequence repeats every cycle.
   const expandedDays =
     schedule.type === 'rotate'
       ? expandRotatePatternDays(pattern, schedule.shift_repeat ?? [], startDate)
@@ -443,14 +440,14 @@ export function getScheduleCalendarCycle(
         const offsetDays = differenceInCalendarDays(date, startDate)
         // 0-indexed — `expandedDays` is a plain array, not `pattern`'s own
         // 1-based `position` field.
-        const dayInCycle = ((offsetDays % cycleLength) + cycleLength) % cycleLength
+        const dayInCycle =
+          ((offsetDays % cycleLength) + cycleLength) % cycleLength
         const expanded = expandedDays[dayInCycle]
         const shift = expanded?.shiftId
           ? shifts.find((s) => s.id === expanded.shiftId)
           : undefined
-        // Re-derived, not just `expanded?.isOff` — a card pointing at a
-        // since-deleted shift must still resolve to off here, even if its
-        // weekday was otherwise active.
+        // Re-derived rather than trusting `expanded.isOff`: a card pointing at
+        // a since-deleted shift must still read as off.
         const isOff = !expanded || expanded.isOff || !shift
         const weekdayCode = format(date, 'EEE').toLowerCase() as ShiftDayOfWeek
         const perWeekdayTimes = expanded?.fromWeeklyCard
@@ -468,12 +465,11 @@ export function getScheduleCalendarCycle(
               ? [
                   {
                     shift,
-                    times:
-                      perWeekdayTimes?.length
-                        ? perWeekdayTimes
-                        : range
-                          ? [range]
-                          : [],
+                    times: perWeekdayTimes?.length
+                      ? perWeekdayTimes
+                      : range
+                        ? [range]
+                        : [],
                   },
                 ]
               : [],
@@ -485,13 +481,17 @@ export function getScheduleCalendarCycle(
       const entries: ScheduleCalendarEntry[] = resolvedShifts.flatMap(
         (shift) => {
           const dayEntry = shift.days.find((d) => d.day === shiftDayCode)
-          return dayEntry?.enabled
-            ? [{ shift, times: dayEntry.times }]
-            : []
+          return dayEntry?.enabled ? [{ shift, times: dayEntry.times }] : []
         }
       )
 
-      return { date, date_str, weekdayIndex, isOff: entries.length === 0, entries }
+      return {
+        date,
+        date_str,
+        weekdayIndex,
+        isOff: entries.length === 0,
+        entries,
+      }
     }
   )
 
@@ -509,12 +509,9 @@ export function getScheduleCalendarCycle(
   }
 }
 
-// The cycle day a crew starts on, in the units the pattern was written in. A
-// whole number of weeks is the common case for these rosters, and "week 2" is
-// the phrase the write-ups use, so it is said out loud rather than left as
-// arithmetic on a day number.
-//
-// Lives here rather than beside the controls that use it so both the schedule
+// The cycle day a crew starts on, in the units the pattern was written in.
+// "Week 2" is the phrase the real-world write-ups use, so it is said out loud
+// rather than left as arithmetic on a day number. Lives here so the schedule
 // form and the Schedule Rotation screen read a crew's start the same way.
 export function describeStartDay(day: number, cycleLength: number): string {
   if (cycleLength > 7 && cycleLength % 7 === 0) {

@@ -1,6 +1,6 @@
 import { AlertTriangle, Info, OctagonAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { SHIFT_BADGE_COLOR_OPTIONS } from '@/features/shifts/data/data'
+import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import { type Shift } from '@/features/shifts/data/schema'
 import {
   type CoverageCrew,
@@ -18,20 +18,6 @@ type RotationCoveragePanelProps = {
 
 function shiftLetter(name: string): string {
   return (name.trim().charAt(0) || '?').toUpperCase()
-}
-
-function ShiftSwatch({ shift }: { shift?: Shift }) {
-  const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-    (option) => option.value === shift?.badge_color
-  )
-  return (
-    <span
-      className={cn(
-        'size-1.5 shrink-0 rounded-full',
-        color?.swatchClassName ?? 'bg-muted-foreground/40'
-      )}
-    />
-  )
 }
 
 const SHOWN_INFO_CODES = new Set<SuggestionWarning['code']>([
@@ -53,19 +39,15 @@ const WARNING_STYLES: Record<
 }
 
 // Shows what the current assignment actually produces, and it is the *only*
-// place a coverage hole is reported: leaving a shift unstaffed is deliberately
-// not a validation error (whether a hole is fixable depends on the crew count,
-// not the shape of the data), so "Next" always advances and this panel has to
-// carry the whole message.
+// place a coverage hole is reported: leaving a shift unstaffed is not a
+// validation error (whether a hole is fixable depends on the crew count, not on
+// the shape of the data), so "Next" always advances and this panel carries the
+// whole message.
 //
-// Two grids, because they answer different questions. The shift rows answer
-// "is every selected shift covered every day", which is the rule the feature
-// now exists to keep. The crew rows below answer "what does each crew's week
-// look like", which is what you read before deciding a roster is humane.
-//
-// Driven by whatever is in the form right now rather than by the last
-// suggestion, so a hand edit updates it immediately and it works just as well
-// for someone who never presses Suggest.
+// Two grids, answering different questions: the shift rows say whether every
+// selected shift is covered every day, the crew rows say what each crew's week
+// looks like. Both are driven by what is in the form right now rather than by
+// the last suggestion, so a hand edit updates them immediately.
 export function RotationCoveragePanel({
   crews,
   analysis,
@@ -80,21 +62,12 @@ export function RotationCoveragePanel({
   const minOnDuty = onDutyCounts.length ? Math.min(...onDutyCounts) : 0
   const maxOnDuty = onDutyCounts.length ? Math.max(...onDutyCounts) : 0
 
-  // Every line that flags something to act on, plus the 'info' notes that
-  // explain something already visible on screen and would otherwise go
-  // unaccounted for:
-  //
-  //   - an unstaffed shift, which drops to 'info' precisely when no
-  //     assignment can fix it — exactly when the red 0 in the grid above most
-  //     needs explaining;
-  //   - the weekday notes, which say how the cycle lands on real dates. A
-  //     14-day pattern read Monday-first behaves differently from the same
-  //     pattern started on a Wednesday, and the start date is set two steps
-  //     away where nothing connects the two.
-  //
-  // What stays hidden is the nobody-in-today line for an office week: the
-  // "On duty" row already shows the zero, and the grid is not lying about it.
-  // `analysis.warnings` still carries every line for callers and tests.
+  // Everything to act on, plus the `info` notes that explain something already
+  // visible: an unstaffed shift (which drops to `info` precisely when no
+  // assignment can fix it, so the red 0 above needs explaining) and the weekday
+  // notes (the start date is set two steps away, where nothing connects them).
+  // The nobody-in-today line stays hidden — the "On duty" row already shows the
+  // zero. `analysis.warnings` still carries every line for callers and tests.
   const shownWarnings = analysis.warnings.filter(
     (warning) =>
       warning.severity !== 'info' || SHOWN_INFO_CODES.has(warning.code)

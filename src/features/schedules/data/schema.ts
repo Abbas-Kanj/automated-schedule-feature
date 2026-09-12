@@ -142,16 +142,16 @@ export const SCHEDULE_ICONS = [
   'home',
   'truck',
 ] as const
-const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
+export const dateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
 
 // --- fixed / flexible: shift selection ---
 //
-// `shift_ids` references records in the standalone `shifts` feature's own
-// store (`useShiftsStore`, see `src/features/shifts`) rather than duplicating
-// a shift's name/badge/icon/days/hours inline here. A schedule fully
-// inherits whatever the referenced Shift itself defines — there's no
-// per-schedule override of a shift's days or times. To run a shift on
-// different days, edit the Shift itself (or pick/create a different one).
+// `shift_ids` references records in the standalone `shifts` feature's store
+// rather than inlining a shift's name/days/hours. A schedule inherits whatever
+// the referenced Shift defines — there is no per-schedule override, so running
+// a shift on different days means editing the Shift.
 const shiftDefinitionFieldsSchema = z.object({
   shift_ids: z
     .array(z.string().min(1))
@@ -169,11 +169,9 @@ export const RECURRENCE_END_TYPES = [
 ] as const
 const recurrenceEndTypeSchema = z.enum(RECURRENCE_END_TYPES)
 
-// Just "when does this whole arrangement stop" — never ends / ends after N
-// occurrences / ends on a specific date. There's no frequency/weekday
-// picker here (that used to live alongside this) since which days a
-// schedule runs on now comes entirely from its selected shifts' own days.
-const endSettingsSchema = z
+// Just "when does this arrangement stop". No frequency/weekday picker, since
+// which days a schedule runs comes entirely from its selected shifts' own days.
+export const endSettingsSchema = z
   .object({
     end_type: recurrenceEndTypeSchema,
     end_occurrences: z.number().min(1).optional(),
@@ -197,8 +195,8 @@ const endSettingsSchema = z
     }
   })
 
-// step 3 (fixed/flexible only) — rotate covers its own start date +
-// repetition through its cycle/pattern config instead
+// Step 3, fixed/flexible only — rotate covers the same ground through its own
+// cycle/pattern config.
 const regularSharedSchema = z.object({
   start_date: dateStringSchema,
   end_settings: endSettingsSchema,
@@ -206,11 +204,9 @@ const regularSharedSchema = z.object({
 
 // --- rotate: cycle / pattern config ---
 
-// "Rotate pattern" builds the cycle day-by-day (a shift or day-off picked
-// per position, see `rotatePatternEntrySchema`). "Custom alternate" starts
-// from how many times each selected shift repeats (`customShiftCountSchema`)
-// and uses that to seed the same per-day pattern, which stays editable
-// afterward — both modes end up driving the same `pattern` array.
+// "Rotate pattern" builds the cycle day by day. "Custom alternate" starts from
+// how many times each selected shift repeats and seeds the same per-day
+// pattern, editable afterwards — both drive the same `pattern` array.
 export const CYCLE_TYPES = ['pattern_shifts', 'custom_shifts'] as const
 const cycleTypeSchema = z.enum(CYCLE_TYPES)
 
@@ -220,18 +216,15 @@ const cycleLengthSchema = z.object({
   days: z.number().min(1),
 })
 
-// A pattern day now points at one of the schedule's own selected shifts
-// (`shift_id`, resolved against `shift_ids`/the `shifts` store) instead of a
-// hand-authored "block" — rotate's step 1/2 match fixed/flexible's exactly
-// (see `shiftDefinitionFieldsSchema`), so there's no separate block concept
-// left to reference.
+// A pattern day points at one of the schedule's own selected shifts, resolved
+// against `shift_ids`.
+//
 // The pattern is a *template*, not a declaration of what runs each day: it
 // describes one crew's journey through the cycle — "Morning, Morning, off,
-// Afternoon, …". It shapes the suggestion in the "Assign to" step, and
-// nothing more. How many shifts actually run on a day is decided by
-// `shift_ids`: every selected shift is meant to be covered every day, which
-// is what `day_coverage` below records. Crews therefore no longer live on a
-// pattern card at all.
+// Afternoon, …" — and shapes the suggestion on the "Assign to" step, nothing
+// more. What actually runs each day is decided by `shift_ids`: every selected
+// shift is meant to be covered every day, which is what `day_coverage` records.
+// Crews therefore do not live on a pattern card at all.
 const rotatePatternEntrySchema = z.object({
   position: z.number().min(1),
   shift_id: z.string().optional(),
@@ -240,17 +233,14 @@ const rotatePatternEntrySchema = z.object({
 
 // The rotation roster, as an explicit (cycle day × shift) → crews matrix.
 //
-// It used to be implicit — a crew's starting card was its offset, and the
-// card's own shift was what it worked. That made the pattern decide which
-// shifts ran: a 5-2 pattern of all-Morning cards could never staff Night,
-// however many crews were added. The matrix decouples the two, and it is
-// also what lets the "Assign to" step's manual grid edit any one cell
-// without dragging a whole crew's journey along with it.
+// Storing the resolved matrix rather than an offset per crew is what decouples
+// the pattern from what runs: an all-Morning 5-2 pattern could otherwise never
+// staff Night however many crews were added. It is also what lets the manual
+// grid edit one cell without dragging a whole crew's journey with it.
 //
-// Sparse: only cells with somebody on them are stored, so an empty cell and
-// an absent one mean the same thing (that shift is unstaffed that day —
-// reported as a warning in `rotation-coverage-panel.tsx`, never a hard
-// validation error).
+// Sparse: only cells with somebody on them are stored, so an empty cell and an
+// absent one mean the same thing — that shift is unstaffed that day, which is
+// reported as a warning, never a validation error.
 const rotateDayCoverageSchema = z.object({
   // 0-based cycle day, i.e. the index of the pattern card it lines up with.
   day: z.number().int().min(0),
@@ -259,32 +249,23 @@ const rotateDayCoverageSchema = z.object({
   team_ids: z.array(z.string()).default([]),
 })
 
-// "Custom shifts" mode: each selected shift gets its own repeat config —
-// how often it recurs and for how many units. The pattern grid's total
-// length equals the plain sum of all shifts' intervals (a weekly x3 shift
-// contributes 3 cards, a daily x5 contributes 5 — no unit conversion), and
-// that card order is exactly the order shifts show up on the calendar
-// (card 1 starts at start_date, card 2 starts right after card 1 ends,
-// etc.). What a card's own real calendar-day span looks like now depends
-// on `frequency` (see `expandRotatePatternDays` in `utils.ts`): a `daily`
-// card is still a single day, always active. A `weekly` card instead spans
-// a real calendar week, active only on that shift's own `weekdays`
-// selection — so `weekdays` now genuinely drives which real weekday a
-// shift lands on, not just validation/UI. `monthly`'s fields
-// (`monthly_mode`/`day_of_month`/`date_specific_*`/`day_position_rules`)
-// are still parity-only for now — a `monthly` card behaves like `daily`
-// (1 day per card, no weekday/date filtering) until a later pass wires
-// those up too.
+// "Custom shifts" mode: each selected shift gets its own repeat config. The
+// pattern's length is the plain sum of all intervals (weekly x3 contributes 3
+// cards, daily x5 contributes 5 — no unit conversion), and that card order is
+// the order the shifts appear on the calendar.
+//
+// A card's real calendar-day span depends on `frequency` (see
+// `expandRotatePatternDays` in `utils.ts`): a daily card is a single day; a
+// weekly card spans a real week, active only on that shift's own `weekdays`.
+// `monthly`'s fields are parity-only for now — a monthly card behaves like a
+// daily one until a later pass wires them up.
 export const SHIFT_REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 
-// Each shift's repeat row reuses `shifts`' own "Repeat" tab fields (weekday
-// picker, monthly sub-modes — see `shift-form/repeat-fields.tsx`) so the two
-// features present identical repeat UI, minus its end-frequency section
-// (end_type/end_date/end_occurrences), which doesn't apply here — the
-// pattern's own length already bounds how long each shift repeats. Kept as
-// its own copy of the weekday/monthly-mode enums rather than importing
-// `shifts`' schema pieces directly, same as `SHIFT_REPEAT_FREQUENCIES` above
-// (see CLAUDE.md — `shifts` is a standalone feature).
+// Each shift's repeat row reuses `shifts`' own "Repeat" tab fields so the two
+// features present identical UI, minus the end-frequency section — the
+// pattern's length already bounds how long each shift repeats. The enums are
+// deliberately its own copy rather than an import, since `shifts` is a
+// standalone feature.
 export const SHIFT_REPEAT_WEEKDAYS = [
   'mon',
   'tue',
@@ -329,18 +310,14 @@ const shiftRepeatSchema = z.object({
 
 // How the roster was *generated*, stored next to the matrix it produced.
 //
-// `day_coverage` above stays the source of truth: it is what every screen
-// reads, and free cell editing can put a crew somewhere no pair of offsets
-// would. But the matrix on its own cannot answer the question every
-// real-world rotation is actually written in — "Team B starts on week 2".
-// These two numbers per crew are that sentence, so they are kept rather than
-// discarded once the cells have been written.
+// `day_coverage` stays the source of truth — free cell editing can put a crew
+// somewhere no pair of offsets would — but the matrix alone cannot answer the
+// question every real-world rotation is written in: "Team B starts on week 2".
 //
-// Deliberately *not* a second source of truth. Whether they still describe
-// the stored cells is re-derived — regenerate from them and compare, see
-// `dayCoverageMatchesPlacements` in `rotation-crews.ts` — rather than tracked
-// by a flag that could drift out of step with the cells. A hand edit in the
-// manual grid simply stops them matching, and the step says so instead of
+// Deliberately not a second source of truth. Whether these still describe the
+// stored cells is re-derived by regenerating and comparing (see
+// `dayCoverageMatchesPlacements`), never tracked by a flag that could drift. A
+// hand edit simply stops them matching, and the step says so rather than
 // silently re-applying them over the edit.
 const rotateCrewPlacementSchema = z.object({
   // `team:<id>` or `employee:<id>` — the same crew key the suggestion and the
@@ -378,11 +355,9 @@ const regularFlexibleSchema = z.object({
   ...shiftDefinitionFieldsSchema.shape,
 })
 
-// rotate's step 1/2 are the same `ScheduleBasicsFields`/`ShiftPickerField`
-// fixed and flexible use — it only diverges from them at step 3 (its own
-// cycle/pattern config). It gets the same `start_date`/`end_settings` as
-// fixed/flexible, collected in a shared "Start & End" step (see
-// `schedule-start-end-fields.tsx`).
+// Rotate shares steps 1 and 2 with fixed/flexible and only diverges at step 3,
+// its own cycle/pattern config. Start date and end settings are the same, in a
+// shared "Start & End" step.
 const regularRotateSchema = z.object({
   parent_type: z.literal('regular'),
   type: z.literal('rotate'),
@@ -407,8 +382,8 @@ const regularScheduleSchema = z
       })
     }
 
-    // A rotation needs at least 2 distinct shifts to alternate between —
-    // fixed/flexible are fine with just one (see `shiftDefinitionFieldsSchema`).
+    // A rotation needs at least 2 shifts to alternate between; fixed/flexible
+    // are fine with one.
     if (val.type === 'rotate' && val.shift_ids.length < 2) {
       ctx.addIssue({
         code: 'custom',
@@ -418,9 +393,8 @@ const regularScheduleSchema = z
     }
 
     if (val.type === 'rotate') {
-      // For pattern_shifts, pattern length must match cycle_length.days.
-      // For custom_shifts, pattern length must equal the plain sum of all
-      // shifts' repeat intervals (weekly x3 + daily x5 => 8 cards).
+      // pattern_shifts: length matches cycle_length.days. custom_shifts: length
+      // is the plain sum of all repeat intervals (weekly x3 + daily x5 => 8).
       const expectedPatternLength =
         val.cycle_type === 'custom_shifts'
           ? val.shift_repeat.reduce((sum, r) => sum + r.interval, 0)
@@ -457,10 +431,9 @@ const regularScheduleSchema = z
       })
 
       // `day_coverage` is only checked for being *well formed*. A shift left
-      // unstaffed on some day is deliberately not an error here — the
-      // coverage panel warns about it and "Next" still advances, because
-      // whether a hole is fixable depends on the crew count, not the shape
-      // of the data (see `rotation-suggestion.ts`'s warning severities).
+      // unstaffed on some day is deliberately not an error: the coverage panel
+      // warns and "Next" still advances, because whether a hole is fixable
+      // depends on the crew count, not on the shape of the data.
       const seenCells = new Set<string>()
       val.day_coverage.forEach((cell, i) => {
         if (!val.shift_ids.includes(cell.shift_id)) {
@@ -490,10 +463,9 @@ const regularScheduleSchema = z
         seenCells.add(key)
       })
 
-      // Same treatment as `day_coverage`: well-formedness only. Placements
-      // that no longer describe the matrix are not an error — hand-editing a
-      // cell is a supported thing to do, and the "Assign to" step reports the
-      // mismatch in place rather than refusing to advance.
+      // Well-formedness only, same as `day_coverage`. Placements that no longer
+      // describe the matrix are not an error — hand-editing a cell is
+      // supported, and the step reports the mismatch in place.
       const seenCrews = new Set<string>()
       val.crew_placements.forEach((placement, i) => {
         if (placement.day_offset >= val.pattern.length) {
@@ -543,16 +515,12 @@ const regularScheduleSchema = z
           })
         }
 
-        // Same per-frequency requirements as shifts' own "Repeat" tab (see
-        // `repeatConfigSchema`'s superRefine in shifts/data/schema.ts),
-        // minus its end-frequency checks — not applicable here.
+        // The same per-frequency requirements as shifts' own "Repeat" tab,
+        // minus its end-frequency checks.
         val.shift_repeat.forEach((r, i) => {
-          // The pattern grid auto-populates each shift's exact `interval`
-          // count of cards (see `pattern-builder.tsx`'s custom_shifts
-          // effect), but every card stays manually reassignable afterward —
-          // this catches a manual edit that pushes one shift past what its
-          // own repeat interval allows (the UI also disables that option
-          // once a shift's cards are used up, this is the safety net).
+          // The grid auto-populates each shift's exact `interval` count of
+          // cards, but every card stays reassignable — this is the safety net
+          // for an edit that pushes one shift past its own interval.
           const assignedCount = val.pattern.filter(
             (p) => !p.is_off && p.shift_id === r.shift_id
           ).length
@@ -620,8 +588,8 @@ const commonScheduleSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
   description: z.string(),
-  // Predefined-template picker on step 1 — wiring templates to actually
-  // pre-fill a schedule is a follow-up; for now this just records the pick.
+  // Step 1's template picker. Wiring templates to pre-fill a schedule is a
+  // follow-up; for now this only records the pick.
   template_id: z.string().optional(),
 })
 

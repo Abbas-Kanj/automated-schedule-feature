@@ -102,7 +102,9 @@ starts where".
 **The change.**
 
 - New **"Assign to" step** in the schedule form, rotate only, sitting between
-  **Pattern** and **Start & End** —
+  **Pattern** and **Start & End** (**as of 2026-09-12 rotate has no "Start &
+  End" step at all** — it moved to the Schedule Rotation screen, so "Assign
+  to" now sits between **Pattern** and **Summary**) —
   `schedule-form/schedule-assign-to-fields.tsx`. One row per cycle position,
   each with Employees + Teams multi-selects, built from the same `MultiSelect`
   the shift form's own Assign-to tab uses.

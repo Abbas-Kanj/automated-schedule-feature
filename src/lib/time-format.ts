@@ -18,8 +18,6 @@ export function formatClockTime(time: string, hour12: boolean): string {
 // Reads the user's preferred time format (see Settings > Display) and
 // returns a bound formatter for it.
 export function useTimeFormat() {
-  const hour12 = useDisplayPreferencesStore(
-    (s) => s.time_format === '12h'
-  )
+  const hour12 = useDisplayPreferencesStore((s) => s.time_format === '12h')
   return (time: string) => formatClockTime(time, hour12)
 }

@@ -1,17 +1,13 @@
 import { type ColumnDef } from '@tanstack/react-table'
-import { cn } from '@/lib/utils'
+import { useTimeFormat } from '@/lib/time-format'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/data-table'
-import { useTimeFormat } from '@/lib/time-format'
 import { usePoliciesStore } from '@/features/shift-policies/stores/policies-store'
-import {
-  SHIFT_BADGE_COLOR_OPTIONS,
-  SHIFT_ICON_OPTIONS,
-  SHIFT_TYPE_OPTIONS,
-} from '../data/data'
+import { SHIFT_ICON_OPTIONS, SHIFT_TYPE_OPTIONS } from '../data/data'
 import { type Shift } from '../data/schema'
 import { getShiftTimeRange } from '../utils'
 import { DataTableRowActions } from './data-table-row-actions'
+import { ShiftSwatch } from './shift-swatch'
 
 // `TimeCell` hosts the time-format hook for the Start/End time columns; it
 // coexists with the file's non-component `shiftsColumns` export, which
@@ -56,16 +52,11 @@ export const shiftsColumns: ColumnDef<Shift>[] = [
     cell: ({ row }) => {
       const shift = row.original
       const icon = SHIFT_ICON_OPTIONS.find((o) => o.value === shift.icon)
-      const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-        (o) => o.value === shift.badge_color
-      )
       const Icon = icon?.icon
       return (
         <span className='flex items-center gap-2 truncate font-medium'>
-          <span
-            className={cn('size-2 shrink-0 rounded-full', color?.swatchClassName)}
-          />
-          {Icon && <Icon className='text-muted-foreground size-4 shrink-0' />}
+          <ShiftSwatch shift={shift} size='md' />
+          {Icon && <Icon className='size-4 shrink-0 text-muted-foreground' />}
           <span className='truncate'>{shift.name}</span>
         </span>
       )
@@ -78,7 +69,9 @@ export const shiftsColumns: ColumnDef<Shift>[] = [
     ),
     accessorFn: (row) => getShiftTimeRange(row.days)?.from_time ?? '',
     cell: ({ row }) => (
-      <TimeCell value={getShiftTimeRange(row.original.days)?.from_time ?? null} />
+      <TimeCell
+        value={getShiftTimeRange(row.original.days)?.from_time ?? null}
+      />
     ),
   },
   {

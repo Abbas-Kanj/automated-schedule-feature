@@ -69,8 +69,8 @@ export function ScheduleBasicsFields({
               </Select>
             </FormControl>
             <p className='text-sm text-muted-foreground'>
-              Predefined templates are coming soon — building a custom
-              template is fully supported today.
+              Predefined templates are coming soon — building a custom template
+              is fully supported today.
             </p>
             <FormMessage />
           </FormItem>

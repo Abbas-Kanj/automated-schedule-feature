@@ -264,7 +264,7 @@ export const ROTATION_PRESETS: RotationPreset[] = [
     label: 'Healthcare 5/2 rotating (28-day)',
     group: 'Named systems',
     description:
-      'Four weeks of five-on/two-off that move through mornings, afternoons and nights. The last week is deliberately broken up, so the rest days do not fall on the same weekday every month. Leaves nights uncovered on one cycle day by design — the coverage panel will say so.',
+      'Four weeks of five-on/two-off that move through mornings, afternoons and nights. The last week is deliberately broken up, so the rest days do not fall on the same weekday every month. Each crew works 19 of the 28 days, so four crews cannot fill all three shifts every day — it takes seven. Four is the usual staffing, and the coverage panel says exactly which cells are left open.',
     minShifts: 3,
     suggestedCrews: 4,
     buildCards: () => [

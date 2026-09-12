@@ -1,9 +1,10 @@
 import { type ReactNode, useMemo, useState } from 'react'
-import { parse } from 'date-fns'
+import { format, parse } from 'date-fns'
 import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Pencil,
   RotateCcw,
   Users,
 } from 'lucide-react'
@@ -24,9 +25,13 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { useSchedulesStore } from '@/features/schedules/stores/schedules-store'
-import { getScheduleCycleLength } from '@/features/schedules/utils'
+import {
+  formatEndSettings,
+  getScheduleCycleLength,
+} from '@/features/schedules/utils'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
+import { RotationDatesDialog } from './components/rotation-dates-dialog'
 import { ScheduleRotationTable } from './components/schedule-rotation-table'
 import { ShiftBadge } from './components/shift-badge'
 import { PERIOD_OPTIONS } from './data'
@@ -56,6 +61,7 @@ export function ScheduleRotation() {
     () => rotateSchedules[0]?.id ?? ''
   )
   const [periodType, setPeriodType] = useState<RotationPeriodType>('weekly')
+  const [datesOpen, setDatesOpen] = useState(false)
 
   const schedule =
     rotateSchedules.find((s) => s.id === scheduleId) ?? rotateSchedules[0]
@@ -97,6 +103,10 @@ export function ScheduleRotation() {
     const next = rotateSchedules.find((s) => s.id === id)
     if (next) setViewDate(scheduleStartDate(next.start_date))
   }
+
+  const endLabel = schedule
+    ? formatEndSettings(schedule.end_settings)
+    : undefined
 
   function resetView() {
     if (schedule) setViewDate(scheduleStartDate(schedule.start_date))
@@ -188,7 +198,7 @@ export function ScheduleRotation() {
                 >
                   <ChevronLeft className='size-4' />
                 </Button>
-                <div className='text-muted-foreground flex items-center gap-2 text-sm font-medium'>
+                <div className='flex items-center gap-2 text-sm font-medium text-muted-foreground'>
                   <CalendarDays className='size-4' />
                   {rotation.rangeLabel}
                 </div>
@@ -204,15 +214,37 @@ export function ScheduleRotation() {
                   <ChevronRight className='size-4' />
                 </Button>
               </div>
-              <Button variant='ghost' size='sm' onClick={resetView}>
-                <RotateCcw className='me-1 size-3.5' />
-                Reset
-              </Button>
+              <div className='flex items-center gap-2'>
+                {/* The schedule wizard has no "Start & End" step for rotate
+                    schedules — this is it. It sits by the navigator because
+                    the start date is what every date on this screen is
+                    counted from. */}
+                <span className='text-xs text-muted-foreground'>
+                  Starts{' '}
+                  {format(
+                    scheduleStartDate(schedule.start_date),
+                    'MMM d, yyyy'
+                  )}
+                  {endLabel ? ` · ${endLabel}` : ''}
+                </span>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setDatesOpen(true)}
+                >
+                  <Pencil className='me-1 size-3.5' />
+                  Start & end
+                </Button>
+                <Button variant='ghost' size='sm' onClick={resetView}>
+                  <RotateCcw className='me-1 size-3.5' />
+                  Reset
+                </Button>
+              </div>
             </div>
 
             {/* Cycle legend — decode the sequence letters */}
             <div className='flex flex-wrap items-center gap-2'>
-              <span className='text-muted-foreground text-xs font-medium'>
+              <span className='text-xs font-medium text-muted-foreground'>
                 Cycle:
               </span>
               {rotation.positions.map((position) => (
@@ -220,13 +252,20 @@ export function ScheduleRotation() {
                   key={position.index}
                   className='flex items-center gap-1.5'
                 >
-                  <span className='text-muted-foreground font-mono text-xs font-semibold'>
+                  <span className='font-mono text-xs font-semibold text-muted-foreground'>
                     {position.letter}
                   </span>
                   <ShiftBadge position={position} />
                 </span>
               ))}
             </div>
+
+            <RotationDatesDialog
+              schedule={schedule}
+              open={datesOpen}
+              onOpenChange={setDatesOpen}
+              onSaved={(startDate) => setViewDate(scheduleStartDate(startDate))}
+            />
 
             {rotation.rows.length === 0 ? (
               <EmptyState
@@ -261,7 +300,7 @@ function EmptyState({
     <div className='flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-12 text-center'>
       <div className='text-muted-foreground'>{icon}</div>
       <p className='font-medium'>{title}</p>
-      <p className='text-muted-foreground max-w-sm text-sm'>{description}</p>
+      <p className='max-w-sm text-sm text-muted-foreground'>{description}</p>
     </div>
   )
 }

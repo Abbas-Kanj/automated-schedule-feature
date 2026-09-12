@@ -29,7 +29,11 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control } = useFormContext<any>()
   const year = useWatch({ control, name: 'year' })
-  const { fields: monthFields, append, remove } = useFieldArray({
+  const {
+    fields: monthFields,
+    append,
+    remove,
+  } = useFieldArray({
     control,
     name: 'months',
   })
@@ -177,7 +181,7 @@ function MonthDaysCard({
         </div>
         {fields.map((dayField, dayIndex) => (
           <div key={dayField.id} className='space-y-1'>
-            <p className='text-muted-foreground text-xs font-medium'>
+            <p className='text-xs font-medium text-muted-foreground'>
               Day {(dayField as unknown as { day: number }).day}
             </p>
             <TimeRangeFields

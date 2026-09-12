@@ -134,7 +134,11 @@ export const policiesColumns: ColumnDef<ShiftPolicy>[] = [
       return (
         <div className='flex flex-wrap gap-1'>
           {labels.map((label) => (
-            <Badge key={label} variant='secondary' className='whitespace-nowrap'>
+            <Badge
+              key={label}
+              variant='secondary'
+              className='whitespace-nowrap'
+            >
               {label}
             </Badge>
           ))}

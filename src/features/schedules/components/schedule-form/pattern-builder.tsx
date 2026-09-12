@@ -30,10 +30,8 @@ import {
 import { RecurrenceFrequencyFields } from '@/components/recurrence-frequency-fields'
 import { RepeatMonthlyFields } from '@/components/repeat-monthly-fields'
 import { SelectDropdown } from '@/components/select-dropdown'
-import {
-  SHIFT_BADGE_COLOR_OPTIONS,
-  SHIFT_ICON_COMPONENTS,
-} from '@/features/shifts/data/data'
+import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
+import { SHIFT_ICON_COMPONENTS } from '@/features/shifts/data/data'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import {
   CYCLE_LENGTH_QUICK_PICKS,
@@ -450,20 +448,10 @@ function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
         {shiftIds.map((shiftId, index) => {
           const shift = shifts.find((s) => s.id === shiftId)
           const Icon = shift ? SHIFT_ICON_COMPONENTS[shift.icon] : undefined
-          const color = shift
-            ? SHIFT_BADGE_COLOR_OPTIONS.find(
-                (o) => o.value === shift.badge_color
-              )
-            : undefined
           return (
             <div key={shiftId} className='space-y-3'>
               <div className='flex items-center gap-2'>
-                <span
-                  className={cn(
-                    'size-2 shrink-0 rounded-full',
-                    color?.swatchClassName
-                  )}
-                />
+                <ShiftSwatch shift={shift} size='md' />
                 {Icon && (
                   <Icon className='size-4 shrink-0 text-muted-foreground' />
                 )}
@@ -727,12 +715,6 @@ function PatternDayCard({
   const Icon = assignedShift
     ? SHIFT_ICON_COMPONENTS[assignedShift.icon]
     : undefined
-  const color = assignedShift
-    ? SHIFT_BADGE_COLOR_OPTIONS.find(
-        (o) => o.value === assignedShift.badge_color
-      )
-    : undefined
-
   if (isCustomShifts && reorder) {
     const isDragging = reorder.draggingIndex === index
     const dropSide =
@@ -780,12 +762,7 @@ function PatternDayCard({
         <CardContent className='flex min-h-8 items-center justify-center gap-1 px-2'>
           {assignedShift && (
             <>
-              <span
-                className={cn(
-                  'size-1.5 shrink-0 rounded-full',
-                  color?.swatchClassName
-                )}
-              />
+              <ShiftSwatch shift={assignedShift} />
               {Icon && <Icon className='size-3 shrink-0' />}
             </>
           )}
@@ -803,12 +780,7 @@ function PatternDayCard({
         <div className='flex min-h-4 items-center justify-center gap-1'>
           {assignedShift && (
             <>
-              <span
-                className={cn(
-                  'size-1.5 shrink-0 rounded-full',
-                  color?.swatchClassName
-                )}
-              />
+              <ShiftSwatch shift={assignedShift} />
               {Icon && <Icon className='size-3 shrink-0' />}
             </>
           )}

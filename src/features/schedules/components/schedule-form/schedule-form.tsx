@@ -60,16 +60,19 @@ function getSteps(
   // rotate gets its own pattern step (cycle/pattern config), then the
   // "Assign to" step that names the crew on each position of the pattern it
   // just built — that pairing is the whole roster the Schedule Rotation
-  // screen reads (see `schedule-assign-to-fields.tsx`). PLUS the same
-  // shared "Start & End" step as fixed/flexible (start date + end
-  // frequency) — see `schedule-start-end-fields.tsx`.
+  // screen reads (see `schedule-assign-to-fields.tsx`).
+  //
+  // It deliberately has NO "Start & End" step: a rotation's start date and
+  // end frequency are edited on the Schedule Rotation screen instead, next to
+  // the cycle they actually shift (see `features/schedule-rotation`). Creation
+  // falls back to `getRegularTypeDefaults` — today, never ends — and the
+  // Summary step says so. fixed/flexible keep the step below.
   if (regularType === 'rotate') {
     return [
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'pattern', label: 'Pattern' },
       { id: 'assign-to', label: 'Assign to' },
-      { id: 'end-settings', label: 'Start & End' },
       { id: 'summary', label: 'Summary' },
     ]
   }
@@ -113,7 +116,9 @@ function getTypeDefaults(type: ScheduleType) {
   }
 }
 
-// "Never ends" is the "Start & End" step's default — pre-selected rather
+// "Never ends" is the "Start & End" step's default — and, for rotate, the
+// value a schedule is created with outright, since that step is on the
+// Schedule Rotation screen instead. Pre-selected rather
 // than starting blank. `end_occurrences` gets a default too, so the "End
 // after" input isn't empty the moment it's switched to (see
 // `EndFrequencyFields`'s always-visible end-settings inputs; mirrors
@@ -448,6 +453,10 @@ export function ScheduleForm({
                 />
               )}
 
+            {/* Rotate has no "Start & End" step (see `getSteps`), but the
+                read-only view renders every block at once and its dates are
+                still worth showing — hence `disabled ||` rather than a
+                step-id check alone. */}
             {(disabled || currentStepId === 'end-settings') &&
               parentType === 'regular' && (
                 <ScheduleStartEndFields disabled={disabled} />

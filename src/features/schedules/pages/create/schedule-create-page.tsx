@@ -39,9 +39,7 @@ export function ScheduleCreatePage() {
               <ArrowLeft className='size-4' /> Back to schedules
             </Link>
           </Button>
-          <h2 className='text-2xl font-bold tracking-tight'>
-            Create schedule
-          </h2>
+          <h2 className='text-2xl font-bold tracking-tight'>Create schedule</h2>
           <p className='text-muted-foreground'>
             Choose a schedule type and fill in the details below.
           </p>

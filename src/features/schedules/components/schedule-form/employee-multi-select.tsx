@@ -1,6 +1,11 @@
 import { type Control } from 'react-hook-form'
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import { MultiSelect } from '@/components/multi-select'
-import { FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { employees } from '../../data/employees'
 
 type EmployeeMultiSelectProps = {
@@ -9,7 +14,10 @@ type EmployeeMultiSelectProps = {
   disabled?: boolean
 }
 
-const SELECT_ALL_OPTION = { value: '__select_all__', label: 'Select all employees' }
+const SELECT_ALL_OPTION = {
+  value: '__select_all__',
+  label: 'Select all employees',
+}
 
 export function EmployeeMultiSelect({
   control,

@@ -6,12 +6,18 @@ Three real feature modules — **`schedules`** (shift/day-based scheduling,
 heavy cross-field validation), **`shifts`** (reusable shift definitions),
 and **`shift-policies`** (attendance rules attached to shifts) — built on
 top of the [shadcn-admin](https://github.com/satnaing/shadcn-admin) admin
-dashboard template. The template's other feature modules (users, tasks,
-chats, apps, dashboard, settings) are kept as reference/demo boilerplate;
-those three are the real domain logic. GitHub Pages deploy configured via
-`.github/workflows/deploy-pages.yml`. See `docs/ARCHITECTURE.md` and
-`docs/FEATURE_MAPPING.md` for the full current-state map — this file doesn't
-duplicate them, just points at them and adds session-level state.
+dashboard template, plus `schedule-rotation`, `schedule-templates`,
+`employees`, `employees-list`, `teams` and `public-holidays`.
+**The template's demo modules were deleted on 2026-09-11** (users, tasks,
+chats, apps, dashboard, and the whole Clerk route tree) — `settings`,
+`auth` and `errors` are the only template features left. GitHub Pages
+deploy configured via `.github/workflows/deploy-pages.yml`.
+
+**`docs/ARCHITECTURE.md` and `docs/FEATURE_MAPPING.md` no longer exist** —
+they were removed in commit `de7eaa0`, so every reference to them below
+(and to `docs/TARGET_ARCHITECTURE.md`) is dangling. The one live document
+is **`docs/ROTATION_ALGORITHM.md`**, which is the current-state map for the
+rotate model and is kept honest by `schedules/doc-examples.test.ts`.
 
 Repo: https://github.com/Abbas-Kanj/automated-schedule-feature
 
@@ -39,9 +45,10 @@ directory.
   `localStorage` (key `"schedules"`), re-validates against `scheduleSchema`
   on load. **No backend today** — TanStack Query is wired (401/500 handling)
   but not actually driving `schedules` yet.
-- **Two coexisting auth flows**: mock (`auth-store.ts`, used under
-  `_authenticated/**`) and a separate partial Clerk flow (`routes/clerk/**`).
-  Don't assume Clerk is wired into the main app shell.
+- **One auth flow**: mock (`auth-store.ts`, used under `_authenticated/**`).
+  The partial Clerk flow under `routes/clerk/**` and the `@clerk/react`
+  dependency were **deleted on 2026-09-11** — it was never wired into the main
+  app shell, and its only authenticated page was the `users` demo.
 - **Vitest in real Chromium** via `@vitest/browser-playwright`, tests
   colocated as `*.test.ts(x)`.
 - **`bridge/`** — a file-based bridge for delegating tasks from Claude Code
@@ -132,7 +139,9 @@ because the same thing had already been hand-rolled 2-4 times:
 `components/data-table/data-table.tsx` (the whole sortable/filterable/
 paginated table — pass `columns` + optionally `globalFilterFn`),
 `components/toggle-button.tsx` (grid toggles, over shadcn `Button`),
-`lib/id.ts#generateId`, `lib/time.ts#toMinutes`. And use the shadcn
+`features/shifts/components/shift-swatch.tsx` (the coloured shift dot —
+owns the badge-colour lookup; replaced eight hand-rolled copies),
+`lib/id.ts#generateId`, `lib/time.ts#toMinutes`, `lib/plural.ts#plural`. And use the shadcn
 primitives (`Button`/`Input`/`Label`/`FormMessage`) rather than styling a
 raw element — several raw ones in this repo carried *stale copies* of the
 primitive's class string.
@@ -584,6 +593,53 @@ a genuine missing-import that `tsc -b` caught.
   `/schedule-rotation` crew line are markup nobody has loaded.**
   → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
 
+## Session state (2026-09-11)
+
+- **Repo-wide refactor + cleanup pass, no behaviour change to the rotate
+  model.** `npm run build` clean, `npm run test` **340 passed / 0 failed**
+  (from 272/3), eslint unchanged at 11/3.
+- **The three long-standing `search-provider.test.tsx` failures are fixed,
+  and they were never flaky** — they asserted `Dashboard`, `Tasks` and
+  `Settings Account`, all of which had been commented out of
+  `sidebar-data.ts`. Fixing them surfaced a **real bug**: `command-menu.tsx`
+  walked only *two* levels of the nav while the sidebar is *three* deep, so
+  every nested palette entry called `navigate({ to: undefined })`. It now
+  flattens the tree recursively to its leaves.
+- **The rotation search is ~12× faster** on the search-heavy suite (2.21s →
+  0.18s of test time) with identical output. Every journey the pattern
+  admits is precomputed into an `Int16Array` once per search; quick
+  turnarounds are a per-crew property so they are precomputed too; the hill
+  climb mutates in place and rolls back instead of cloning two arrays per
+  trial. No scoring rule changed.
+- **Deleted the template demo modules** — `users`, `tasks`, `chats`, `apps`,
+  `dashboard`, the `help-center` route, the whole `routes/clerk/**` tree,
+  `top-nav.tsx`, `coming-soon.tsx`, 14 unused brand icons, the dead
+  `schedules/components/schedule-form/{badge-color,icon-picker}-field.tsx`,
+  and the deps `@clerk/react`, `recharts`, `@faker-js/faker`. `/` now
+  redirects to `/schedules`. **`POS` is still in the sidebar pointing at
+  `#`** — left alone deliberately, it looks like a roadmap placeholder
+  rather than template boilerplate.
+- **New: `docs/ROTATION_ALGORITHM.md`** — the model, the scoring order, the
+  search seeds, every warning, the measured preset coverage table, and an
+  explicit list of what is *not* covered (weekend-equity scoring, skill mix,
+  leave/availability, monthly repeat rules, per-day headcount targets).
+  Every number in it is computed by `schedules/doc-examples.test.ts`, so the
+  doc fails the build rather than drifting.
+- **Found and corrected a wrong preset description:** `healthcare_five_two`
+  claimed it "leaves nights uncovered on one cycle day". It actually leaves
+  **16 cells** uncovered at its suggested 4 crews and needs **7** — 19 work
+  days × 4 crews is 76 crew-days against 84 cells.
+- New tests: `schedules/data/schema.test.ts` (33 — the rotate branch's
+  cross-field rules had no coverage at all),
+  `schedules/data/rotation-presets.test.ts` (12),
+  `schedules/doc-examples.test.ts` (24), plus additions to
+  `schedules/utils.test.ts`, `rotation-crews.test.ts`,
+  `schedule-rotation/utils.test.ts` and a new `lib/plural.test.ts`.
+- The three `schedule-form.test.tsx` wizard tests now carry an explicit
+  45s timeout — they take ~14s alone and were flaking against vitest's
+  15s default under a loaded full-suite run.
+- **Still not browser-verified** — no browser tooling this session either.
+
 ## Pick up here next session
 
 0. **Answer the open preset question** — offered and not yet answered: add
@@ -613,7 +669,8 @@ a genuine missing-import that `tsc -b` caught.
    *and* a warning naming that shift, and **Next must still advance**
    (warn, don't block). Under-crew it (3 shifts, 2 crews) → the warning
    must read structural ("N crews would cover every shift every day"), not
-   as something done wrong. Then **Next → Next → Summary**: the coverage
+   as something done wrong. Then **Next → Summary** (rotate no longer has
+   a "Start & End" step — 2026-09-12): the coverage
    grid there must match the one on the step. Then `/schedule-rotation` →
    *Plant Coverage (2-2-3)* → **Daily** tab.
    **Never-seen markup:** the coverage panel's two grids + warning list,
@@ -651,10 +708,11 @@ a genuine missing-import that `tsc -b` caught.
 8. Fix or confirm-and-ignore the `index.html` OG/Twitter meta tag mismatch
    surfaced by graphify (`shadcn-admin.netlify.app` vs. the real GitHub
    Pages deploy target).
-9. `docs/TARGET_ARCHITECTURE.md` is a dangling reference — recreate it or
-   remove the references to it in `ARCHITECTURE.md`/`FEATURE_MAPPING.md`.
-   `docs/ARCHITECTURE.md` / `FEATURE_MAPPING.md` also predate
-   `shift-policies` and the shared `DataTable`.
+9. **`docs/` holds only `ROTATION_ALGORITHM.md`.** `ARCHITECTURE.md` and
+   `FEATURE_MAPPING.md` were deleted in `de7eaa0` and
+   `TARGET_ARCHITECTURE.md` never existed here, so there is no
+   current-state map outside the rotate model. Decide whether to write one
+   or to let `ROTATION_ALGORITHM.md` plus this file stand as the map.
 10. `gh auth login` (interactive) if `gh` is ever needed for repo creation/PR
    work — not needed for anything done so far.
 11. **Decide on the duplicate sidebar entry** for `/schedule-rotation`
@@ -664,8 +722,9 @@ a genuine missing-import that `tsc -b` caught.
     while `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is `7` — a 7-day
     weekly cycle renders as "1 week" correct by luck. Found, not fixed.
 13. **`eslint` reports 11 errors / 3 warnings repo-wide** — re-verified
-    2026-09-11, unchanged. `features/schedules` and `features/schedule-rotation`
-    are clean (0 errors); the errors are all elsewhere — mostly
-    `react-hooks/set-state-in-effect`, in files untouched since the
-    2026-08-25 session recorded "eslint clean". Reconcile before treating
-    lint as a gate.
+    2026-09-11 after the refactor, unchanged. All `react-hooks/
+    set-state-in-effect` / exhaustive-deps, across five files:
+    `components/multi-select/index.tsx`,
+    `schedules/components/schedule-form/{pattern-builder,schedule-form}.tsx`,
+    `shift-policies/components/{policy-rules-field,time-24-input}.tsx`.
+    Reconcile before treating lint as a gate.

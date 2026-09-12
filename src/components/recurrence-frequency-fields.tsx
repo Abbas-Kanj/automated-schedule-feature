@@ -119,7 +119,8 @@ export function RecurrenceFrequencyFields({
   monthlyFields,
 }: RecurrenceFrequencyFieldsProps) {
   const frequency = useWatch({ control, name: `${name}.frequency` }) as
-    string | undefined
+    | string
+    | undefined
 
   return (
     <div className='space-y-3'>

@@ -96,7 +96,7 @@ export function EndFrequencyFields({
                           }
                         />
                       </FormControl>
-                      <span className='text-muted-foreground text-sm'>
+                      <span className='text-sm text-muted-foreground'>
                         occurrence(s)
                       </span>
                     </div>

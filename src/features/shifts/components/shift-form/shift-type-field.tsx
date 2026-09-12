@@ -35,7 +35,7 @@ export function ShiftTypeField({
             <RadioGroupItem value={option.value} />
             {option.label}
           </span>
-          <span className='text-muted-foreground text-xs'>
+          <span className='text-xs text-muted-foreground'>
             {option.description}
           </span>
         </Label>

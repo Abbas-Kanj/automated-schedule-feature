@@ -15,7 +15,11 @@ import {
 import { Form } from '@/components/ui/form'
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog'
 import { emptyShiftFormValues } from '../data/defaults'
-import { type Shift, type ShiftFormValues, shiftFormSchema } from '../data/schema'
+import {
+  type Shift,
+  type ShiftFormValues,
+  shiftFormSchema,
+} from '../data/schema'
 import { useDeriveShortCode } from '../hooks/use-derive-short-code'
 import { useShiftsStore } from '../stores/shifts-store'
 import { normalizeShiftFormValues } from '../utils'

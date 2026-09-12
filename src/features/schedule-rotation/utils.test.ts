@@ -8,9 +8,13 @@ import {
   type RotateSchedule,
   buildRotation,
   getAssignedIndex,
+  getPeriodEnd,
   getPeriodIndex,
+  getRangeLabel,
+  getPeriodStart,
   getRotationPositions,
   getRotationRoster,
+  shiftPeriod,
 } from './utils'
 
 function makeShift(
@@ -384,5 +388,92 @@ describe('daily period type', () => {
       'daily'
     )
     expect(rotation.rangeLabel).toBe('Wed, Aug 19, 2026')
+  })
+})
+
+// The three period granularities the screen offers. Each has to agree with
+// itself: a period's start, its end, and the step to the next one all have to
+// describe the same unit, or paging lands somewhere the rotation math does not
+// expect.
+describe('period boundaries', () => {
+  // A Wednesday, deliberately mid-week and mid-month.
+  const viewDate = new Date(2026, 0, 14, 15, 30)
+
+  it('starts a daily period at midnight and ends it just before the next', () => {
+    expect(getPeriodStart(viewDate, 'daily')).toEqual(new Date(2026, 0, 14))
+    expect(getPeriodEnd(viewDate, 'daily').getDate()).toBe(14)
+    expect(getPeriodEnd(viewDate, 'daily').getHours()).toBe(23)
+  })
+
+  // Monday-first, matching the weekday chips used everywhere else.
+  it('starts a weekly period on the Monday', () => {
+    const start = getPeriodStart(viewDate, 'weekly')
+    expect(start.getDay()).toBe(1)
+    expect(start.getDate()).toBe(12)
+    expect(getPeriodEnd(viewDate, 'weekly').getDay()).toBe(0)
+  })
+
+  it('starts a monthly period on the first', () => {
+    expect(getPeriodStart(viewDate, 'monthly').getDate()).toBe(1)
+    expect(getPeriodEnd(viewDate, 'monthly').getDate()).toBe(31)
+  })
+
+  it('steps by the same unit it measures, in both directions', () => {
+    expect(shiftPeriod(viewDate, 'daily', 1).getDate()).toBe(15)
+    expect(shiftPeriod(viewDate, 'daily', -1).getDate()).toBe(13)
+    expect(shiftPeriod(viewDate, 'weekly', 1).getDate()).toBe(21)
+    expect(shiftPeriod(viewDate, 'monthly', 1).getMonth()).toBe(1)
+    expect(shiftPeriod(viewDate, 'monthly', -1).getMonth()).toBe(11)
+  })
+
+  // Stepping one period forward must advance the index by exactly one,
+  // whichever granularity is showing — that is what makes one step of the
+  // pager equal one card of the pattern.
+  it('advances the period index by exactly one per step', () => {
+    const schedule = {
+      start_date: '2026-01-05',
+    } as RotateSchedule
+
+    ;(['daily', 'weekly', 'monthly'] as const).forEach((periodType) => {
+      const here = getPeriodIndex(schedule, viewDate, periodType)
+      const next = getPeriodIndex(
+        schedule,
+        shiftPeriod(viewDate, periodType, 1),
+        periodType
+      )
+      expect(next - here, periodType).toBe(1)
+    })
+  })
+
+  // Viewing before the schedule begins is allowed; the rotation wraps either
+  // way, so the index simply goes negative rather than clamping.
+  it('goes negative before the schedule starts', () => {
+    const schedule = { start_date: '2026-01-05' } as RotateSchedule
+    expect(getPeriodIndex(schedule, new Date(2026, 0, 1), 'daily')).toBe(-4)
+  })
+})
+
+describe('getRangeLabel', () => {
+  it('names a single day in daily mode', () => {
+    const day = new Date(2026, 0, 14)
+    expect(getRangeLabel(day, day, 'daily')).toBe('Wed, Jan 14, 2026')
+  })
+
+  it('names the month in monthly mode', () => {
+    expect(
+      getRangeLabel(new Date(2026, 0, 1), new Date(2026, 0, 31), 'monthly')
+    ).toBe('January 2026')
+  })
+
+  it('does not repeat the month for a week inside one month', () => {
+    expect(
+      getRangeLabel(new Date(2026, 0, 12), new Date(2026, 0, 18), 'weekly')
+    ).toBe('Jan 12 – 18, 2026')
+  })
+
+  it('names both months for a week that straddles them', () => {
+    expect(
+      getRangeLabel(new Date(2026, 0, 26), new Date(2026, 1, 1), 'weekly')
+    ).toBe('Jan 26 – Feb 1, 2026')
   })
 })

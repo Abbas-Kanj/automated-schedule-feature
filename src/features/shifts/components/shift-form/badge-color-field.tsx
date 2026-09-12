@@ -63,7 +63,7 @@ export function BadgeColorField({
                   // The swatch IS the colour, so keep Button's hover/active
                   // background from painting over it.
                   'hover:bg-[unset] dark:hover:bg-[unset]',
-                  value === o.value && 'ring-ring ring-2'
+                  value === o.value && 'ring-2 ring-ring'
                 )}
               />
             ))}

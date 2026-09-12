@@ -39,9 +39,9 @@ async function pickTeams(screen: Screen, names: string[]) {
   await userEvent.keyboard('{Escape}')
 }
 
-// assign-to -> end-settings -> summary -> submit.
+// assign-to -> summary -> submit. Rotate has no "Start & End" step — a
+// rotation's dates are edited on the Schedule Rotation screen instead.
 async function finish(screen: Screen) {
-  await userEvent.click(screen.getByRole('button', { name: 'Next' }))
   await userEvent.click(screen.getByRole('button', { name: 'Next' }))
   await userEvent.click(screen.getByRole('button', { name: 'Save schedule' }))
 }
@@ -69,71 +69,88 @@ function uncoveredCells(schedule: Schedule) {
   return rotate.pattern.length * rotate.shift_ids.length - staffed.size
 }
 
+// These three drive the whole wizard in a real browser — several steps, a
+// multi-select each, and a coverage search on top — which lands close enough to
+// vitest's 15s default to flake under a loaded full-suite run.
+const WIZARD_TIMEOUT = 45_000
+
 describe('ScheduleForm — rotate crew assignment', () => {
-  it('keeps a suggested assignment when the step is left with Next', async () => {
-    const onSubmit = vi.fn()
-    const screen = await render(
-      <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
-    )
+  it(
+    'keeps a suggested assignment when the step is left with Next',
+    async () => {
+      const onSubmit = vi.fn()
+      const screen = await render(
+        <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
+      )
 
-    await goToAssignTo(screen)
-    await pickTeams(screen, ['Team A', 'Team B'])
-    await userEvent.click(
-      screen.getByRole('button', { name: /suggest assignment/i })
-    )
-    await finish(screen)
+      await goToAssignTo(screen)
+      await pickTeams(screen, ['Team A', 'Team B'])
+      await userEvent.click(
+        screen.getByRole('button', { name: /suggest assignment/i })
+      )
+      await finish(screen)
 
-    expect(onSubmit).toHaveBeenCalledTimes(1)
-    // Both teams placed — and the employees the seed had assigned cleared,
-    // not left behind to double-book the cycle.
-    expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
-      'team:team-a',
-      'team:team-b',
-    ])
-  })
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+      // Both teams placed — and the employees the seed had assigned cleared,
+      // not left behind to double-book the cycle.
+      expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
+        'team:team-a',
+        'team:team-b',
+      ])
+    },
+    WIZARD_TIMEOUT
+  )
 
-  it('applies the suggestion on Next when the button was never pressed', async () => {
-    const onSubmit = vi.fn()
-    const screen = await render(
-      <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
-    )
+  it(
+    'applies the suggestion on Next when the button was never pressed',
+    async () => {
+      const onSubmit = vi.fn()
+      const screen = await render(
+        <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
+      )
 
-    await goToAssignTo(screen)
-    await pickTeams(screen, ['Team A', 'Team B'])
-    // Deliberately no click on "Suggest assignment" — picking a pool and
-    // continuing used to advance with the old roster still in place.
-    await finish(screen)
+      await goToAssignTo(screen)
+      await pickTeams(screen, ['Team A', 'Team B'])
+      // Deliberately no click on "Suggest assignment" — picking a pool and
+      // continuing used to advance with the old roster still in place.
+      await finish(screen)
 
-    expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
-      'team:team-a',
-      'team:team-b',
-    ])
-  })
+      expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
+        'team:team-a',
+        'team:team-b',
+      ])
+    },
+    WIZARD_TIMEOUT
+  )
 
-  it('leaves a hand-placed roster alone while Assign manually is on', async () => {
-    const onSubmit = vi.fn()
-    const screen = await render(
-      <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
-    )
+  it(
+    'leaves a hand-placed roster alone while Assign manually is on',
+    async () => {
+      const onSubmit = vi.fn()
+      const screen = await render(
+        <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
+      )
 
-    await goToAssignTo(screen)
-    await pickTeams(screen, ['Team A'])
-    // Switch to the manual view *after* picking a pool: the pool selection is
-    // still there, but "Assign manually" says the stored matrix wins.
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Assign manually' })
-    )
-    await finish(screen)
+      await goToAssignTo(screen)
+      await pickTeams(screen, ['Team A'])
+      // Switch to the manual view *after* picking a pool: the pool selection is
+      // still there, but "Assign manually" says the stored matrix wins.
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Assign manually' })
+      )
+      await finish(screen)
 
-    // The pool says teams, the stored matrix says employees — and the manual
-    // toggle says the matrix wins.
-    expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
-      'employee:emp-a',
-      'employee:emp-b',
-      'employee:emp-c',
-      'employee:emp-d',
-    ])
-  })
+      // The pool says teams, the stored matrix says employees — and the manual
+      // toggle says the matrix wins.
+      expect(crewKeys(onSubmit.mock.calls[0][0])).toEqual([
+        'employee:emp-a',
+        'employee:emp-b',
+        'employee:emp-c',
+        'employee:emp-d',
+      ])
+    },
+    WIZARD_TIMEOUT
+  )
 
   it('staffs every shift on every cycle day when there are crews enough', () => {
     // The seeded rotation is the shape the rework exists for: three shifts,

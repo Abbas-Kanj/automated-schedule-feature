@@ -190,7 +190,7 @@ export function GeneralTab() {
             </FormControl>
             <FormMessage />
             {form.formState.errors.custom_category && (
-              <p className='text-destructive text-sm'>
+              <p className='text-sm text-destructive'>
                 {form.formState.errors.custom_category.message}
               </p>
             )}
@@ -203,7 +203,7 @@ export function GeneralTab() {
           cross midnight (see `ShiftTimesTab`'s `isOvernightCategory`). */}
       {category === 'overnight' && (
         <div className='flex flex-row items-center justify-between rounded-md border p-3'>
-          <Label className='text-muted-foreground font-normal'>
+          <Label className='font-normal text-muted-foreground'>
             Check next day
           </Label>
           <Switch checked disabled />
@@ -287,13 +287,13 @@ export function GeneralTab() {
               />
             </FormControl>
             {timezoneMode === 'local' && (
-              <p className='text-muted-foreground text-xs'>
+              <p className='text-xs text-muted-foreground'>
                 Uses whichever local time zone this shift is viewed in —
                 currently {LOCAL_TIMEZONE}.
               </p>
             )}
             {form.formState.errors.timezone && (
-              <p className='text-destructive text-sm'>
+              <p className='text-sm text-destructive'>
                 {form.formState.errors.timezone.message}
               </p>
             )}

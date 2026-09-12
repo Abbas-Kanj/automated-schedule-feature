@@ -20,10 +20,8 @@ import {
 } from '@/components/ui/popover'
 import { ShiftDaysTable } from '@/features/shifts/components/shift-days-table'
 import { ShiftFormDialog } from '@/features/shifts/components/shift-form-dialog'
-import {
-  SHIFT_BADGE_COLOR_OPTIONS,
-  SHIFT_ICON_COMPONENTS,
-} from '@/features/shifts/data/data'
+import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
+import { SHIFT_ICON_COMPONENTS } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 
@@ -47,7 +45,8 @@ export function ShiftPickerField({
   const formatTime = useTimeFormat()
 
   const selectedIds = useWatch({ control, name: 'shift_ids' }) as
-    string[] | undefined
+    | string[]
+    | undefined
 
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -171,9 +170,6 @@ export function ShiftPickerField({
                               shift.id
                             )
                             const Icon = SHIFT_ICON_COMPONENTS[shift.icon]
-                            const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-                              (o) => o.value === shift.badge_color
-                            )
                             return (
                               <Button
                                 key={shift.id}
@@ -188,12 +184,7 @@ export function ShiftPickerField({
                                   isSelected && 'bg-primary/5'
                                 )}
                               >
-                                <span
-                                  className={cn(
-                                    'size-2.5 shrink-0 rounded-full',
-                                    color?.swatchClassName
-                                  )}
-                                />
+                                <ShiftSwatch shift={shift} size='lg' />
                                 {Icon && (
                                   <Icon className='size-4 shrink-0 text-muted-foreground' />
                                 )}
@@ -240,20 +231,12 @@ export function ShiftPickerField({
                     {selectedShifts.map((shift) => {
                       const enabledDays = shift.days.filter((d) => d.enabled)
                       const Icon = SHIFT_ICON_COMPONENTS[shift.icon]
-                      const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-                        (o) => o.value === shift.badge_color
-                      )
                       return (
                         <Card key={shift.id} className='gap-0 py-3'>
                           <CardContent className='flex items-start gap-3 px-4'>
                             <div className='min-w-0 flex-1 space-y-1'>
                               <div className='flex items-center gap-2'>
-                                <span
-                                  className={cn(
-                                    'size-2 shrink-0 rounded-full',
-                                    color?.swatchClassName
-                                  )}
-                                />
+                                <ShiftSwatch shift={shift} size='md' />
                                 {Icon && (
                                   <Icon className='size-4 shrink-0 text-muted-foreground' />
                                 )}

@@ -15,7 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { RecurrenceWeekdayChips, type RecurrenceOption } from './recurrence-frequency-fields'
+import {
+  RecurrenceWeekdayChips,
+  type RecurrenceOption,
+} from './recurrence-frequency-fields'
 
 // Monday by default, like the "Case Monthly" wireframe's example ("the 2nd
 // Monday").
@@ -142,7 +145,7 @@ export function RepeatMonthlyFields({
               </FormItem>
             )}
           />
-          <span className='text-muted-foreground pb-2 text-sm'>and</span>
+          <span className='pb-2 text-sm text-muted-foreground'>and</span>
           <FormField
             control={control}
             name={`${name}.date_specific_2`}

@@ -1,13 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { type Shift } from '@/features/shifts/data/schema'
 import { buildDefaultDays } from '@/features/shifts/utils'
+import { type Schedule } from './data/schema'
 import {
   type CalendarScheduleInput,
+  calculateHours,
+  deriveShortCode,
+  describeStartDay,
+  formatTimes,
+  getDaysInMonthArray,
+  getDaysOfMonth,
   getScheduleCalendarCycle,
   getScheduleCycleLength,
+  getScheduleSummary,
+  getScheduleTotalHours,
 } from './utils'
 
-function makeShift(overrides: Partial<Shift> & Pick<Shift, 'id' | 'name'>): Shift {
+function makeShift(
+  overrides: Partial<Shift> & Pick<Shift, 'id' | 'name'>
+): Shift {
   return {
     short_code: overrides.id.slice(0, 6).toUpperCase(),
     badge_color: 'blue',
@@ -22,7 +33,10 @@ function makeShift(overrides: Partial<Shift> & Pick<Shift, 'id' | 'name'>): Shif
     // (unlike `emptyShiftFormValues`'s blank in-progress form, whose days
     // all start disabled) — default every fixture shift to enabled all
     // week, same as `getShiftTimeRange`'s real callers expect.
-    days: buildDefaultDays({ from_time: '09:00', to_time: '17:00', overnight: false }, true),
+    days: buildDefaultDays(
+      { from_time: '09:00', to_time: '17:00', overnight: false },
+      true
+    ),
     break_enabled: false,
     breaks: [],
     description: undefined,
@@ -119,9 +133,10 @@ describe('getScheduleCalendarCycle — fixed/flexible', () => {
   const weekdayShift = makeShift({
     id: 'weekdays',
     name: 'Weekdays',
-    days: buildDefaultDays({ from_time: '09:00', to_time: '17:00', overnight: false }, false).map(
-      (d) => ({ ...d, enabled: d.day !== 'sat' && d.day !== 'sun' })
-    ),
+    days: buildDefaultDays(
+      { from_time: '09:00', to_time: '17:00', overnight: false },
+      false
+    ).map((d) => ({ ...d, enabled: d.day !== 'sat' && d.day !== 'sun' })),
   })
 
   const schedule: CalendarScheduleInput = {
@@ -130,7 +145,7 @@ describe('getScheduleCalendarCycle — fixed/flexible', () => {
     shift_ids: ['weekdays'],
   }
 
-  it('is active on the shift\'s own enabled weekdays and off on the rest', () => {
+  it("is active on the shift's own enabled weekdays and off on the rest", () => {
     const cycle = getScheduleCalendarCycle(schedule, [weekdayShift], 0)
     expect(cycle.days).toHaveLength(7)
     const byDate = Object.fromEntries(cycle.days.map((d) => [d.date_str, d]))
@@ -148,7 +163,10 @@ describe('getScheduleCalendarCycle — fixed/flexible', () => {
     const eveningShift = makeShift({
       id: 'evenings',
       name: 'Evenings',
-      days: buildDefaultDays({ from_time: '18:00', to_time: '22:00', overnight: false }, true),
+      days: buildDefaultDays(
+        { from_time: '18:00', to_time: '22:00', overnight: false },
+        true
+      ),
     })
     const cycle = getScheduleCalendarCycle(
       { ...schedule, shift_ids: ['weekdays', 'evenings'] },
@@ -156,7 +174,10 @@ describe('getScheduleCalendarCycle — fixed/flexible', () => {
       0
     )
     const monday = cycle.days.find((d) => d.date_str === '2026-01-05')
-    expect(monday?.entries.map((e) => e.shift.id)).toEqual(['weekdays', 'evenings'])
+    expect(monday?.entries.map((e) => e.shift.id)).toEqual([
+      'weekdays',
+      'evenings',
+    ])
   })
 })
 
@@ -178,18 +199,32 @@ describe('getScheduleCalendarCycle — end_settings capping', () => {
   })
 
   it('after_occurrences: stops once cycleIndex reaches the occurrence count', () => {
-    const withEnd = { ...base, end_settings: { end_type: 'after_occurrences', end_occurrences: 2 } }
-    expect(getScheduleCalendarCycle(withEnd, [shiftA], 0).canGoToNextCycle).toBe(true)
-    expect(getScheduleCalendarCycle(withEnd, [shiftA], 1).canGoToNextCycle).toBe(false)
+    const withEnd = {
+      ...base,
+      end_settings: { end_type: 'after_occurrences', end_occurrences: 2 },
+    }
+    expect(
+      getScheduleCalendarCycle(withEnd, [shiftA], 0).canGoToNextCycle
+    ).toBe(true)
+    expect(
+      getScheduleCalendarCycle(withEnd, [shiftA], 1).canGoToNextCycle
+    ).toBe(false)
   })
 
   it('on_date: stops once the next cycle would start past the end date', () => {
-    const withEnd = { ...base, end_settings: { end_type: 'on_date', end_date: '2026-01-02' } }
+    const withEnd = {
+      ...base,
+      end_settings: { end_type: 'on_date', end_date: '2026-01-02' },
+    }
     // cycle 0 is just 2026-01-01 (pattern length 1) — the next cycle would
     // start 2026-01-02, still within range.
-    expect(getScheduleCalendarCycle(withEnd, [shiftA], 0).canGoToNextCycle).toBe(true)
+    expect(
+      getScheduleCalendarCycle(withEnd, [shiftA], 0).canGoToNextCycle
+    ).toBe(true)
     // cycle 1 (2026-01-02) — the next cycle would start 2026-01-03, past it.
-    expect(getScheduleCalendarCycle(withEnd, [shiftA], 1).canGoToNextCycle).toBe(false)
+    expect(
+      getScheduleCalendarCycle(withEnd, [shiftA], 1).canGoToNextCycle
+    ).toBe(false)
   })
 })
 
@@ -220,10 +255,16 @@ describe('getScheduleCalendarCycle — rotate custom_shifts follows plain patter
   it('shows Shift A, Shift B, Shift B, Shift A on consecutive days, in that exact order', () => {
     const cycle = getScheduleCalendarCycle(schedule, [shiftA, shiftB], 0)
     expect(cycle.days.map((d) => d.date_str)).toEqual([
-      '2026-08-24', '2026-08-25', '2026-08-26', '2026-08-27',
+      '2026-08-24',
+      '2026-08-25',
+      '2026-08-26',
+      '2026-08-27',
     ])
     expect(cycle.days.map((d) => d.entries[0]?.shift.id)).toEqual([
-      'a', 'b', 'b', 'a',
+      'a',
+      'b',
+      'b',
+      'a',
     ])
   })
 })
@@ -272,7 +313,11 @@ describe('getScheduleCalendarCycle — rotate custom_shifts, weekly frequency ex
       { position: 5, is_off: false, shift_id: 'b' },
     ],
     shift_repeat: [
-      { shift_id: 'a', frequency: 'weekly', weekdays: ['mon', 'wed', 'fri', 'sat'] },
+      {
+        shift_id: 'a',
+        frequency: 'weekly',
+        weekdays: ['mon', 'wed', 'fri', 'sat'],
+      },
       { shift_id: 'b', frequency: 'weekly', weekdays: ['mon', 'fri'] },
     ],
   }
@@ -311,13 +356,18 @@ describe('getScheduleCalendarCycle — rotate custom_shifts, weekly frequency ex
     expect(cycle.days.length).toBe(28)
   })
 
-  it('shows the shift\'s real per-weekday hours on a weekly-expanded active day, not a generic summary', () => {
+  it("shows the shift's real per-weekday hours on a weekly-expanded active day, not a generic summary", () => {
     const preciseShiftA = makeShift({
       id: 'a',
       name: 'Shift A',
       days: shiftA.days.map((d) =>
         d.day === 'wed'
-          ? { ...d, times: [{ from_time: '06:00', to_time: '14:00', overnight: false }] }
+          ? {
+              ...d,
+              times: [
+                { from_time: '06:00', to_time: '14:00', overnight: false },
+              ],
+            }
           : d
       ),
     })
@@ -352,7 +402,9 @@ describe('getScheduleCalendarCycle — rotate custom_shifts, weekly card edge ca
       start_date: '2026-08-24', // Monday
       shift_ids: ['ghost'],
       pattern: [{ position: 1, is_off: false, shift_id: 'ghost' }],
-      shift_repeat: [{ shift_id: 'ghost', frequency: 'weekly', weekdays: ['mon'] }],
+      shift_repeat: [
+        { shift_id: 'ghost', frequency: 'weekly', weekdays: ['mon'] },
+      ],
     }
     // No shifts at all resolve — 'ghost' was deleted.
     const cycle = getScheduleCalendarCycle(schedule, [], 0)
@@ -394,14 +446,18 @@ describe('getScheduleCalendarCycle — rotate custom_shifts, weekly card edge ca
       start_date: '2026-08-24', // Monday
       shift_ids: ['a'],
       pattern: [{ position: 1, is_off: false, shift_id: 'a' }],
-      shift_repeat: [{ shift_id: 'a', frequency: 'weekly', weekdays: ['mon', 'wed'] }],
+      shift_repeat: [
+        { shift_id: 'a', frequency: 'weekly', weekdays: ['mon', 'wed'] },
+      ],
     }
     const cycle0 = getScheduleCalendarCycle(schedule, [shiftA], 0)
     const cycle1 = getScheduleCalendarCycle(schedule, [shiftA], 1)
     expect(cycle0.days[0].date_str).toBe('2026-08-24')
     expect(cycle1.days[0].date_str).toBe('2026-08-31')
     // Same weekly card repeats identically on the next cycle.
-    expect(cycle0.days.map((d) => d.isOff)).toEqual(cycle1.days.map((d) => d.isOff))
+    expect(cycle0.days.map((d) => d.isOff)).toEqual(
+      cycle1.days.map((d) => d.isOff)
+    )
   })
 })
 
@@ -430,5 +486,224 @@ describe('getScheduleCycleLength — rotate custom_shifts', () => {
       ],
     }
     expect(getScheduleCycleLength(schedule)).toBe(2)
+  })
+})
+
+describe('calculateHours', () => {
+  it('adds up a day of ranges to two decimal places', () => {
+    expect(
+      calculateHours([
+        { from_time: '09:00', to_time: '12:30' },
+        { from_time: '13:15', to_time: '17:00' },
+      ])
+    ).toBe(7.25)
+  })
+
+  // A range whose end reads earlier than its start is an overnight, not a
+  // negative day — the one case worth pinning, since the naive subtraction
+  // gives back a number that looks plausible and is wrong by 24 hours.
+  it('reads a range that ends before it starts as crossing midnight', () => {
+    expect(calculateHours([{ from_time: '22:00', to_time: '06:00' }])).toBe(8)
+  })
+
+  it('skips an incomplete range rather than counting it as zero-length', () => {
+    expect(
+      calculateHours([
+        { from_time: '', to_time: '17:00' },
+        { from_time: '09:00', to_time: '17:00' },
+      ])
+    ).toBe(8)
+  })
+
+  it('is 0 for no ranges at all', () => {
+    expect(calculateHours([])).toBe(0)
+  })
+})
+
+describe('deriveShortCode', () => {
+  it('takes the initials of a multi-word name', () => {
+    expect(deriveShortCode('Night Shift Crew')).toBe('NSC')
+  })
+
+  it('takes the first six characters of a single word', () => {
+    expect(deriveShortCode('Maintenance')).toBe('MAINTE')
+  })
+
+  it('caps initials at six characters', () => {
+    expect(deriveShortCode('a b c d e f g h')).toBe('ABCDEF')
+  })
+
+  it('is empty for a blank name', () => {
+    expect(deriveShortCode('   ')).toBe('')
+  })
+})
+
+describe('formatTimes', () => {
+  const identity = (time: string) => time
+
+  it('joins every range with the caller’s own clock formatter', () => {
+    expect(
+      formatTimes(
+        [
+          { from_time: '09:00', to_time: '17:00' },
+          { from_time: '18:00', to_time: '20:00' },
+        ],
+        identity
+      )
+    ).toBe('09:00–17:00, 18:00–20:00')
+  })
+
+  it('is a dash when there is nothing to show', () => {
+    expect(formatTimes([], identity)).toBe('—')
+    expect(formatTimes(undefined, identity)).toBe('—')
+  })
+})
+
+describe('describeStartDay', () => {
+  // "Week 2" is the phrase the real-world rotation write-ups use, so a cycle
+  // that is a whole number of weeks says it out loud.
+  it('names the week on a whole-week cycle', () => {
+    expect(describeStartDay(7, 28)).toBe('Day 8 · week 2')
+    expect(describeStartDay(0, 28)).toBe('Day 1 · week 1')
+  })
+
+  it('gives a plain day number when the cycle is not whole weeks', () => {
+    expect(describeStartDay(3, 10)).toBe('Day 4')
+  })
+
+  // Exactly one week is still a single week, so the suffix says nothing.
+  it('leaves a seven-day cycle as plain days', () => {
+    expect(describeStartDay(3, 7)).toBe('Day 4')
+  })
+})
+
+describe('getDaysOfMonth', () => {
+  it('returns every day of the month with its weekday', () => {
+    const days = getDaysOfMonth(2026, 2)
+    expect(days).toHaveLength(28)
+    expect(days[0].date_str).toBe('2026-02-01')
+    expect(days[0].weekday).toBe('sunday')
+    expect(days[27].date_str).toBe('2026-02-28')
+  })
+
+  it('counts a leap February', () => {
+    expect(getDaysOfMonth(2028, 2)).toHaveLength(29)
+    expect(getDaysInMonthArray(2028, 2)).toHaveLength(29)
+  })
+
+  it('numbers days from 1', () => {
+    expect(getDaysInMonthArray(2026, 4)).toEqual(
+      Array.from({ length: 30 }, (_, i) => i + 1)
+    )
+  })
+})
+
+describe('getScheduleTotalHours', () => {
+  const morning = makeShift({ id: 'shift-morning', name: 'Morning' })
+
+  const fixedSchedule = {
+    id: 'sched-1',
+    name: 'Fixed',
+    description: '',
+    parent_type: 'regular',
+    type: 'fixed',
+    shift_ids: ['shift-morning'],
+    temporary_schedule: false,
+    start_date: '2026-01-05',
+    end_settings: { end_type: 'never' },
+  } as unknown as Schedule
+
+  it('adds every enabled day of every selected shift for fixed', () => {
+    // 8 hours a day, enabled all seven days.
+    expect(getScheduleTotalHours(fixedSchedule, [morning])).toBe(56)
+  })
+
+  it('ignores a shift id with no shift behind it', () => {
+    expect(getScheduleTotalHours(fixedSchedule, [])).toBe(0)
+  })
+
+  it('averages a rotate pattern over its cycle length', () => {
+    const rotateSchedule = {
+      id: 'sched-2',
+      name: 'Rotate',
+      description: '',
+      parent_type: 'regular',
+      type: 'rotate',
+      shift_ids: ['shift-morning'],
+      temporary_schedule: false,
+      start_date: '2026-01-05',
+      end_settings: { end_type: 'never' },
+      cycle_type: 'pattern_shifts',
+      cycle_length: { unit: 'custom_days', days: 2 },
+      pattern: [
+        { position: 1, shift_id: 'shift-morning', is_off: false },
+        { position: 2, is_off: true },
+      ],
+      shift_repeat: [],
+      day_coverage: [],
+      crew_placements: [],
+    } as unknown as Schedule
+
+    // One working card worth 56, spread over a two-day cycle.
+    expect(getScheduleTotalHours(rotateSchedule, [morning])).toBe(28)
+  })
+})
+
+describe('getScheduleSummary', () => {
+  const morning = makeShift({ id: 'shift-morning', name: 'Morning' })
+
+  it('counts shifts and their enabled days for fixed', () => {
+    const schedule = {
+      id: 'sched-1',
+      name: 'Fixed',
+      description: '',
+      parent_type: 'regular',
+      type: 'fixed',
+      shift_ids: ['shift-morning'],
+      temporary_schedule: false,
+      start_date: '2026-01-05',
+      end_settings: { end_type: 'never' },
+    } as unknown as Schedule
+
+    expect(getScheduleSummary(schedule, [morning])).toBe('1 shift · 7 days')
+  })
+
+  it('names the cycle for rotate', () => {
+    const schedule = {
+      id: 'sched-2',
+      name: 'Rotate',
+      description: '',
+      parent_type: 'regular',
+      type: 'rotate',
+      shift_ids: ['shift-morning', 'shift-night'],
+      temporary_schedule: false,
+      start_date: '2026-01-05',
+      end_settings: { end_type: 'never' },
+      cycle_type: 'pattern_shifts',
+      cycle_length: { unit: 'custom_days', days: 14 },
+      pattern: [],
+      shift_repeat: [],
+      day_coverage: [],
+      crew_placements: [],
+    } as unknown as Schedule
+
+    expect(getScheduleSummary(schedule, [morning])).toContain('14-day cycle')
+  })
+
+  it('lists the weekdays for a weekly_one schedule', () => {
+    const schedule = {
+      id: 'sched-3',
+      name: 'Weekly',
+      description: '',
+      parent_type: 'daily',
+      type: 'weekly_one',
+      days: [
+        { day: 'monday', times: [{ from_time: '09:00', to_time: '17:00' }] },
+        { day: 'friday', times: [{ from_time: '09:00', to_time: '17:00' }] },
+      ],
+      employees: [{ value: 'emp-a', label: 'Amir' }],
+    } as unknown as Schedule
+
+    expect(getScheduleSummary(schedule, [])).toBe('Monday, Friday · 2 days')
   })
 })

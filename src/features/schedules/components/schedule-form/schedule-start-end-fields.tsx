@@ -1,5 +1,4 @@
 import { useFormContext } from 'react-hook-form'
-import { EndFrequencyFields } from '@/components/end-frequency-fields'
 import {
   FormControl,
   FormField,
@@ -7,6 +6,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { EndFrequencyFields } from '@/components/end-frequency-fields'
 import { DateField } from './date-field'
 
 type ScheduleStartEndFieldsProps = {

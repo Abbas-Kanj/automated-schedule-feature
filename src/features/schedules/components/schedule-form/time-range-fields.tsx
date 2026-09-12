@@ -1,5 +1,5 @@
-import { Plus, Trash2 } from 'lucide-react'
 import { type Control, useFieldArray, useWatch } from 'react-hook-form'
+import { Plus, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -53,7 +53,7 @@ export function TimeRangeFields({
               </FormItem>
             )}
           />
-          <span className='text-muted-foreground pt-2 text-sm'>to</span>
+          <span className='pt-2 text-sm text-muted-foreground'>to</span>
           <FormField
             control={control}
             name={`${name}.${index}.to_time`}

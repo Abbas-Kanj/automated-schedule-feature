@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useTimeFormat } from '@/lib/time-format'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import {
-  SHIFT_BADGE_COLOR_OPTIONS,
-  SHIFT_ICON_COMPONENTS,
-} from '@/features/shifts/data/data'
+import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
+import { SHIFT_ICON_COMPONENTS } from '@/features/shifts/data/data'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import {
   type CalendarScheduleInput,
@@ -32,7 +30,9 @@ type ScheduleCalendarPreviewProps = {
 // schedule at once. Sits in the Summary step in place of a flat
 // position/weekday list so "what actually happens on, say, the Monday
 // three weeks from now" is a straight read instead of mental math.
-export function ScheduleCalendarPreview({ values }: ScheduleCalendarPreviewProps) {
+export function ScheduleCalendarPreview({
+  values,
+}: ScheduleCalendarPreviewProps) {
   const shifts = useShiftsStore((s) => s.shifts)
   const formatTime = useTimeFormat()
   const [cycleIndex, setCycleIndex] = useState(0)
@@ -66,8 +66,7 @@ export function ScheduleCalendarPreview({ values }: ScheduleCalendarPreviewProps
   // Pad the grid out to full weeks so every day lands under its real
   // weekday column, same as a real calendar month view.
   const leadingBlanks = firstDay.weekdayIndex
-  const trailingBlanks =
-    (7 - ((leadingBlanks + cycle.days.length) % 7)) % 7
+  const trailingBlanks = (7 - ((leadingBlanks + cycle.days.length) % 7)) % 7
 
   return (
     <div className='space-y-3'>
@@ -149,19 +148,11 @@ function CalendarDayCell({
       ) : (
         <div className='space-y-1'>
           {day.entries.map((entry, i) => {
-            const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-              (o) => o.value === entry.shift.badge_color
-            )
             const Icon = SHIFT_ICON_COMPONENTS[entry.shift.icon]
             return (
               <div key={`${entry.shift.id}-${i}`} className='space-y-0.5'>
                 <div className='flex min-w-0 items-center gap-1'>
-                  <span
-                    className={cn(
-                      'size-1.5 shrink-0 rounded-full',
-                      color?.swatchClassName
-                    )}
-                  />
+                  <ShiftSwatch shift={entry.shift} />
                   {Icon && (
                     <Icon className='size-3 shrink-0 text-muted-foreground' />
                   )}

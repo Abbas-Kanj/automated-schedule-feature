@@ -131,7 +131,7 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
           <FormLabel>Pick a starting day</FormLabel>
           <div className='grid grid-cols-7 gap-1 text-center'>
             {WEEKDAY_HEADERS.map((h) => (
-              <div key={h} className='text-muted-foreground text-xs'>
+              <div key={h} className='text-xs text-muted-foreground'>
                 {h}
               </div>
             ))}
@@ -151,7 +151,7 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
                   onClick={() => handleSelectStart(d.date_str)}
                   className={cn(
                     'h-9 w-full px-1 text-sm',
-                    isStart && 'ring-primary ring-2 ring-offset-1'
+                    isStart && 'ring-2 ring-primary ring-offset-1'
                   )}
                 >
                   {format(d.date, 'd')}
@@ -168,7 +168,7 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
           <FormLabel>
             Number of consecutive days (max 7)
             {selectedRangeDays.length > 0 && (
-              <span className='text-muted-foreground ml-2 font-normal'>
+              <span className='ml-2 font-normal text-muted-foreground'>
                 {format(selectedRangeDays[0].date, 'MMM d')} –{' '}
                 {format(
                   selectedRangeDays[selectedRangeDays.length - 1].date,
@@ -225,7 +225,7 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
                           />
                           {d.weekday.charAt(0).toUpperCase() +
                             d.weekday.slice(1)}
-                          <span className='text-muted-foreground text-xs font-normal'>
+                          <span className='text-xs font-normal text-muted-foreground'>
                             {format(d.date, 'MMM d')}
                           </span>
                         </CardTitle>

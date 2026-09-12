@@ -52,7 +52,7 @@ export function TimezoneField({
           <RadioGroupItem value='local' />
           Local
         </span>
-        <span className='text-muted-foreground flex items-center gap-1.5 text-xs'>
+        <span className='flex items-center gap-1.5 text-xs text-muted-foreground'>
           <CalendarIcon className='size-3.5' />
           {LOCAL_TIMEZONE}
         </span>
@@ -81,7 +81,7 @@ export function TimezoneField({
                 <span className='truncate'>
                   {value ?? 'Select a time zone'}
                 </span>
-                <ChevronsUpDownIcon className='text-muted-foreground size-4 shrink-0' />
+                <ChevronsUpDownIcon className='size-4 shrink-0 text-muted-foreground' />
               </Button>
             </PopoverTrigger>
             <PopoverContent className='w-72 p-0'>

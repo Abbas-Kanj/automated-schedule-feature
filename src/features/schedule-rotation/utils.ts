@@ -42,26 +42,22 @@ export function isRotateSchedule(
 // exactly one pattern position.
 //
 // `daily` is what makes a day-based pattern mean what it says: a 2-2-3 roster
-// is fourteen *days*, so its fourteen cards have to advance one per day. Read
-// through the weekly step the same cards would describe a fourteen-*week*
-// cycle instead — the same numbers, off by a factor of seven.
+// is fourteen *days*, so its cards advance one per day. Read weekly, the same
+// cards would describe a fourteen-*week* cycle — off by a factor of seven.
 //
-// `weekly` (Monday-first) and `monthly` keep the older reading, where a card
-// is a whole week or month on one shift — the "Amir works mornings this week,
-// afternoons next week" rotation the seeded schedules describe.
+// `weekly` (Monday-first) and `monthly` keep the older reading, where a card is
+// a whole week or month on one shift.
 export type RotationPeriodType = 'daily' | 'weekly' | 'monthly'
 
-// One resolved day of the rotation cycle. Used two ways: as a card of the
-// schedule's own `pattern` (the template — see `getRotationPositions`), and as
-// one cell of an employee's actual cycle (what they work that day — see
-// `buildRotation`). `isOff` is re-derived rather than trusting a flag, so a
-// day pointing at a since-deleted shift still reads as off.
+// One resolved day of the rotation cycle, used both as a card of the schedule's
+// `pattern` (the template) and as a cell of an employee's actual cycle. `isOff`
+// is re-derived rather than trusted, so a day pointing at a since-deleted shift
+// still reads as off.
 export type RotationPosition = {
   index: number
   shift?: Shift
   isOff: boolean
-  // Single-letter chip for the "Current Schedule Sequence" column, e.g.
-  // Morning -> "M", an off day -> "O".
+  // Single-letter chip for the sequence column: Morning -> "M", off -> "O".
   letter: string
   label: string
   badgeColor?: ShiftBadgeColor
@@ -71,18 +67,13 @@ export type RotationRow = {
   employee: Employee
   employeeId: string
   fullName: string
-  // First cycle day this employee works. Not a stagger any more — the roster
-  // is stored per (day, shift) rather than as an offset into the pattern (see
-  // `day_coverage` in `schedules/data/schema.ts`) — it is kept only to sort
-  // the table in a stable, readable order.
+  // First cycle day this employee works. Not a stagger — the roster is stored
+  // per (day, shift), not as an offset — so this only sorts the table.
   offset: number
-  // The crew this employee rotates with, and the cycle day that crew starts
-  // on — the "Team B starts on week 2" half of the schedule (see
-  // `crew_placements` in `schedules/data/schema.ts`).
-  //
-  // `startDay` is only filled in when the stored start days still describe
-  // the stored matrix. After a hand edit they are history, and repeating them
-  // here would describe a roster this screen is not showing.
+  // The crew this employee rotates with, and the cycle day that crew starts on
+  // — the "Team B starts on week 2" half of the schedule. `startDay` is only
+  // filled in while the stored start days still describe the stored matrix;
+  // after a hand edit they are history.
   crewKey?: string
   crewLabel?: string
   startDay?: number
@@ -123,10 +114,9 @@ function toPosition(
   }
 }
 
-// Resolves a rotate schedule's pattern (sorted by position) into display-ready
-// cycle days. This is the *template* — one crew's journey, the thing the
-// suggestion works from (see `schedules/rotation-suggestion.ts`) — not what
-// anybody in particular works. Who works what comes from `getRotationRoster`.
+// A rotate schedule's pattern, sorted by position and resolved for display.
+// This is the *template* — one crew's journey — not what anybody in particular
+// works; that comes from `getRotationRoster`.
 export function getRotationPositions(
   schedule: RotateSchedule,
   shifts: Shift[]
@@ -142,20 +132,11 @@ export function getRotationPositions(
     )
 }
 
-// The roster is the schedule's own `day_coverage` matrix: for every employee
-// it names (directly, or through a team), which shift they work on each day of
-// the cycle.
+// The roster is the schedule's own `day_coverage` matrix: for every employee it
+// names, directly or through a team, which shift they work each cycle day.
 //
-// It used to be inferred from the pattern — a crew sat on one card and its
-// offset was that card's index. That could not express what the feature now
-// requires, a rotation covering *every* selected shift every day: two crews on
-// the same rest rhythm working different shifts have the same offset, and one
-// offset cannot name two shifts. So the resolved matrix is stored instead and
-// read straight back here.
-//
-// A position's shift still carries its own "Assign to" picks (see
-// `features/shifts`), but those say who may work that shift in general, not
-// who covers which day of this rotation.
+// A shift's own "Assign to" picks are deliberately ignored here — those say who
+// may work that shift in general, not who covers which day of this rotation.
 export function getRotationRoster(
   schedule: RotateSchedule,
   employees: Employee[],
@@ -173,10 +154,9 @@ export function getRotationRoster(
     employees.filter((e) => e.id).map((e) => [e.id as string, e])
   )
   const byEmployee = new Map<string, Map<number, string>>()
-  // Which crew put this employee on the rotation. A team crew is worth naming
-  // — it is the unit the roster was built out of; an individually picked
-  // employee is their own crew, so repeating their name under their name
-  // would say nothing and is left off.
+  // Which crew put this employee on the rotation. A team is worth naming; an
+  // individually picked employee is their own crew, so their name is left off
+  // rather than repeated under itself.
   const crewByEmployee = new Map<string, { key: string; label?: string }>()
 
   const record = (
@@ -192,8 +172,8 @@ export function getRotationRoster(
       days = new Map()
       byEmployee.set(employeeId, days)
     }
-    // First one wins, so a hand-made double booking renders as one shift
-    // rather than flickering between two. The form warns about it in place.
+    // First one wins, so a hand-made double booking renders as one shift. The
+    // form warns about it in place.
     if (!days.has(day)) days.set(day, shiftId)
   }
 
@@ -258,9 +238,9 @@ export function shiftPeriod(
     : addMonths(date, delta)
 }
 
-// How many whole periods `viewDate` sits after the schedule's own start —
-// period 0 is the period containing `start_date`. Can be negative (viewing a
-// period before the schedule begins); the rotation math wraps either way.
+// How many whole periods `viewDate` sits after the schedule's start; period 0
+// contains `start_date`. Negative when viewing a period before the schedule
+// begins — the rotation math wraps either way.
 export function getPeriodIndex(
   schedule: RotateSchedule,
   viewDate: Date,
@@ -277,9 +257,9 @@ export function getPeriodIndex(
     : differenceInCalendarMonths(current, anchor)
 }
 
-// Cycle day a given period lands on, wrapped into [0, cycleLength). The
-// `offset` is 0 for the cycle itself; it stays a parameter because the pattern
-// preview elsewhere still walks the cards from an arbitrary starting card.
+// Cycle day a given period lands on, wrapped into [0, cycleLength). `offset` is
+// 0 for the cycle itself, and stays a parameter because the pattern preview
+// walks the cards from an arbitrary starting card.
 export function getAssignedIndex(
   offset: number,
   periodIndex: number,
@@ -301,8 +281,7 @@ export function getRangeLabel(
     : `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
 }
 
-// Top-level builder: everything the screen needs for one schedule, one
-// period type, and one view date.
+// Everything the screen needs for one schedule, period type and view date.
 export function buildRotation(
   schedule: RotateSchedule,
   shifts: Shift[],
@@ -319,18 +298,15 @@ export function buildRotation(
   const periodEnd = getPeriodEnd(viewDate, periodType)
   const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
 
-  // The cycle day the current period lands on. The same day for everyone now:
-  // people no longer differ by an offset into a shared pattern, they differ by
-  // what the matrix gives each of them on that day.
+  // The same cycle day for everyone: people differ by what the matrix gives
+  // them that day, not by an offset into a shared pattern.
   const assignedIndex = cycleLength
     ? getAssignedIndex(0, periodIndex, cycleLength)
     : 0
 
-  // Are the schedule's stored start days still a true description of its
-  // matrix? Checked once for the whole table rather than per row, and only
-  // when it holds are start days shown at all — a roster finished by hand is
-  // no longer "each crew a week apart", and saying so anyway would be the
-  // screen making something up.
+  // Are the stored start days still a true description of the matrix? Checked
+  // once for the table, and only when it holds are start days shown at all — a
+  // roster finished by hand is no longer "each crew a week apart".
   const orderedShiftIds = orderShiftIdsByStart(schedule.shift_ids, shifts)
   const placementsDescribeCoverage = dayCoverageMatchesPlacements(
     patternToSlots(
@@ -345,13 +321,12 @@ export function buildRotation(
   )
 
   const rows: RotationRow[] = roster.map(
-    ({ employee, employeeId, byDay, crewKey, crewLabel }) => {
+    ({ employee, employeeId, byDay, offset, crewKey, crewLabel }) => {
       const dayFor = (day: number) => {
         const shiftId = byDay.get(day)
         return toPosition(day, shiftId ? shiftById.get(shiftId) : undefined)
       }
-      // Rotated so the day they are on right now reads first, matching the
-      // "Current Schedule Sequence" column.
+      // Rotated so the day they are on right now reads first.
       const sequence = positions.map((_, i) =>
         dayFor((assignedIndex + i) % cycleLength)
       )
@@ -360,7 +335,7 @@ export function buildRotation(
         employee,
         employeeId,
         fullName: getEmployeeFullName(employee),
-        offset: Math.min(...byDay.keys()),
+        offset,
         crewKey,
         crewLabel,
         startDay:

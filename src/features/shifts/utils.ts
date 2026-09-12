@@ -17,7 +17,10 @@ export function deriveShortCode(name: string): string {
     .toUpperCase()
 }
 
-export function calculateShiftHours(from_time: string, to_time: string): number {
+export function calculateShiftHours(
+  from_time: string,
+  to_time: string
+): number {
   if (!from_time || !to_time) return 0
   const from = parse(from_time, 'HH:mm', new Date())
   const to = parse(to_time, 'HH:mm', new Date())
@@ -59,7 +62,10 @@ export function buildDefaultDays(
 // user-entered `duration_minutes` isn't allowed to exceed (see
 // `shiftFieldsSchema`'s `superRefine` and `ShiftTimesTab`'s live check).
 // 0 for an invalid (non-increasing) range rather than a negative number.
-export function getBreakSpanMinutes(from_time: string, to_time: string): number {
+export function getBreakSpanMinutes(
+  from_time: string,
+  to_time: string
+): number {
   if (!from_time || !to_time || !(to_time > from_time)) return 0
   return differenceInMinutes(
     parse(to_time, 'HH:mm', new Date()),

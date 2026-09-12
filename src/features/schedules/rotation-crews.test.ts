@@ -291,3 +291,57 @@ describe('shiftHoursById', () => {
     expect(shiftHoursById([blank]).has('s-blank')).toBe(false)
   })
 })
+
+describe('patternToSlots', () => {
+  it('re-indexes the 1-based pattern onto 0-based slots', () => {
+    expect(
+      patternToSlots([
+        { position: 1, shift_id: 's-morning', is_off: false },
+        { position: 2, is_off: true },
+      ])
+    ).toEqual([
+      { index: 0, shiftId: 's-morning', isOff: false },
+      { index: 1, shiftId: undefined, isOff: true },
+    ])
+  })
+
+  // A card marked working but naming no shift cannot staff anything, so it has
+  // to read as off rather than as a working card with an undefined shift.
+  it('treats a working card with no shift as a rest card', () => {
+    expect(patternToSlots([{ position: 1, is_off: false }])).toEqual([
+      { index: 0, shiftId: undefined, isOff: true },
+    ])
+  })
+
+  it('is empty for an empty pattern', () => {
+    expect(patternToSlots([])).toEqual([])
+  })
+})
+
+describe('crewKeysFromDayCoverage', () => {
+  it('collects both kinds of crew, each once, however many cells it is on', () => {
+    const keys = crewKeysFromDayCoverage([
+      {
+        day: 0,
+        shift_id: 's-morning',
+        employee_ids: ['emp-a'],
+        team_ids: ['team-1'],
+      },
+      {
+        day: 1,
+        shift_id: 's-night',
+        employee_ids: ['emp-a', 'emp-b'],
+        team_ids: ['team-1'],
+      },
+    ])
+
+    expect(new Set(keys)).toEqual(
+      new Set(['team:team-1', 'employee:emp-a', 'employee:emp-b'])
+    )
+    expect(keys).toHaveLength(3)
+  })
+
+  it('is empty for an empty matrix', () => {
+    expect(crewKeysFromDayCoverage([])).toEqual([])
+  })
+})

@@ -1,18 +1,11 @@
 // Bridges a rotate schedule's stored data and the schema-free model
-// `rotation-suggestion.ts` reasons in.
+// `rotation-suggestion.ts` reasons in, in both directions: `day_coverage` (the
+// stored matrix) becomes `CoverageCrew[]` for grading, and the placements the
+// search returns become `day_coverage` cells.
 //
-// Two directions, both needed:
-//
-//   - **In:** `day_coverage` (the stored (cycle day × shift) → crews matrix)
-//     becomes `CoverageCrew[]`, which is what grades the rotation. Every
-//     screen that shows or scores a rotation reconstructs the same crews from
-//     it, so the reconstruction lives here rather than in each screen.
-//   - **Out:** the placements the search returns become `day_coverage` cells.
-//
-// It also owns the shift *order*, which the suggestion treats as given but
-// somebody has to decide: shifts rotate in clock order, earliest start first,
-// so a crew stepping one along moves forward through the day rather than
-// backwards into a night.
+// It also owns the shift *order*, which the suggestion treats as given: shifts
+// rotate in clock order, earliest start first, so a crew stepping one along
+// moves forward through the day rather than backwards into a night.
 import { toMinutes } from '@/lib/time'
 import { type Shift } from '@/features/shifts/data/schema'
 import { getShiftTimeRange } from '@/features/shifts/utils'
@@ -47,9 +40,9 @@ export function patternToSlots(
   }))
 }
 
-// A shift's own start: the earliest `from_time` across the days it is enabled
-// on. A shift with no enabled day sorts last rather than first, so an
-// unconfigured shift does not silently become the head of the rotation.
+// A shift's own start: the earliest `from_time` across its enabled days. A
+// shift with no enabled day sorts last rather than first, so an unconfigured
+// shift does not silently become the head of the rotation.
 function shiftStartMinutes(shift: Shift): number {
   const starts = shift.days
     .filter((day) => day.enabled)
@@ -77,18 +70,14 @@ export function orderShiftIdsByStart(
   })
 }
 
-// Each shift's span in clock minutes, which is what turns "Night then
-// Morning" into a number of hours off. Built here rather than in
-// `rotation-suggestion.ts`, which stays free of the shift schema.
+// Each shift's span in clock minutes, which is what turns "Night then Morning"
+// into a number of hours off. A shift finishing at or before it starts runs
+// past midnight, so its end is pushed into the next day — that is what makes a
+// night ending at 06:00 into a morning starting at 06:00 come out as zero rest
+// rather than a negative day.
 //
-// A shift finishing at or before it starts runs past midnight, so its end is
-// pushed into the next day — that is what makes the rest arithmetic work out
-// to zero for a night ending at 06:00 followed by a morning starting at
-// 06:00, instead of to a nonsensical negative day.
-//
-// Shifts with no enabled day are left out entirely rather than defaulted:
-// inventing hours for an unconfigured shift would invent a rest violation
-// with them.
+// Shifts with no enabled day are left out rather than defaulted: inventing
+// hours for an unconfigured shift would invent a rest violation with them.
 export function shiftHoursById(shifts: Shift[]): Map<string, ShiftHours> {
   const hours = new Map<string, ShiftHours>()
   shifts.forEach((shift) => {
@@ -104,10 +93,9 @@ export function shiftHoursById(shifts: Shift[]): Map<string, ShiftHours> {
   return hours
 }
 
-// The stored matrix, read back as crews. A crew is one team (all its members
-// rotate together) or one individually picked employee — the same unit the
-// suggestion places, so a suggested roster round-trips through storage
-// unchanged.
+// The stored matrix, read back as crews — one team (whose members rotate
+// together) or one individually picked employee, the same unit the suggestion
+// places, so a suggested roster round-trips through storage unchanged.
 //
 // A team or employee the stores no longer know about is dropped: it cannot be
 // labelled or counted, and leaving it in would report phantom coverage.
@@ -132,11 +120,11 @@ export function crewsFromDayCoverage(
       crews.set(key, crew)
     }
     const worked = crew.byDay.get(day)
-    if (worked) {
-      if (!worked.includes(shiftId)) worked.push(shiftId)
+    if (!worked) {
+      crew.byDay.set(day, [shiftId])
       return
     }
-    crew.byDay.set(day, [shiftId])
+    if (!worked.includes(shiftId)) worked.push(shiftId)
   }
 
   cells.forEach((cell) => {
@@ -162,13 +150,12 @@ export function crewsFromDayCoverage(
 }
 
 // The other direction: what the search decided, as storable cells. Sparse —
-// only cells somebody landed on are written, so "no cell" and "empty cell"
-// stay the same thing everywhere.
+// only cells somebody landed on are written, so "no cell" and "empty cell" stay
+// the same thing everywhere.
 //
-// Takes the *stored* placement shape (a crew key and two numbers) rather than
-// the search's own, because the two callers that matter both hold that shape:
-// the suggestion after `crewPlacementsToStored`, and the step's per-crew
-// "starts on day N" editor, which has no search result behind it at all.
+// Takes the *stored* placement shape rather than the search's own, because both
+// callers hold that shape: the suggestion after `crewPlacementsToStored`, and
+// the step's "starts on day N" editor, which has no search result behind it.
 export function cellsFromCrewPlacements(
   slots: SuggestionSlot[],
   placements: RotateCrewPlacement[],
@@ -222,9 +209,9 @@ export function cellsFromPlacements(
   )
 }
 
-// The search's placements in the shape the schedule stores. Only the crew's
-// key survives — the label and headcount are looked up from the stores on the
-// way back out, so a renamed team does not leave a stale name in the record.
+// The search's placements in the shape the schedule stores. Only the crew's key
+// survives — the label and headcount are looked up from the stores on the way
+// back out, so a renamed team does not leave a stale name in the record.
 export function crewPlacementsToStored(
   placements: CrewPlacement[]
 ): RotateCrewPlacement[] {
@@ -251,16 +238,13 @@ function normalizeCells(cells: RotateDayCoverage[]): string {
 
 // Do the stored placements still describe the stored matrix?
 //
-// Re-derived rather than tracked. A `stale` flag next to the data is one more
-// thing that can be wrong — it has to be cleared on every path that touches a
-// cell, and the one path that forgets makes the record lie. Regenerating and
-// comparing cannot drift: the answer is a fact about the two values sitting
-// in the form right now.
+// Re-derived by regenerating and comparing, never tracked as a flag: a flag has
+// to be cleared on every path that touches a cell, and the one path that
+// forgets makes the record lie.
 //
-// False means somebody hand-edited a cell (or the pool changed under them),
-// so the offsets are history rather than a description. Callers show the
-// matrix and say the offsets no longer describe it; they must not re-apply
-// them, which would silently undo the edit.
+// False means somebody hand-edited a cell (or the pool changed under them), so
+// the offsets are history rather than a description. Callers show the matrix
+// and say so; they must not re-apply the offsets, which would undo the edit.
 export function dayCoverageMatchesPlacements(
   slots: SuggestionSlot[],
   placements: RotateCrewPlacement[],
@@ -275,8 +259,8 @@ export function dayCoverageMatchesPlacements(
   )
 }
 
-// The crew keys currently on a matrix, in the `kind:id` form the suggestion
-// and the step's crew pool both use.
+// The crew keys currently on a matrix, in the `kind:id` form the suggestion and
+// the step's crew pool both use.
 export function crewKeysFromDayCoverage(cells: RotateDayCoverage[]): string[] {
   const keys = new Set<string>()
   cells.forEach((cell) => {

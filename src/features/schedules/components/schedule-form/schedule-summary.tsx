@@ -1,16 +1,13 @@
 import { type ReactNode, useMemo } from 'react'
-import { parse } from 'date-fns'
+import { format, parse } from 'date-fns'
 import { type Control, useWatch } from 'react-hook-form'
 import { useTimeFormat } from '@/lib/time-format'
-import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { getEmployeeFullName } from '@/features/employees/utils'
 import { ShiftDaysTable } from '@/features/shifts/components/shift-days-table'
-import {
-  SHIFT_BADGE_COLOR_OPTIONS,
-  SHIFT_ICON_COMPONENTS,
-} from '@/features/shifts/data/data'
+import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
+import { SHIFT_ICON_COMPONENTS } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
@@ -33,7 +30,7 @@ import {
   shiftHoursById,
 } from '../../rotation-crews'
 import { analyzeDayCoverage, crewRequirement } from '../../rotation-suggestion'
-import { calculateHours, formatTimes } from '../../utils'
+import { calculateHours, formatEndSettings, formatTimes } from '../../utils'
 import { RotationCoveragePanel } from './rotation-coverage-panel'
 import { CrewStartSummary } from './rotation-crew-starts'
 import { ScheduleCalendarPreview } from './schedule-calendar-preview'
@@ -81,23 +78,6 @@ function SummaryRow({
       <span className='text-end font-medium'>{value || '—'}</span>
     </div>
   )
-}
-
-// "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line —
-// the three end-settings shapes never coexist, so they don't need three
-// separate rows.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function formatEndSettings(endSettings: any): string | undefined {
-  if (!endSettings?.end_type) return undefined
-  if (endSettings.end_type === 'after_occurrences') {
-    return endSettings.end_occurrences
-      ? `After ${endSettings.end_occurrences} occurrence(s)`
-      : undefined
-  }
-  if (endSettings.end_type === 'on_date') {
-    return endSettings.end_date ? `On ${endSettings.end_date}` : undefined
-  }
-  return 'Never ends'
 }
 
 // Everything identifying the schedule — name/description, both type levels
@@ -219,9 +199,6 @@ function ShiftsSummary({ values }: { values: any }) {
       )}
       {resolvedShifts.map((shift, i) => {
         const Icon = SHIFT_ICON_COMPONENTS[shift.icon]
-        const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-          (o) => o.value === shift.badge_color
-        )
         const enabledDays = shift.days.filter((d) => d.enabled)
         const totalHours = enabledDays.reduce(
           (sum, d) => sum + calculateHours(d.times),
@@ -237,12 +214,7 @@ function ShiftsSummary({ values }: { values: any }) {
             className='space-y-1.5 border-t pt-2 first:border-t-0 first:pt-0'
           >
             <div className='flex items-center gap-2'>
-              <span
-                className={cn(
-                  'size-2 shrink-0 rounded-full',
-                  color?.swatchClassName
-                )}
-              />
+              <ShiftSwatch shift={shift} size='md' />
               {Icon && (
                 <Icon className='size-4 shrink-0 text-muted-foreground' />
               )}
@@ -412,6 +384,30 @@ function AssignToSummary({ values }: { values: any }) {
   )
 }
 
+// Rotate only: the wizard has no "Start & End" step (see `getSteps` in
+// `schedule-form.tsx`) — those live on the Schedule Rotation screen, next to
+// the cycle they shift. A rotate schedule is therefore *always* saved with
+// some start date, so the one thing the Summary has to do is say where it
+// came from and where to change it; silently showing "today / never ends" as
+// if it had been chosen is how a schedule starts on the wrong day.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function RotateDatesNotice({ values }: { values: any }) {
+  const isStillDefault =
+    values.start_date === format(new Date(), 'yyyy-MM-dd') &&
+    (values.end_settings?.end_type ?? 'never') === 'never'
+
+  return (
+    <div className='rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm'>
+      <p className='font-medium'>Start and end are set on Schedule Rotation</p>
+      <p className='text-muted-foreground'>
+        {isStillDefault
+          ? 'Not set yet — this schedule will start today and never end. Open Schedule Rotation after saving to set its real start date and end.'
+          : 'Change this rotation’s start date or end on the Schedule Rotation screen.'}
+      </p>
+    </div>
+  )
+}
+
 type ScheduleSummaryProps = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: Control<any>
@@ -429,6 +425,7 @@ export function ScheduleSummary({ control }: ScheduleSummaryProps) {
       {values.parent_type === 'regular' && (
         <>
           <ShiftsSummary values={values} />
+          {values.type === 'rotate' && <RotateDatesNotice values={values} />}
           {values.type === 'rotate' && <AssignToSummary values={values} />}
           <SummarySection title='Calendar preview'>
             {values.type === 'rotate' && (

@@ -1,5 +1,4 @@
 import { Info, PencilLine } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -7,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { SHIFT_BADGE_COLOR_OPTIONS } from '@/features/shifts/data/data'
+import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import { type Shift } from '@/features/shifts/data/schema'
 import { type RotateCrewPlacement } from '../../data/schema'
 import {
@@ -19,27 +18,19 @@ import { describeStartDay } from '../../utils'
 
 // The two numbers behind a crew's row of the coverage matrix, as something a
 // person can read and change: "Team B starts on day 8 — week 2 — on nights".
+// That is the sentence every real-world rotation is written in, and the matrix
+// alone cannot say it — see `crew_placements` in `schedules/data/schema.ts`,
+// which is stored beside the matrix without displacing it as the truth.
 //
-// Every real-world rotation is written that way ("assign Team A to day 1 of
-// the template, Team B to day 8"), and until now the schedule could not say
-// it: the search's offsets were materialised into `day_coverage` and thrown
-// away, so a saved rotation had a roster but no account of how it was built.
-// They are stored alongside the matrix now — see `crew_placements` in
-// `schedules/data/schema.ts` — with the matrix still the source of truth.
-//
-// Which means these controls can go out of date, and saying so is half their
-// job: a hand edit in the manual grid moves one cell, which no pair of
-// offsets can describe. `describesCoverage` is re-derived by regenerating
-// from the offsets and comparing, never tracked as a flag, so it cannot claim
-// a roster is generated when it is not.
+// So these controls can go out of date, and saying so is half their job.
+// `describesCoverage` is re-derived by regenerating from the offsets and
+// comparing, so it cannot claim a roster is generated when it is not.
 
-// The shift a crew is actually on when its cycle opens — the first working
-// card it lands on, not the first card, so an offset that starts on a rest
-// day still names the shift the crew is heading into.
-//
-// This is what makes the shift-step control legible. The stored number is a
-// transposition through the shift list, which means nothing on its own;
-// "Team B works nights" is the same fact in the words the user has.
+// The shift a crew is on when its cycle opens — the first *working* card it
+// lands on, so an offset starting on a rest day still names the shift the crew
+// is heading into. This is what makes the shift-step control legible: the
+// stored number is a transposition through the shift list and means nothing on
+// its own.
 function openingShiftId(
   slots: SuggestionSlot[],
   placement: Pick<RotateCrewPlacement, 'day_offset' | 'shift_step'>,
@@ -52,24 +43,9 @@ function openingShiftId(
   ).find((shiftId) => shiftId)
 }
 
-function ShiftSwatch({ shift }: { shift?: Shift }) {
-  const color = SHIFT_BADGE_COLOR_OPTIONS.find(
-    (option) => option.value === shift?.badge_color
-  )
-  return (
-    <span
-      className={cn(
-        'size-1.5 shrink-0 rounded-full',
-        color?.swatchClassName ?? 'bg-muted-foreground/40'
-      )}
-    />
-  )
-}
-
-// Shown wherever the offsets are displayed and they no longer describe the
-// stored roster. Deliberately not an error and never destructive-coloured:
-// hand-editing a cell is a supported thing to do, and the matrix is still
-// exactly what the schedule will run.
+// Shown wherever the offsets are displayed and no longer describe the stored
+// roster. Never an error and never destructive-coloured: hand-editing a cell is
+// supported, and the matrix is still exactly what the schedule will run.
 function HandEditedNote() {
   return (
     <p className='flex items-start gap-1.5 text-xs text-muted-foreground'>
@@ -94,10 +70,10 @@ type CrewStartEditorProps = {
   onChange: (next: RotateCrewPlacement[]) => void
 }
 
-// One row per crew: which cycle day it starts on, and which shift it opens
-// on. Changing either regenerates the whole matrix from every crew's offsets
-// — see `applyPlacements` in `schedule-assign-to-fields.tsx` — so the two
-// stay consistent by construction rather than by being edited in step.
+// One row per crew: which cycle day it starts on, and which shift it opens on.
+// Changing either regenerates the whole matrix from every crew's offsets (see
+// `applyPlacements` in `schedule-assign-to-fields.tsx`), so the two stay
+// consistent by construction rather than by being edited in step.
 export function CrewStartEditor({
   placements,
   crewLabels,
@@ -148,10 +124,10 @@ export function CrewStartEditor({
               <Select
                 value={String(placement.day_offset)}
                 // Radix re-emits an empty value from its hidden native
-                // <select> while it catches up with a programmatically set
-                // one — which is every value here, since "Suggest" writes
-                // them. Dropping empties is safe: there is no clear
-                // affordance, so a real pick is never empty.
+                // <select> while it catches up with a programmatically set one
+                // — which is every value here, since "Suggest" writes them.
+                // Dropping empties is safe: there is no clear affordance, so a
+                // real pick is never empty.
                 onValueChange={(value) => {
                   if (!value) return
                   update(placement.crew, { day_offset: Number(value) })
@@ -231,9 +207,8 @@ type CrewStartSummaryProps = {
   describesCoverage: boolean
 }
 
-// The same fact, read-only, on the Summary step. A roster assembled as "each
-// crew a week apart" should still say so where somebody signs it off — the
-// coverage grid proves it is covered, but not how it was meant to be read.
+// The same fact, read-only, on the Summary step: a roster assembled as "each
+// crew a week apart" should still say so where somebody signs it off.
 export function CrewStartSummary({
   placements,
   crews,
@@ -243,8 +218,8 @@ export function CrewStartSummary({
 }: CrewStartSummaryProps) {
   if (cycleLength === 0) return null
 
-  // Nothing to report rather than something wrong: a roster built entirely by
-  // hand never had start days, and the grid below says everything about it.
+  // Nothing to report rather than something wrong — a roster built by hand
+  // never had start days, and the grid below says everything about it.
   if (placements.length === 0) {
     return (
       <p className='flex items-start gap-1.5 text-xs text-muted-foreground'>
