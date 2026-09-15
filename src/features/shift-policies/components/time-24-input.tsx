@@ -27,13 +27,9 @@ function normalize(raw: string): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-// A 24-hour "HH:mm" text field, standing in for `<input type="time">`.
-// The native control renders an AM/PM segment whenever the *browser's*
-// locale is 12-hour, and that's a browser-level setting the page can't
-// override — `lang="en-GB"` on the input is widely repeated advice but not
-// something Chrome honours. Trading the native picker for a masked text
-// input is the only way to guarantee no AM/PM. The value is "HH:mm" either
-// way, which is what `timeStringSchema` validates.
+// Stands in for `<input type="time">`, whose AM/PM segment depends on the
+// browser's locale and can't be forced off (`lang` on the input doesn't
+// work) — a masked text field is the only way to guarantee 24-hour "HH:mm".
 export function Time24Input({
   value,
   onChange,
@@ -42,9 +38,7 @@ export function Time24Input({
   className,
   'aria-label': ariaLabel,
 }: Time24InputProps) {
-  // Own buffer so a half-typed "9:" isn't reformatted mid-edit; resynced
-  // when the value changes from outside (a rule being retyped, a form
-  // reset).
+  // Own buffer so a half-typed "9:" isn't reformatted mid-edit.
   const [buffer, setBuffer] = useState(value ?? '')
   useEffect(() => {
     setBuffer(value ?? '')

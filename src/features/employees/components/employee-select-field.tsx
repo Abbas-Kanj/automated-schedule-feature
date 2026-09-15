@@ -17,11 +17,8 @@ import { type Employee } from '../data/schema'
 
 type Option = { value: string; label: string }
 
-// The employee record stores `sex` / `position` / `organization_unit` as
-// `{ value, label }` objects, but a shadcn Select works in plain strings.
-// This binds one of those object fields to a shadcn Select, mapping the
-// string the Select emits back to the stored option object (and vice versa)
-// — so the whole form stays on shadcn components with no react-select.
+// These fields store `{ value, label }` objects, but shadcn Select works in
+// plain strings — this maps the emitted string back to the stored object.
 type EmployeeObjectField = 'sex' | 'position' | 'organization_unit'
 
 type EmployeeSelectFieldProps = {

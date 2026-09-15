@@ -7,26 +7,15 @@ const DEFAULT_TAB_CONTENT_CLASSNAME =
   'max-h-[60vh] w-[calc(100%+0.75rem)] overflow-y-auto py-1 pe-3'
 
 type ShiftFormTabsProps = {
-  // The dialog version caps tab content at 60vh with its own scrollbar so
-  // the dialog chrome stays put; the full-page create screen has no such
-  // constraint and just lets the page scroll — see
-  // `pages/create/shift-create-page.tsx`.
+  // The dialog version caps tab content at 60vh with its own scrollbar; the
+  // full-page create screen has no such constraint and just lets the page
+  // scroll.
   contentClassName?: string
 }
 
-// Shared tab layout for both the "Edit shift" dialog (`shift-form-dialog.tsx`)
-// and the "Create shift" page (`pages/create/shift-create-page.tsx`) — every
-// tab reads/writes through `useFormContext`, so this component itself takes
-// no form props.
-//
-// "Repeat" and "Assign to" are deliberately not offered. Their components
-// (`repeat-tab.tsx`, `assign-to-tab.tsx`) and their schema fields are kept:
-// the fields are optional-or-defaulted and their validation is gated behind
-// `repeat_enabled` / `assign_to_enabled`, so an existing shift that has them
-// set keeps its values through an edit — `normalizeShiftFormValues` only
-// blanks a field when its own toggle reads false, and nothing here changes a
-// toggle. Same arrangement `service_resource` / `service_territory` have
-// already had: schema field, no UI.
+// "Repeat" and "Assign to" tabs are parked (components + schema fields kept
+// but not shown) — their fields stay optional/gated behind their own
+// enabled toggles, so an existing shift keeps its values through an edit.
 export function ShiftFormTabs({
   contentClassName = DEFAULT_TAB_CONTENT_CLASSNAME,
 }: ShiftFormTabsProps) {

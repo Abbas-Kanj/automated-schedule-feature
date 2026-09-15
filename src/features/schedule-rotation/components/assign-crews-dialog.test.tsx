@@ -6,12 +6,8 @@ import { type Schedule } from '@/features/schedules/data/schema'
 import { type RotateSchedule, isRotateSchedule } from '../utils'
 import { AssignCrewsDialog, AssignToPanel } from './assign-crews-dialog'
 
-// Covers the seam between "Save" and the assignment UI it wraps, now that
-// crew assignment lives here instead of on the wizard's "Next" button — see
-// the equivalent seam that used to live in `schedule-form.test.tsx`. The
-// assignment UI itself (`ScheduleAssignToFields`) is unchanged and stays
-// covered by `schedule-assign-to-fields.test.tsx`; what's new here is that
-// Save reads its final state and hands it to `updateSchedule` correctly.
+// Covers Save handing its final form state to updateSchedule.
+// ScheduleAssignToFields itself is covered by schedule-assign-to-fields.test.tsx.
 
 const seed = sampleSchedules.find((s) => s.id === 'sched-rotation')!
 if (!isRotateSchedule(seed)) throw new Error('Seed is not a rotate schedule')
@@ -91,8 +87,6 @@ describe('AssignToPanel', () => {
     const screen = await render(<AssignToPanel schedule={rotation} />)
 
     await pickTeams(screen, ['Team A', 'Team B'])
-    // Deliberately no click on "Suggest assignment" — picking a pool and
-    // saving used to leave the old roster in place.
     await save(screen)
 
     expect(crewKeys()).toEqual(['team:team-a', 'team:team-b'])
@@ -109,8 +103,6 @@ describe('AssignToPanel', () => {
     )
     await save(screen)
 
-    // The pool says teams, the stored matrix says employees — and the manual
-    // toggle says the matrix wins.
     expect(crewKeys()).toEqual([
       'employee:emp-a',
       'employee:emp-b',
@@ -151,10 +143,8 @@ describe('AssignToPanel', () => {
   })
 })
 
-// The dialog around that panel. Its whole reason to exist is steering whoever
-// opened it toward a schedule nobody has staffed yet, so that is what these
-// pin down. Note every seeded rotate schedule *is* staffed — an unstaffed one
-// has to be built here rather than found.
+// Every seeded rotate schedule is staffed, so an unstaffed one is built here
+// rather than found.
 describe('AssignCrewsDialog', () => {
   const staffed = rotation
   const unstaffed: RotateSchedule = {

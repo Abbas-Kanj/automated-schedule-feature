@@ -110,7 +110,6 @@ export const MultiSelect = ({
           valueContainer: () => s.valueContainer,
           singleValue: () => s.singleValue,
 
-          // ✅ UPDATED: ensure consistent border theme in multi tags
           multiValue: () => s.multiValue,
           multiValueLabel: () => s.multiValueLabel,
           multiValueRemove: () => s.multiValueRemove,

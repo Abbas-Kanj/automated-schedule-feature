@@ -24,14 +24,9 @@ import { type ShiftFormValues } from '../../data/schema'
 
 type Option = { value: string; label: string }
 
-// "Assign to" tab of `ShiftFormDialog` (formerly "Additional info") — its
-// own toggle enables/disables the picks below.
-//
-// PARKED: `shift-form-tabs.tsx` no longer offers this tab, so nothing
-// renders it today. Kept, with its schema fields, because stored shifts
-// still carry values here and `normalizeShiftFormValues` preserves them.
-// None of these picks drive anything: who rotates through a schedule's
-// shifts is decided by the schedule's own `day_coverage` matrix, not here.
+// PARKED: not rendered by `shift-form-tabs.tsx`, kept with its schema
+// fields for stored shifts. Does NOT drive Schedule Rotation — that's the
+// schedule's own `day_coverage` matrix.
 export function AssignToTab() {
   const form = useFormContext<ShiftFormValues>()
   const assignToEnabled = useWatch({

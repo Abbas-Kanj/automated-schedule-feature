@@ -18,14 +18,12 @@ import { ScrollArea } from './ui/scroll-area'
 
 type CommandNavLink = {
   url: string
-  // Every title from the top of the nav down to the link, so an entry reads
-  // "Time Track > Schedules > Shift policies" rather than just "Shift policies".
+  // Full path from the nav root, so an entry reads "Time Track > Schedules > Shift policies".
   trail: string[]
 }
 
-// The nav is nested as deep as it likes, so the palette flattens it to its
-// leaves rather than assuming a fixed depth — walking only one level down left
-// every grandchild rendering as a branch title with no url to navigate to.
+// Flattens to leaves recursively — the nav is nested arbitrarily deep, and
+// walking only one level left grandchildren rendering as branches with no url.
 function flattenNavItems(
   items: NavItem[],
   trail: string[] = []

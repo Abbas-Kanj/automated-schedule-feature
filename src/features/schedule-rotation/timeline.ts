@@ -1,16 +1,8 @@
 // The crew-by-day view of a rotation: one row per crew, one dot per calendar
-// day, colored by the shift that crew works that day.
-//
-// This is a different question from the one `utils.ts`'s `buildRotation`
-// answers. That one is per *employee* ("what is Amir on this week, and what
-// does his cycle look like from here"). This one is per *crew* across a run of
-// consecutive days — the shape a rotation is actually designed in and reviewed
-// as, where the interesting property is how the colored bands step sideways
-// row over row.
-//
-// It reads `day_coverage` through `crewsFromDayCoverage`, the same
-// reconstruction the suggestion scorer uses, so the picture on screen and the
-// grade the form gives are built from one source.
+// day. Different from `utils.ts`'s `buildRotation`, which is per *employee*;
+// this is per *crew*, the shape a rotation is designed and reviewed in.
+// Reads `day_coverage` via `crewsFromDayCoverage`, the same reconstruction the
+// suggestion scorer uses, so the picture and the grade share one source.
 import {
   addDays,
   differenceInCalendarDays,
@@ -40,21 +32,17 @@ import {
   toPosition,
 } from './utils'
 
-// How much calendar the grid covers at once. A week is the readable unit for
-// "who is on right now"; a month is the unit a rotation is *designed* in —
-// long enough for a 28-day cycle to close, which is where the stepping bands
-// become visible.
+// Week is the readable "who's on now" unit; month is long enough for a
+// 28-day cycle to close, where the stepping bands become visible.
 export type TimelineSpan = 'week' | 'month'
 
-// Days are grouped in sevens so a row reads as weeks, matching how rosters are
-// written down ("days 1-7, days 8-14, ..."). A cycle whose length isn't a
-// multiple of seven just gets a short final block.
+// Grouped in sevens so a row reads as weeks ("days 1-7, days 8-14, ...");
+// a cycle length not a multiple of seven just gets a short final block.
 const DAYS_PER_BLOCK = 7
 
 export type TimelineDay = {
   date: Date
-  // Which day of the schedule's own cycle this calendar day lands on. Same for
-  // every crew — crews differ by what the matrix gives each of them on it.
+  // Same for every crew — crews differ by what the matrix gives them on it.
   cycleDay: number
   isToday: boolean
 }
@@ -70,16 +58,13 @@ export type TimelineCrewRow = {
   key: string
   label: string
   headcount: number
-  // One entry per day in `days`, index-aligned — so a row renders by walking
-  // the blocks and indexing into this.
+  // Index-aligned with `days`.
   cells: RotationPosition[]
-  // The first calendar day this crew actually works. Derived from the
-  // schedule's own start rather than from the visible range, so navigating
-  // months never changes what it says.
+  // Derived from the schedule's own start, not the visible range, so
+  // navigating months never changes what it says.
   startDate: Date
-  // Working days in the visible range. Shown because equity across crews is
-  // the first thing anybody checks on a grid like this, and counting dots by
-  // eye across 31 columns is exactly what a computer should be doing.
+  // Working days in the visible range, so equity across crews doesn't have to
+  // be counted by eye across 31 columns.
   daysOn: number
 }
 
@@ -87,26 +72,22 @@ export type RotationTimeline = {
   days: TimelineDay[]
   blocks: TimelineBlock[]
   rows: TimelineCrewRow[]
-  // The schedule's selected shifts in clock order, plus a trailing "off"
-  // entry — the key that decodes the dots.
+  // Selected shifts in clock order, plus a trailing "off" entry.
   legend: RotationPosition[]
   rangeLabel: string
   span: TimelineSpan
   cycleLength: number
 }
 
-// How many calendar days one cycle position covers, which is what turns a
-// crew's cycle-day offset into a real date.
+// How many calendar days one cycle position covers.
 const DAYS_PER_ADVANCE: Record<RotationPeriodType, number> = {
   daily: 1,
   weekly: 7,
   monthly: 31,
 }
 
-// The first calendar day on or after the schedule's start that this crew is
-// rostered on. Walked rather than computed, because `getPeriodIndex` is the
-// one place that knows how a date maps onto a cycle day and duplicating that
-// arithmetic here is how the two would drift apart.
+// Walked rather than computed: `getPeriodIndex` is the one place that knows
+// how a date maps onto a cycle day, so duplicating that math here would drift.
 function crewStartDate(
   schedule: RotateSchedule,
   workedDays: Set<number>,
@@ -128,7 +109,7 @@ function crewStartDate(
   return start
 }
 
-// Exported for the Fixed work schedule screen, which draws the same grid.
+// Exported for the fixed-work-schedule screen, which draws the same grid.
 export function spanDays(viewDate: Date, span: TimelineSpan): Date[] {
   if (span === 'week') {
     const start = startOfWeek(viewDate, { weekStartsOn: 1 })
@@ -151,9 +132,8 @@ export function toBlocks(
     const sameMonth = first.getMonth() === last.getMonth()
     blocks.push({
       key: format(first, 'yyyy-MM-dd'),
-      // Within a month the "days N-M" phrasing is the one rosters are written
-      // in; a lone week is better named by its dates, which are already the
-      // column headers' context.
+      // "Days N-M" matches how rosters are written within a month; a lone
+      // week is better named by its dates.
       label:
         span === 'month'
           ? `Days ${format(first, 'd')}\u2013${format(last, 'd')}`
@@ -174,10 +154,8 @@ export function buildRotationTimeline(
   employees: Employee[],
   teams: Team[],
   viewDate: Date,
-  // How fast the cycle advances — the screen's Daily/Weekly/Monthly choice.
-  // The grid always draws calendar *days*; this only decides how many of them
-  // share a cycle position, so a weekly rotation renders as seven identical
-  // dots in a row rather than as seven different ones.
+  // The grid always draws calendar days; this decides how many share a cycle
+  // position (a weekly rotation renders as seven identical dots in a row).
   periodType: RotationPeriodType,
   span: TimelineSpan,
   today: Date = new Date()
@@ -190,9 +168,9 @@ export function buildRotationTimeline(
       .map((e) => [e.id as string, getEmployeeFullName(e)])
   )
 
-  // Always the whole week or month. Days before the schedule's start are drawn
-  // too, wrapped back through the cycle — clamping them away left a schedule
-  // starting on the 31st with a one-dot month.
+  // Always the whole week/month, including days before the schedule's start
+  // (wrapped through the cycle) — clamping those shrinks a month to one dot
+  // when the schedule starts on the 31st.
   const days: TimelineDay[] = spanDays(viewDate, span).map((date) => ({
     date,
     cycleDay: cycleLength
@@ -223,10 +201,8 @@ export function buildRotationTimeline(
       cycleLength
     )
     const cells = days.map((day) => {
-      // A hand-made double booking lands two shifts on one day; the first is
-      // drawn, the same way the employee table resolves it, so the two screens
-      // never disagree about what a cell shows. The form warns about it in
-      // place rather than either screen inventing a way to draw both.
+      // First shift wins on a hand-made double booking, matching how the
+      // employee table resolves it.
       const shiftId = crew.byDay.get(day.cycleDay)?.[0]
       return toPosition(
         day.cycleDay,
@@ -268,8 +244,7 @@ export function buildRotationTimeline(
   }
 }
 
-// The schedule's start, as a date. Kept here so the screen and the builder
-// parse it the same way.
+// Kept here so the screen and the builder parse the start date the same way.
 export function parseScheduleStart(startDate: string): Date {
   return startOfDay(parse(startDate, 'yyyy-MM-dd', new Date()))
 }

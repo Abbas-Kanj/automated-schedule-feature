@@ -9,8 +9,6 @@ import { Switch } from '@/components/ui/switch'
 import { type ShiftFormValues } from '../../data/schema'
 import { RepeatFields } from './repeat-fields'
 
-// "Repeat" tab of `ShiftFormDialog` — the "Repeat" toggle plus the shared
-// `RepeatFields` (frequency/interval/weekdays/monthly/end).
 export function RepeatTab() {
   const form = useFormContext<ShiftFormValues>()
   const repeatEnabled = useWatch({

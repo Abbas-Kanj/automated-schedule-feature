@@ -41,9 +41,7 @@ function SummarySection({
   )
 }
 
-// `inline` sits the value right after its label instead of pushing it to
-// the opposite edge — used by the Basics block, whose values are short
-// enough that a full-width gap just makes them harder to pair up.
+// `inline` sits the value right after its label instead of the opposite edge.
 function SummaryRow({
   label,
   value,
@@ -69,9 +67,7 @@ function SummaryRow({
   )
 }
 
-// "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line —
-// the three end-settings shapes never coexist, so they don't need three
-// separate rows.
+// The three end-settings shapes never coexist, so one line covers all of them.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function formatEndSettings(endSettings: any): string | undefined {
   if (!endSettings?.end_type) return undefined
@@ -86,10 +82,6 @@ function formatEndSettings(endSettings: any): string | undefined {
   return 'Never ends'
 }
 
-// Everything identifying the schedule — name/description, both type levels
-// (parent + specific), rotate's own pattern type, and the start/end dates —
-// in a single block, so the reader isn't hopping between cards for what is
-// really one set of facts.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function BasicsSummary({ values }: { values: any }) {
   const isRegular = values.parent_type === 'regular'
@@ -133,8 +125,8 @@ function BasicsSummary({ values }: { values: any }) {
   )
 }
 
-// Legacy `parent_type: 'daily'` schedules only (view/edit of pre-existing
-// data — see `schedule-form.tsx`); the wizard can't create these anymore.
+// Legacy `parent_type: 'daily'` schedules only — view/edit of pre-existing
+// data, the wizard can't create these anymore.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function DailyDaysSummary({ values }: { values: any }) {
   const formatTime = useTimeFormat()
@@ -184,11 +176,8 @@ function DailyDaysSummary({ values }: { values: any }) {
   )
 }
 
-// Each selected shift exactly the way the "Shifts" step already shows it —
-// name + colour/icon, weekly hours, then the same collapsed "Day | Times"
-// table (`ShiftDaysTable`: identical consecutive days collapse into
-// "Mon → Fri", differing ones stay their own rows). Badge colour and icon
-// get no label rows of their own; the swatch and glyph already say it.
+// Mirrors the "Shifts" step's own display — `ShiftDaysTable` collapses
+// identical consecutive days into "Mon → Fri".
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ShiftsSummary({ values }: { values: any }) {
   const shifts = useShiftsStore((s) => s.shifts)
@@ -259,8 +248,8 @@ function ShiftsSummary({ values }: { values: any }) {
   )
 }
 
-// Rotate and fixed — who was picked, then a crew count for the work step,
-// not a second copy of its coverage grid.
+// Rotate and fixed — who was picked, plus a crew count rather than a second
+// copy of the coverage grid.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AssignToSummary({ values }: { values: any }) {
   const teams = useTeamsStore((s) => s.teams)
@@ -285,7 +274,6 @@ function AssignToSummary({ values }: { values: any }) {
   )
 }
 
-// Fixed only — the "Occurrence" step as one line, plus its exceptions.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function OccurrenceSummary({ values }: { values: any }) {
   const occurrence = values.occurrence
@@ -363,9 +351,8 @@ export function ScheduleSummary({ control }: ScheduleSummaryProps) {
           )}
           <SummarySection title='Calendar preview'>
             {values.type === 'rotate' && (
-              // The preview walks the *pattern*, which is one crew's journey
-              // — so it shows one shift a day even when the schedule runs
-              // several. Who covers the rest is the grid above, not this.
+              // Walks the *pattern* — one crew's journey — so it shows one
+              // shift a day even when several run.
               <p className='text-xs text-muted-foreground'>
                 One crew&apos;s cycle on real dates. The other selected shifts
                 run on the same days, covered by the other crews — see “Assign

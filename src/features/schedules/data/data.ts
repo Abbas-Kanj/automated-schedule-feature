@@ -160,12 +160,10 @@ export const CYCLE_TYPE_OPTIONS = [
   description: string
 }[]
 
-// "Monthly" is listed but not selectable — a month-long cycle is still
-// modelled as a flat 30 days (see `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS`) and
-// nothing downstream honours real calendar months yet, so it stays greyed
-// out rather than disappearing. Same reasoning for every other `disabled:
-// true` monthly option below (and in `shifts/data/data.ts`). Existing
-// monthly data still renders — only picking it anew is blocked.
+// "Monthly" stays greyed out, not removed — nothing downstream honours real
+// calendar months yet (see `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS`). Same reasoning
+// for every other `disabled: true` monthly option here and in
+// `shifts/data/data.ts`; existing monthly data still renders.
 export const CYCLE_LENGTH_UNIT_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly', disabled: true },
@@ -179,11 +177,9 @@ export const CYCLE_LENGTH_UNIT_OPTIONS = [
 export const CYCLE_LENGTH_QUICK_PICKS = [6, 8, 10]
 // export const CYCLE_LENGTH_QUICK_PICKS = [7, 14, 6, 28, 35]
 
-// Weekly/monthly cycle lengths are entered as a week/month count in the UI
-// (e.g. "2 week(s)", "1 month") and converted to the stored day count using
-// these flat approximations — a "month" here is always 30 days, not the
-// calendar month's actual length. Custom-days cycles skip this and store
-// the day count directly (the quick-pick UI from before).
+// Converts a UI week/month count to the stored day count. A "month" is
+// always a flat 30 days, not the calendar month's real length. Custom-days
+// cycles skip this and store the day count directly.
 export const CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS: Partial<
   Record<(typeof CYCLE_LENGTH_UNITS)[number], number>
 > = {
@@ -197,9 +193,8 @@ export const RECURRENCE_END_TYPE_OPTIONS = [
   { value: 'on_date', label: 'End on' },
 ] satisfies { value: (typeof RECURRENCE_END_TYPES)[number]; label: string }[]
 
-// Fixed schedules' "Occurrence" step. Unlike the other monthly options above,
-// monthly is selectable here — `occurrencePattern` reads it as a 30-day month,
-// the same flat approximation `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS` uses.
+// Unlike the other monthly options above, monthly is selectable here —
+// `occurrencePattern` reads it via the same flat 30-day approximation.
 export const OCCURRENCE_FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
@@ -220,11 +215,9 @@ export const SHIFT_REPEAT_FREQUENCY_OPTIONS = [
   disabled?: boolean
 }[]
 
-// Weekday chips + monthly sub-mode options for the "Custom alternate" per-
-// shift repeat rows (see `schedule-form/pattern-builder.tsx`'s
-// `ShiftRepeats`) — mirrors shifts' own `DAY_LABELS`/
-// `REPEAT_MONTHLY_MODE_OPTIONS` (see `shifts/data/data.ts`) since both
-// render the identical shared `RecurrenceFrequencyFields`/`RepeatMonthlyFields`.
+// Mirrors shifts' own `DAY_LABELS`/`REPEAT_MONTHLY_MODE_OPTIONS`
+// (`shifts/data/data.ts`) — both render the same shared
+// `RecurrenceFrequencyFields`/`RepeatMonthlyFields`.
 const SHIFT_REPEAT_DAY_LABELS: Record<
   (typeof SHIFT_REPEAT_WEEKDAYS)[number],
   string

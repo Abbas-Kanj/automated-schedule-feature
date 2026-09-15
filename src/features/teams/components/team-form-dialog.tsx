@@ -37,8 +37,6 @@ type TeamFormDialogProps = {
 
 type EmployeeOption = { value: string; label: string }
 
-// Creates or edits a team — a name, an optional description, and a
-// multi-select of members drawn from the employee directory store.
 export function TeamFormDialog({
   currentRow,
   open,
@@ -92,9 +90,8 @@ export function TeamFormDialog({
     >
       <DialogContent
         className='sm:max-w-lg'
-        // The Employees dropdown portals its menu to <body> (so the scrollable
-        // form below doesn't clip it) — keep a click on those options from
-        // registering as an outside-click that closes the dialog.
+        // The Employees dropdown portals its menu to <body> — keep a click
+        // there from registering as an outside-click that closes the dialog.
         onInteractOutside={(event) => {
           const target = event.detail.originalEvent.target as HTMLElement | null
           if (target?.closest('.multi-select-menu-portal')) {

@@ -8,9 +8,7 @@ const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 type MultiSelectProps = ComponentProps<typeof MultiSelect>
 
 type FilterableMultiSelectProps = MultiSelectProps & {
-  // Told which letter is active (null = All) so this can become a server-side
-  // query once there is an API behind the options — the reason the strip
-  // exists at all is a directory too long to scroll.
+  // Reports the active letter (null = All) for a future server-side query.
   onLetterChange?: (letter: string | null) => void
   className?: string
 }
@@ -22,14 +20,9 @@ function firstLetter(option: { label?: unknown }): string {
     .toUpperCase()
 }
 
-// An A–Z strip over a `MultiSelect`, for picking people out of a directory
-// that is too long to scroll: tap a letter, the list narrows to names that
-// start with it.
-//
-// The strip narrows `options` only. react-select takes `value` separately, so
-// a name already chosen stays chosen — and stays visible as a chip — while a
-// letter it does not match is active. That separation is the whole reason
-// this can be a wrapper rather than a fork of `MultiSelect`.
+// An A-Z strip over `MultiSelect` that narrows `options` only — react-select
+// takes `value` separately, so an already-picked chip survives a letter that
+// excludes it.
 export function FilterableMultiSelect({
   options,
   onLetterChange,

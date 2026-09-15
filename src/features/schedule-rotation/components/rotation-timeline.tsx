@@ -14,10 +14,8 @@ type RotationTimelineProps = {
   timeline: RotationTimeline
 }
 
-// One calendar day is one fixed-width column, and the header row is built from
-// the same blocks as the crew rows — that shared width is the only thing
-// keeping a date above the dot it belongs to, so it lives in one constant
-// rather than being restated per row.
+// Shared with the header row's blocks — one constant keeps a date aligned
+// above the dot it belongs to instead of restating the width per row.
 const DAY_COLUMN = { week: 'w-12', month: 'w-6' } as const
 const DOT_SIZE = { week: 'size-5', month: 'size-3' } as const
 
@@ -48,9 +46,8 @@ function ShiftDot({
           'rounded-full',
           DOT_SIZE[span],
           dotClassName(position),
-          // Today gets a ring rather than a different fill: the fill already
-          // means "which shift", and overloading it would make one crew's
-          // Tuesday look like a shift nobody has.
+          // A ring, not a different fill — the fill already means "which
+          // shift".
           day.isToday &&
             'ring-2 ring-foreground/60 ring-offset-2 ring-offset-background'
         )}
@@ -59,8 +56,7 @@ function ShiftDot({
   )
 }
 
-// The key to the dots. Deliberately the first thing on the card: a grid of
-// bare colored circles is unreadable until this has been read once.
+// Shown first: a grid of bare colored circles is unreadable without this.
 function TimelineLegend({ legend }: { legend: RotationPosition[] }) {
   const formatTime = useTimeFormat()
 
@@ -115,9 +111,7 @@ function CrewRow({
           {' · '}
           {row.daysOn === 1 ? '1 day on' : `${row.daysOn} days on`}
         </div>
-        {/* The day this crew joins the rotation. A staggered roster is
-            written as "Team B starts on week 2", so the date that sentence
-            resolves to belongs next to the name. */}
+        {/* The date "Team B starts on week 2" resolves to. */}
         <div className='text-xs text-muted-foreground'>
           Starts {format(row.startDate, 'MMM d, yyyy')}
         </div>
@@ -139,9 +133,8 @@ function CrewRow({
 }
 
 export function RotationTimelineGrid({ timeline }: RotationTimelineProps) {
-  // Where each block starts in the flat `cells` array. Recomputed from the
-  // blocks rather than stored, so a short final block (a cycle that is not a
-  // multiple of seven days) can never put a row out of step with its header.
+  // Recomputed rather than stored, so a short final block (cycle length not a
+  // multiple of seven) can't drift out of step with its header.
   const blockOffsets: number[] = []
   timeline.blocks.reduce((offset, block) => {
     blockOffsets.push(offset)
@@ -154,7 +147,6 @@ export function RotationTimelineGrid({ timeline }: RotationTimelineProps) {
 
       <div className='overflow-x-auto rounded-lg border'>
         <div className='min-w-max'>
-          {/* Column headers — block name over the seven days it covers. */}
           <div className='flex items-end gap-6 px-4 pt-4 pb-2'>
             <div className='w-44 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground uppercase'>
               Crew

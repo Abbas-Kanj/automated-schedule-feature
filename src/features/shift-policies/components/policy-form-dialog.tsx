@@ -39,12 +39,10 @@ type PolicyFormDialogProps = {
   onSaved?: (policy: ShiftPolicy) => void
 }
 
-// Creates or edits a shift policy. Opened both from the policies screen and
-// from the shift form's "Shift policy" tab — which means this dialog can
-// render *inside* another form. Radix portals the content out of that
-// form's DOM subtree, but React still bubbles the inner submit event
-// through the React tree, so `onSubmit` stops propagation explicitly or
-// saving a policy would also submit the shift.
+// Can render inside another form (the shift form's policy tab). Radix
+// portals it out of that form's DOM subtree, but React still bubbles the
+// inner submit event through the React tree, so `onSubmit` stops
+// propagation explicitly or saving a policy would also submit the shift.
 export function PolicyFormDialog({
   currentRow,
   open,
@@ -104,8 +102,7 @@ export function PolicyFormDialog({
           <form
             id='shift-policy-form'
             onSubmit={(event) => {
-              // Keeps a policy save from bubbling into a host form (the
-              // shift form's policy tab opens this dialog).
+              // Keeps a policy save from bubbling into a host form.
               event.stopPropagation()
               void form.handleSubmit(onSubmit)(event)
             }}

@@ -205,9 +205,6 @@ describe('shiftPolicyFormSchema', () => {
   })
 
   it('rejects window fields on a missed-punch rule and vice versa', () => {
-    // The discriminated union means each type only accepts its own shape —
-    // a missed-punch rule missing its occurrence fields can't fall back to
-    // being read as a window rule.
     const result = shiftPolicyFormSchema.safeParse(
       policy([{ ...validRule, policy_type: 'missed_punch_error' }])
     )

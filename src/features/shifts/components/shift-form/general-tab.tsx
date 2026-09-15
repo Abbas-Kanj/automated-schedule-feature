@@ -29,11 +29,6 @@ import { IconPickerField } from './icon-picker-field'
 import { ShiftTypeField } from './shift-type-field'
 import { TimezoneField } from './timezone-field'
 
-// "General" tab of `ShiftFormDialog` — name/look, type/category, status,
-// time zone and active toggle. Hours live on their own "Shift times" tab
-// (see `shift-times-tab.tsx`) and policy on its own "Shift policy" tab
-// (see `shift-policy-tab.tsx`). Split out so the dialog itself only wires
-// up the form and its tabs.
 export function GeneralTab() {
   const form = useFormContext<ShiftFormValues>()
 
@@ -198,9 +193,7 @@ export function GeneralTab() {
         )}
       />
 
-      {/* Not a real form field — just an indicator that the "Overnight"
-          category forces every time range on the "Shift times" tab to
-          cross midnight (see `ShiftTimesTab`'s `isOvernightCategory`). */}
+      {/* Not a real form field — indicator only. */}
       {category === 'overnight' && (
         <div className='flex flex-row items-center justify-between rounded-md border p-3'>
           <Label className='font-normal text-muted-foreground'>

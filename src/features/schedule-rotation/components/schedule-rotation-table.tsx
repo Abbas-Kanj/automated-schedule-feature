@@ -13,22 +13,15 @@ import { ShiftBadge } from './shift-badge'
 
 type ScheduleRotationTableProps = {
   rows: RotationRow[]
-  // What the last column is showing, spelled out by the caller — the table
-  // reads one specific day of the range on screen, so naming that day is the
-  // only honest header. A period word ("this week") would be a lie the moment
-  // a rotation advances daily and a person works three shifts inside it.
+  // Spelled out by the caller: this reads one specific day, so a period word
+  // like "this week" would misdescribe a daily-advancing rotation.
   assignedHeading: string
   cycleLength: number
 }
 
-// How this employee's crew was placed against the pattern — the sentence the
-// rotation was designed in ("Team B starts on week 2"), read back where
-// somebody is looking at the result.
-//
-// Absent for a rotation finished by hand: `startDay` is only filled in while
-// the stored start days still describe the stored matrix (see
-// `buildRotation`), so nothing here can claim a stagger the grid does not
-// have. The crew name still shows, because that stays true either way.
+// `startDay` is only set while the stored start days still describe the
+// stored matrix (see `buildRotation`) — a hand-finished rotation shows just
+// the crew name rather than claiming a stagger the grid no longer has.
 function CrewNote({
   row,
   cycleLength,
@@ -50,8 +43,8 @@ function CrewNote({
   )
 }
 
-// The single-letter cycle chips, rotated so the employee's current position
-// is first and emphasized — e.g. Alice "M A N O", Bob "A N O M".
+// Rotated so the employee's current position is first and emphasized — e.g.
+// Alice "M A N O", Bob "A N O M".
 function SequenceChips({ row }: { row: RotationRow }) {
   return (
     <div className='flex items-center gap-2 font-mono text-sm tracking-wide'>

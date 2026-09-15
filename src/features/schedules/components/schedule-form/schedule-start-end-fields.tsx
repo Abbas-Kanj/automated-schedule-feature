@@ -13,9 +13,7 @@ type ScheduleStartEndFieldsProps = {
   disabled?: boolean
 }
 
-// Shared "Start & End" step body — start date + end frequency block
-// (`end_settings`). Used by fixed/flexible and rotate alike; rotate's own
-// schema carries `end_settings` too so both arms share this exact step.
+// Shared "Start & End" step body: start date + end frequency (`end_settings`).
 export function ScheduleStartEndFields({
   disabled,
 }: ScheduleStartEndFieldsProps) {

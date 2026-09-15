@@ -1,8 +1,7 @@
 import { toMinutes } from '@/lib/time'
 
-// Length of the daily window in minutes. A `to_time` at or before
-// `from_time` reads as crossing midnight, so it wraps to the next day
-// rather than going negative — same rule as `shifts`' `getTimeRangeSpan`.
+// A `to_time` at or before `from_time` reads as crossing midnight, so it
+// wraps to the next day rather than going negative.
 export function getDurationMinutes(fromTime: string, toTime: string): number {
   const from = toMinutes(fromTime)
   const to = toMinutes(toTime)

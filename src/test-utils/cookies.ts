@@ -1,12 +1,6 @@
 import { removeCookie } from '@/lib/cookies'
 
-/**
- * Remove cookies visible on `document.cookie` for test isolation.
- *
- * - No `filter`: remove every cookie.
- * - `string`: remove only names that **start with** that string (prefix).
- * - `RegExp`: remove only names where `filter.test(name)` is true.
- */
+// Removes cookies for test isolation; `filter` is a name prefix or RegExp, omit to clear all.
 export function clearCookies(filter?: string | RegExp): void {
   if (typeof document === 'undefined') return
 

@@ -32,9 +32,8 @@ const PRIORITY_VARIANTS: Record<
   low: 'outline',
 }
 
-// Hosts the time-format hook for the Window column; coexists with this
-// file's non-component `scheduleTemplatesColumns` export, which fast
-// refresh doesn't support — same arrangement as `policies-columns`.
+// Coexists with this file's non-component `scheduleTemplatesColumns` export,
+// which fast refresh doesn't support.
 // eslint-disable-next-line react-refresh/only-export-components
 function WindowCell({ template }: { template: ScheduleTemplate }) {
   const formatTime = useTimeFormat()

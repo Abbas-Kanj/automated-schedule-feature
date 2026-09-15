@@ -31,12 +31,9 @@ type ShiftFormDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
-// Edits an existing shift (`currentRow` set) or creates a new one inline
-// (no `currentRow`) — the shifts feature's own "Create Shift" button no
-// longer uses this (see `pages/create/shift-create-page.tsx`, wired from
-// `features/shifts/index.tsx`), but `schedules`' shift picker still opens
-// this dialog for its own "quick-create a shift while building a
-// schedule" flow, so create support stays here for that consumer.
+// Edits an existing shift (`currentRow` set) or creates a new one inline —
+// create support stays for `schedules`' shift picker, which quick-creates a
+// shift while building a schedule.
 export function ShiftFormDialog({
   currentRow,
   open,
@@ -51,26 +48,19 @@ export function ShiftFormDialog({
     resolver: zodResolver(shiftFormSchema) as Resolver<ShiftFormValues>,
     defaultValues: isEdit ? currentRow : emptyShiftFormValues,
   })
-  // react-hook-form only computes `isDirty` if something reads it during
-  // render — it's gated behind a Proxy subscription for performance, so
-  // reading it only inside an event handler (as `requestClose` below
-  // does) leaves it permanently stuck at its initial `false`. Destructure
-  // it here, at render time, to actually arm the subscription.
+  // react-hook-form's `isDirty` is gated behind a Proxy subscription that
+  // only arms if read during render — reading it only in an event handler
+  // leaves it stuck at `false`.
   const { isDirty } = form.formState
   useDeriveShortCode(form)
 
-  // Resets the form back to its defaults/currentRow and actually closes.
-  // Only ever called once we know it's safe to discard whatever's typed —
-  // either the form wasn't dirty, or the user confirmed the discard.
   const resetAndClose = () => {
     form.reset(isEdit ? currentRow : emptyShiftFormValues)
     onOpenChange(false)
   }
 
-  // Radix's Dialog routes every dismiss path (outside click, Escape, the
-  // built-in close button) through this one `onOpenChange(false)` call —
-  // intercept it and, if there's something to lose, confirm first instead
-  // of discarding silently. See `UnsavedChangesDialog`.
+  // Radix routes every dismiss path through this one `onOpenChange(false)`
+  // call — intercept it to confirm before discarding unsaved changes.
   const requestClose = () => {
     if (isDirty) {
       setConfirmCloseOpen(true)

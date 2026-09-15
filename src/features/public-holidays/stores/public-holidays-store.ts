@@ -22,10 +22,8 @@ const storedSchema = z.object({
 
 type StoredState = z.infer<typeof storedSchema>
 
-// Nothing seeded: no year is open, so the screen starts on its empty state
-// and "Open year" is the only way in — which is the real feature path
-// (`openYear` pre-fills that year's fixed-date holidays) rather than a
-// pre-baked sample set.
+// Nothing seeded: no year is open, so "Open year" (which pre-fills
+// fixed-date holidays) is the only way in, not a pre-baked sample set.
 function defaultState(): StoredState {
   return { holidays: [], open_years: [] }
 }

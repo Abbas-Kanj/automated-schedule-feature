@@ -20,33 +20,19 @@ import {
   type RecurrenceOption,
 } from './recurrence-frequency-fields'
 
-// Monday by default, like the "Case Monthly" wireframe's example ("the 2nd
-// Monday").
 const DEFAULT_DAY_POSITION_RULE = { position: 2, weekday: 'mon' } as const
 
 type RepeatMonthlyFieldsProps = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: Control<any>
-  // Field path prefix — reads/writes `${name}.monthly_mode`,
-  // `${name}.day_of_month`, `${name}.date_specific_1/2` and
-  // `${name}.day_position_rules`. Lets `shifts`' Repeat tab and `schedules`'
-  // rotate "Custom alternate" per-shift repeat rows share this component
-  // despite their different field names — same pattern as
-  // `RecurrenceFrequencyFields`.
+  // Field path prefix, so shifts' Repeat tab and schedules' rotate "Custom
+  // alternate" rows can share this despite different field names.
   name: string
   monthlyModeOptions: RecurrenceOption[]
   weekdayOptions: RecurrenceOption[]
   disabled?: boolean
 }
 
-// Shared "Repeat monthly" sub-mode block — a single day-of-month, two
-// specific day-of-month picks, or an "nth weekday of the month" pattern
-// (e.g. "the 2nd Tuesday"). Extracted from shifts' own `RepeatFields` (see
-// `shift-form/repeat-fields.tsx`) so schedules' rotate "Custom alternate"
-// pattern type (see `schedule-form/pattern-builder.tsx`'s `ShiftRepeats`)
-// can reuse the exact same UI/logic — everything shifts' "Repeat" tab
-// renders once `frequency === 'monthly'` except its end-frequency section,
-// which that consumer renders separately (or not at all).
 export function RepeatMonthlyFields({
   control,
   name,

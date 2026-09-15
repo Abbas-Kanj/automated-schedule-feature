@@ -19,8 +19,7 @@ type AssignToCrewFieldsProps = {
   disabled?: boolean
 }
 
-// "Assign to" step, rotate and fixed: who this schedule's roster is drawn
-// from — teams or employees, and which ones. The next step ("Work rotation" /
+// Who this schedule's roster is drawn from. The next step ("Work rotation" /
 // "Work fixed") places exactly these crews on days and shifts.
 export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,8 +42,8 @@ export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
     }))
   const options = crewKind === 'team' ? teamOptions : employeeOptions
 
-  // Switching kind starts the pick over: team ids and employee ids are
-  // different namespaces, so carrying one into the other would be meaningless.
+  // Team ids and employee ids are different namespaces, so switching kind
+  // starts the pick over.
   const selectKind = (kind: CrewKind) => {
     if (kind === crewKind) return
     setValue('crew_kind', kind, { shouldDirty: true })
@@ -85,8 +84,7 @@ export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
         </div>
 
         {/* Keyed on the kind so the picker remounts rather than holding the
-            other kind's ids for a frame — see the 09-03 Teams ⇄ Employees fix
-            in `schedule-assign-to-fields.tsx`. */}
+            other kind's ids for a frame. */}
         <FormField
           key={crewKind}
           control={control}

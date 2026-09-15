@@ -9,10 +9,8 @@ import {
 import { PolicyPicker } from '@/features/shift-policies/components/policy-picker'
 import { type ShiftFormValues } from '../../data/schema'
 
-// "Shift policy" tab — attaches any number of shared shift-policy records
-// (see `features/shift-policies`) to this shift, and creates new ones
-// inline. The picker itself is shared with the shifts table's "Modify
-// policy" drawer; this tab is just its react-hook-form host.
+// The picker is shared with the shifts table's "Modify policy" drawer;
+// this tab is just its react-hook-form host.
 export function ShiftPolicyTab() {
   const form = useFormContext<ShiftFormValues>()
 

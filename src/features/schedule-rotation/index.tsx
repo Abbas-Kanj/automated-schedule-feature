@@ -56,8 +56,7 @@ function scheduleStartDate(startDate: string): Date {
   return parse(startDate, 'yyyy-MM-dd', new Date())
 }
 
-// Which cycle days each employee works, read off the schedule's own coverage
-// matrix. Teams resolve to their members, since the table lists people.
+// Teams resolve to their members, since the table lists people.
 function buildWorkDays(
   schedule: RotateSchedule | undefined,
   teams: Team[]
@@ -93,12 +92,8 @@ export function ScheduleRotation() {
   const [scheduleId, setScheduleId] = useState<string>(
     () => rotateSchedules[0]?.id ?? ''
   )
-  // How much calendar each of the two views shows. They are separate because
-  // they answer different questions — the grid is "how does this rotation
-  // look", the table is "who is on" — and somebody comparing a month of bands
-  // against this week's roster should not have to give one up for the other.
-  // Both open on the span the schedule's own cycle is written in
-  // (`getDefaultSpan`) and stay clickable afterwards.
+  // Separate state per view (grid vs. table) so comparing a month of bands
+  // against this week's roster doesn't force both onto the same span.
   const [span, setSpan] = useState<TimelineSpan>(() =>
     rotateSchedules[0] ? getDefaultSpan(rotateSchedules[0]) : 'month'
   )
@@ -118,15 +113,12 @@ export function ScheduleRotation() {
     ? getAdvanceType(schedule)
     : 'daily'
 
-  // The navigator steps by whatever is on screen.
   const stepType: RotationPeriodType = span === 'week' ? 'weekly' : 'monthly'
   const rangeStart = getPeriodStart(viewDate, stepType)
   const rangeEnd = getPeriodEnd(viewDate, stepType)
 
-  // Which single day the employee table reads. Today when today is on screen —
-  // that is the question somebody opening this screen is usually asking — and
-  // otherwise the first day of whatever range they navigated to, so the table
-  // always describes a day the timeline above it is actually showing.
+  // Today when today is on screen, otherwise the first day of the visible
+  // range — so the employee table always describes a day the grid shows.
   const anchorDate = isWithinInterval(new Date(), {
     start: rangeStart,
     end: rangeEnd,
@@ -150,17 +142,10 @@ export function ScheduleRotation() {
     ? buildRotation(schedule, shifts, employees, teams, anchorDate, advanceType)
     : null
 
-  // Which cycle days the employees table's own period covers. The table is a
-  // roster, so the useful filter is "who is actually on during this" — a
-  // rotation long enough to have people idle for a whole week is exactly when
-  // reading the full list stops being useful.
   const employeeStepType: RotationPeriodType =
     employeeSpan === 'week' ? 'weekly' : 'monthly'
 
-  // Which cycle days each employee works, read off the schedule's own matrix.
-  // Teams resolve to their members, since the table lists people.
-  // Not memoized: the React Compiler is on, and a manual useMemo here is one
-  // it declines to preserve.
+  // Plain function, not useMemo — the React Compiler rejects manual memoization.
   const workDaysByEmployee = buildWorkDays(schedule, teams)
 
   const employeeRows = (() => {
@@ -183,8 +168,7 @@ export function ScheduleRotation() {
 
     return rotation.rows.filter((row) => {
       const worked = workDaysByEmployee.get(row.employeeId)
-      // Somebody the matrix does not mention is left in rather than hidden —
-      // an unexplained disappearance is worse than an extra row.
+      // Left in rather than hidden if the matrix doesn't mention them.
       if (!worked) return true
       return [...worked].some((day) => covered.has(day))
     })
@@ -254,7 +238,6 @@ export function ScheduleRotation() {
           />
         ) : (
           <div className='flex flex-1 flex-col gap-6'>
-            {/* Date navigator */}
             <div className='flex flex-wrap items-center gap-2'>
               <Button
                 variant='outline'
@@ -303,8 +286,7 @@ export function ScheduleRotation() {
                   <RotationTimelineGrid timeline={timeline} />
                 </section>
 
-                {/* The same roster read the other way round — per person
-                    rather than per crew, for one day of the range above. */}
+                {/* The same roster per person rather than per crew. */}
                 <section className='flex flex-col gap-3'>
                   <div className='flex flex-wrap items-baseline justify-between gap-2'>
                     <h3 className='text-lg font-semibold tracking-tight'>
@@ -352,8 +334,8 @@ export function ScheduleRotation() {
         )}
       </Main>
 
-      {/* Mounted only while open so the picker re-seeds its default (the
-          first unstaffed schedule) on every open, without an effect. */}
+      {/* Mounted only while open so the picker re-seeds its default without
+          an effect. */}
       {assignOpen && (
         <AssignCrewsDialog
           open={assignOpen}

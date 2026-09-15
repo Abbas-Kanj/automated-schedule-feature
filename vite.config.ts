@@ -8,10 +8,8 @@ import { playwright } from '@vitest/browser-playwright'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // GitHub Pages serves project sites from https://<user>.github.io/<repo>/,
-  // so the build needs that repo name as its base path. Netlify (and local
-  // dev/preview) serve from the root, so this only kicks in when the Pages
-  // workflow sets GH_PAGES=true.
+  // GitHub Pages serves project sites from /<repo>/, so only use that base
+  // when the Pages workflow sets GH_PAGES=true; Netlify/local serve from root.
   base: process.env.GH_PAGES === 'true' ? '/automated-schedule-feature/' : '/',
   plugins: [
     tanstackRouter({
@@ -22,21 +20,17 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
-    // react-select pulls its own React instance under vitest's browser mode
-    // otherwise, which makes its hooks throw on mount (see
-    // `schedule-assign-to-fields.test.tsx`).
+    // Without this, react-select pulls its own React instance under vitest's
+    // browser mode and its hooks throw on mount.
     dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // Pre-bundled up front so a cold cache cannot discover them mid-run.
-  // When vitest optimizes a dep partway through a file it reloads the page,
-  // and the reload briefly resolves a second React — the same
-  // "Invalid hook call" the dedupe above exists to prevent, except it only
-  // shows on the *first* run after `node_modules/.vite` is cleared, then
-  // disappears. Anything a component test mounts that is not already reached
-  // from `src/main.tsx` belongs here.
+  // Pre-bundled so a cold `node_modules/.vite` cache can't discover a dep
+  // mid-run — that triggers a page reload that briefly resolves a second
+  // React ("Invalid hook call"). Add anything a component test mounts that
+  // `src/main.tsx` doesn't already reach.
   optimizeDeps: {
     include: [
       '@radix-ui/react-switch',

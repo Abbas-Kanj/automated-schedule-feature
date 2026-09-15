@@ -64,9 +64,7 @@ const shiftStatusSchema = z.enum(SHIFT_STATUSES)
 export const SHIFT_TIME_SLOT_TYPES = ['regular', 'overtime'] as const
 const shiftTimeSlotTypeSchema = z.enum(SHIFT_TIME_SLOT_TYPES)
 
-// "Repeat" tab — mirrors the shape of `schedules`' recurrence
-// fields (see `schedules/data/schema.ts`), kept as its own copy since
-// `shifts` is a standalone feature.
+// Mirrors schedules' recurrence shape, kept as its own copy since shifts is standalone.
 export const REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 const repeatFrequencySchema = z.enum(REPEAT_FREQUENCIES)
 
@@ -77,9 +75,8 @@ export const REPEAT_END_TYPES = [
 ] as const
 const repeatEndTypeSchema = z.enum(REPEAT_END_TYPES)
 
-// Monthly's 3 sub-modes (see the "Case Monthly" wireframe): a single
-// day-of-month, two specific day-of-month picks, or an "nth weekday of the
-// month" pattern (e.g. "the 2nd Tuesday").
+// Monthly's 3 sub-modes: a single day-of-month, two specific day-of-month
+// picks, or an "nth weekday of the month" pattern (e.g. "the 2nd Tuesday").
 export const REPEAT_MONTHLY_MODES = [
   'day_month',
   'date_specific',
@@ -87,8 +84,6 @@ export const REPEAT_MONTHLY_MODES = [
 ] as const
 const repeatMonthlyModeSchema = z.enum(REPEAT_MONTHLY_MODES)
 
-// Break-time list, a standalone field on the "Shift times" tab (see
-// `shift-form/shift-times-tab.tsx`).
 export const BREAK_TYPES = ['paid', 'unpaid'] as const
 const breakTypeSchema = z.enum(BREAK_TYPES)
 
@@ -107,9 +102,8 @@ const timeStringSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required')
 
-// One contiguous time range within a day. Lets the range cross midnight
-// (e.g. 22:00 -> 06:00) instead of failing the "end after start" check
-// below — see the `dayTimesCollide` refine on `dayTimeEntrySchema`.
+// One time range; may cross midnight (22:00 -> 06:00) instead of failing
+// the "end after start" check below.
 const timeRangeEntrySchema = z.object({
   from_time: timeStringSchema,
   to_time: timeStringSchema,
@@ -117,13 +111,10 @@ const timeRangeEntrySchema = z.object({
 })
 
 // Unwraps a range onto a continuous timeline (adding a day once it crosses
-// midnight) so two ranges on the same day can be compared for overlap with
-// plain start/end math. Mirrors `schedules`' `getShiftTimeEntryRange`. Only
-// the clock actually wrapping matters here, not the `overnight` flag on its
-// own — a range whose `overnight` is set but that already ends after it
-// starts (09:00 -> 17:00) doesn't span an extra day (see `ShiftTimesTab`'s
-// "Overnight" category handling, which forces that flag on regardless of
-// the times actually chosen).
+// midnight) so two ranges can be compared with plain start/end math. Only
+// the clock actually wrapping matters, not the `overnight` flag itself — a
+// range flagged overnight that already ends after it starts doesn't span
+// an extra day.
 function getTimeRangeSpan(entry: { from_time: string; to_time: string }) {
   const start = toMinutes(entry.from_time)
   let end = toMinutes(entry.to_time)
@@ -131,8 +122,6 @@ function getTimeRangeSpan(entry: { from_time: string; to_time: string }) {
   return { start, end }
 }
 
-// True if any two ranges in the list overlap. Mirrors `schedules`'
-// `shiftTimesCollide`.
 export function dayTimesCollide(
   times: { from_time: string; to_time: string; overnight?: boolean }[]
 ): boolean {
@@ -142,24 +131,20 @@ export function dayTimesCollide(
   )
 }
 
-// One row of the weekly hours grid (see `shift-form/shift-hours-field.tsx`).
-// `enabled` is whether the shift runs that day at all; `times` holds one or
-// more non-colliding ranges for that day, only meaningful when it is.
+// `times` (one or more non-colliding ranges) only matters when `enabled`.
 const dayTimeEntrySchema = z.object({
   day: dayOfWeekSchema,
   enabled: z.boolean(),
   times: z.array(timeRangeEntrySchema).default([]),
 })
 
-// The single "nth weekday of the month" rule for the Day-Position monthly
-// sub-mode, e.g. { position: 2, weekday: 'tue' } = "the 2nd Tuesday".
+// e.g. { position: 2, weekday: 'tue' } = "the 2nd Tuesday".
 const repeatDayPositionRuleSchema = z.object({
   position: z.number().min(1).max(28),
   weekday: dayOfWeekSchema,
 })
 
-// The "Repeat" tab's config, only meaningful once its "Repeat" toggle
-// (`repeat_enabled`) is on — see `shift-form/repeat-fields.tsx`.
+// Only meaningful once `repeat_enabled` is on.
 const repeatConfigSchema = z.object({
   frequency: repeatFrequencySchema.optional(),
   interval: z.number().min(1).optional(),
@@ -178,15 +163,8 @@ const repeatConfigSchema = z.object({
   end_occurrences: z.number().min(1).optional(),
 })
 
-// One row of the break-time list. `break_type` is per-break — each break
-// created on a shift can be paid or unpaid independently of the others
-// (there's no shift-wide setting). `duration_minutes` is user-entered (not
-// picked from a preset list) and bounded by this entry's own
-// from_time–to_time span (see the `duration_minutes` check below) — only
-// meaningful for paid breaks, an unpaid break just treats its whole
-// from/to span as the break. `name`/`icon` are just a label — no
-// downstream validation of their own. `icon` reuses the shift-level icon
-// enum rather than a parallel one.
+// `break_type` is per-break, not shift-wide. `duration_minutes` is bounded
+// by this entry's own from_time-to_time span, only meaningful for paid breaks.
 const breakEntrySchema = z.object({
   break_type: breakTypeSchema.optional(),
   from_time: timeStringSchema,
@@ -196,8 +174,8 @@ const breakEntrySchema = z.object({
   icon: shiftIconSchema.optional(),
 })
 
-// Shared shape for both the stored `Shift` record and the create/edit form
-// (which fills in `id` separately — see `shifts/utils.ts#generateId`).
+// Shared by the stored `Shift` record and the create/edit form, which fills
+// in `id` separately.
 const shiftFieldsSchema = z
   .object({
     name: z.string().min(1, 'Shift name is required'),
@@ -213,58 +191,30 @@ const shiftFieldsSchema = z
     // time zone id, e.g. "Europe/Berlin".
     timezone: z.string().optional(),
     // 'same' copies one time range to every enabled day; 'different' lets
-    // each day carry its own range. See `shift-form/shift-times-tab.tsx`.
+    // each day carry its own range.
     hours_mode: shiftHoursModeSchema,
     days: z.array(dayTimeEntrySchema).length(7, 'All 7 days are required'),
-    // "Shift times" tab — the day this shift starts applying, as
-    // "yyyy-MM-dd". Optional: a shift definition is reusable without one,
-    // and nothing else validates against it today.
     start_date: z.string().optional(),
-    // "Shift times" tab — how long a full/half day of work counts for, in
-    // hours. Both optional: a shift is still valid without them, and
-    // neither feeds any other validation today.
     full_day_hours: z.number().min(0).max(24).optional(),
     half_day_hours: z.number().min(0).max(24).optional(),
-    // Break-time toggle, a field on the "Shift times" tab — off by
-    // default, `breaks` is only validated once it's on. Paid/unpaid is set
-    // per break entry (see `breakEntrySchema.break_type`), not shift-wide.
     break_enabled: z.boolean().default(false),
     breaks: z.array(breakEntrySchema).default([]),
     description: z.string().max(200).optional(),
     is_active: z.boolean().default(true),
-    // Shift policies attached to this shift, by id — the records the
-    // "Shift policy" tab and the table's policy drawer search, attach and
-    // create (see `features/shift-policies`). Optional by design: a shift
-    // definition is useful without one, so we don't force a pick.
     policy_ids: z.array(z.string()).default([]),
     status: shiftStatusSchema,
     time_slot_type: shiftTimeSlotTypeSchema,
-    // "Repeat" tab's toggle — off by default, `repeat` is only validated
-    // once it's on.
     repeat_enabled: z.boolean().default(false),
     repeat: repeatConfigSchema,
-    // "Assign to" tab's toggle — off by default. Doesn't gate any of its
-    // own validation (the picks below have none of their own either), just
-    // enables/disables the fields it sits above in the UI.
     assign_to_enabled: z.boolean().default(false),
-    // "Assign to" tab — all optional, freeform picks with no downstream
-    // validation of their own. `work_type_group` is a single-select of the
-    // assignment mode (team / employee / group / by branch). The other two
-    // dropdowns are hidden in the UI today (see `assign-to-tab.tsx`) but the
-    // fields are kept so stored records and `utils.ts` don't need reshaping.
+    // Other two dropdowns are hidden in the UI; fields kept so stored
+    // records don't need reshaping.
     work_type_group: z.string().optional(),
     service_resource: z.string().optional(),
     service_territory: z.string().optional(),
-    // Who *may* work this shift — individual employees (by id, against the
-    // `employees` directory) and/or whole teams (by id, against
-    // `features/teams`, whose members resolve to employees).
-    //
-    // Sample data only, and no UI offers them any more (see
-    // `shift-form-tabs.tsx`). They do NOT decide who rotates through a
-    // schedule's shifts: that moved onto the schedule's own `day_coverage`
-    // matrix on 2026-08-29, and `schedule-rotation/scenario.test.ts` pins it
-    // by stripping every shift's picks and asserting the roster is
-    // unchanged.
+    // Sample data only — no UI offers these any more, and they do NOT
+    // decide who rotates through a schedule's shifts (that's the
+    // schedule's own `day_coverage` matrix).
     employee_ids: z.array(z.string()).default([]),
     team_ids: z.array(z.string()).default([]),
   })
@@ -341,10 +291,7 @@ const shiftFieldsSchema = z
           })
           return
         }
-        // Duration defaults on creation (see `DEFAULT_BREAK` in
-        // `shift-times-tab.tsx`) and is edited via an "H:MM" input rather
-        // than typed in from scratch, so it's not required the way the
-        // break type is — only bounded once one is entered.
+        // Not required, only bounded once entered.
         if (
           b.break_type === 'paid' &&
           b.duration_minutes &&
@@ -373,10 +320,7 @@ const shiftFieldsSchema = z
           path: ['repeat', 'interval'],
         })
       }
-      // "Days" (daily) is interval-only — no weekday picker, so nothing to
-      // require here. Weekly allows any number of selected days (see the
-      // shared `@/components/recurrence-frequency-fields`), just at least
-      // one.
+      // Daily has no weekday picker, so nothing to require here.
       if (val.repeat.frequency === 'weekly' && !val.repeat.weekdays?.length) {
         ctx.addIssue({
           code: 'custom',

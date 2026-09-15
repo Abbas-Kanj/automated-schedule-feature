@@ -1,26 +1,10 @@
 import { buildDefaultDays } from '../utils'
 import { type Shift } from './schema'
 
-// The shifts behind the sample rotation scenarios (see
-// `features/schedules/data/schedules.fixtures.ts` — those are test fixtures;
-// the app itself ships with no schedules). These shifts *are* seeded, so a
-// schedule created by hand has something to select:
-//
-//   Morning / Afternoon / Night   8-hour continuous cover — Team A's demo
-//                                 rotation and both factory line rosters.
-//   Early / Late                  Team B's desk alternation.
-//   Day 12h / Night 12h           two 12-hour watches — every security and
-//                                 hospital roster runs on this pair.
-//   Office                        Monday–Friday 09:00–17:00 for the fixed
-//                                 head-office schedule.
-//
-// `employee_ids`/`team_ids` here say who *may* work a shift. They are no
-// longer what builds a rotation: who holds which slot of a cycle is set on
-// the schedule, in its own "Assign to" step (see
-// `features/schedule-rotation/utils.ts#getRotationRoster`, which reads the
-// schedule's pattern and nothing else). The picks below are kept as sample
-// data for that tab — changing them will not move anyone on the Schedule
-// Rotation screen.
+// Seeded so a schedule created by hand has shifts to select. `employee_ids`/
+// `team_ids` say who *may* work a shift but do NOT drive Schedule Rotation
+// rosters — that's set on the schedule's own "Assign to" step; these are
+// sample data only.
 export const defaultShifts: Shift[] = [
   {
     id: 'shift-morning',
@@ -88,8 +72,7 @@ export const defaultShifts: Shift[] = [
     category: 'night',
     timezone_mode: 'local',
     hours_mode: 'same',
-    // Wraps past midnight, so the range is flagged `overnight` rather than
-    // failing the "end after start" check (see `shiftFieldsSchema`).
+    // Wraps past midnight — flagged `overnight`.
     days: buildDefaultDays({
       from_time: '22:00',
       to_time: '06:00',
@@ -204,8 +187,7 @@ export const defaultShifts: Shift[] = [
     category: 'night',
     timezone_mode: 'local',
     hours_mode: 'same',
-    // Wraps past midnight — flagged `overnight` rather than failing the
-    // "end after start" check (see `shiftFieldsSchema`).
+    // Wraps past midnight — flagged `overnight`.
     days: buildDefaultDays({
       from_time: '19:00',
       to_time: '07:00',

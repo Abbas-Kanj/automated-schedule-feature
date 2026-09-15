@@ -48,9 +48,8 @@ import {
   isFixedSchedule,
 } from './utils'
 
-// A fixed schedule repeats the same week (or month) indefinitely, so unlike a
-// rotation there is no cycle to see from its start: open on today, unless the
-// schedule has not started yet.
+// Unlike a rotation there's no cycle to see from the start, so open on today
+// unless the schedule hasn't started yet.
 function initialViewDate(schedule: FixedSchedule | undefined): Date {
   const today = new Date()
   if (!schedule) return today
@@ -86,8 +85,7 @@ export function FixedWorkSchedule() {
   const rangeStart = getPeriodStart(viewDate, stepType)
   const rangeEnd = getPeriodEnd(viewDate, stepType)
 
-  // Today when it is on screen, otherwise the first day shown — the same rule
-  // the rotating screen's table uses.
+  // Today when it is on screen, otherwise the first day shown.
   const tableDate = isWithinInterval(new Date(), {
     start: rangeStart,
     end: rangeEnd,

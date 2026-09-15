@@ -29,9 +29,6 @@ export function formatMinutes(minutes: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
 
-// A blank window rule — 1x factor over an hour, booked as presence. Mirrors
-// the "sensible default rather than empty inputs" approach the shift
-// form's break rows take.
 export function buildDefaultRule(
   id: string,
   policy_type: WindowPolicyType = 'tardy'
@@ -47,9 +44,8 @@ export function buildDefaultRule(
   }
 }
 
-// A blank day-off / public-holiday rule — 8 hours worked, treated as normal
-// work (so no attendance option or rate yet; those appear once the mode
-// switches to overtime or substitute).
+// Treated as normal work, so no attendance option or rate yet — those
+// appear once the mode switches to overtime or substitute.
 export function buildDefaultHolidayWorkRule(
   id: string,
   policy_type: HolidayWorkPolicyType
@@ -65,9 +61,6 @@ export function buildDefaultHolidayWorkRule(
   }
 }
 
-// The other shape: one missed punch over a month of days, deducting an
-// hour. `attendance_type` is fixed at 'deduction' by the schema — the form
-// shows it as a disabled select.
 export function buildDefaultMissedPunchRule(id: string): MissedPunchRule {
   return {
     id,
@@ -84,10 +77,9 @@ export function buildDefaultMissedPunchRule(id: string): MissedPunchRule {
   }
 }
 
-// Swaps a rule to another type, keeping what the shapes share (its id and
-// name) and defaulting the rest. A move between two window types keeps
-// everything; a move between the two holiday-work types also keeps the hours
-// and mode, resetting only the case fields whose options differ.
+// Keeps what the shapes share (id, name) and defaults the rest. A move
+// between two holiday-work types also keeps hours/mode, resetting only the
+// case fields whose options differ.
 export function retypeRule(rule: PolicyRule, next: PolicyType): PolicyRule {
   if (rule.policy_type === next) return rule
 
@@ -127,8 +119,6 @@ export function retypeRule(rule: PolicyRule, next: PolicyType): PolicyRule {
   return { ...buildDefaultRule(rule.id, next), name: rule.name }
 }
 
-// One line describing what a rule does, in whichever shape it takes — the
-// collapsed rule row and the read-only details dialog show the same text.
 // `formatTime` comes from the caller's `useTimeFormat`, so the window
 // follows the user's 12/24-hour display preference.
 export function describeRule(

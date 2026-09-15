@@ -61,7 +61,7 @@ describe('buildRotationTimeline', () => {
     const timeline = build(panama, '2026-09-17', 'daily', 'week')
 
     expect(timeline.days).toHaveLength(7)
-    // 2026-09-17 is a Thursday; the week it belongs to starts Monday the 14th.
+    // 2026-09-17 is a Thursday; that week starts Monday the 14th.
     expect(timeline.days[0].date.getDay()).toBe(1)
     expect(timeline.days[0].date.getDate()).toBe(14)
     expect(timeline.blocks).toHaveLength(1)
@@ -81,16 +81,11 @@ describe('buildRotationTimeline', () => {
     const timeline = build(panama, '2026-09-15', 'daily', 'month')
     const cycleDays = timeline.days.slice(0, 5).map((d) => d.cycleDay)
 
-    // Consecutive calendar days land on consecutive cycle positions.
     cycleDays.slice(1).forEach((day, i) => {
       expect(day).toBe((cycleDays[i] + 1) % timeline.cycleLength)
     })
   })
 
-  // The two readings of a pattern differ by a factor of seven (see
-  // `RotationPeriodType`), and the grid has to show that difference rather
-  // than quietly drawing days either way: a week-per-card rotation is seven
-  // identical dots, not seven different ones.
   it('holds one cycle position for a whole week when the rotation advances weekly', () => {
     const timeline = build(alternation, '2026-09-14', 'weekly', 'week')
 
@@ -112,8 +107,6 @@ describe('buildRotationTimeline', () => {
     expect(timeline.legend[timeline.legend.length - 1].isOff).toBe(true)
   })
 
-  // Rows are crews, not people — a four-person team is one row, which is the
-  // whole reason this view exists next to the employee table.
   it('renders one row per crew rather than one per employee', () => {
     const timeline = build(dupont, '2026-09-15', 'daily', 'month')
     const keys = timeline.rows.map((r) => r.key)
@@ -122,10 +115,8 @@ describe('buildRotationTimeline', () => {
     expect(timeline.rows.some((row) => row.headcount > 1)).toBe(true)
   })
 
-  // The screen no longer asks how fast a rotation advances — it reads it off
-  // the schedule. Every sample roster is a day-card pattern, so every one of
-  // them has to come back `daily`; one that came back `weekly` would render
-  // as a cycle seven times longer than it is.
+  // Every sample roster is a day-card pattern, so every one has to come back
+  // `daily` — `weekly` would render as a cycle seven times too long.
   it('reads the advance rate off the schedule rather than asking', () => {
     const rotates = sampleSchedules.filter(isRotateSchedule)
 
@@ -138,9 +129,6 @@ describe('buildRotationTimeline', () => {
     })
   })
 
-  // Every sample schedule starts 2026-08-31 and the screen opens on that
-  // date. Clamping days before the start once left August as a single dot
-  // per crew.
   it('draws the whole month even when the schedule starts on its last day', () => {
     const timeline = build(panama, '2026-08-31', 'daily', 'month')
 
@@ -151,8 +139,6 @@ describe('buildRotationTimeline', () => {
     })
   })
 
-  // A staggered roster is the whole point of the per-crew start: the second
-  // crew does not exist on the grid until its own first working day.
   const [first, second] = employees.filter((e) => e.id).slice(0, 2)
   const staggered: RotateSchedule = {
     ...panama,

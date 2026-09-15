@@ -9,17 +9,14 @@ import { getShiftTimeRange } from '../utils'
 import { DataTableRowActions } from './data-table-row-actions'
 import { ShiftSwatch } from './shift-swatch'
 
-// `TimeCell` hosts the time-format hook for the Start/End time columns; it
-// coexists with the file's non-component `shiftsColumns` export, which
-// fast refresh doesn't support — acceptable for a column-def module.
+// Coexists with the file's non-component `shiftsColumns` export, which fast
+// refresh doesn't support — acceptable for a column-def module.
 // eslint-disable-next-line react-refresh/only-export-components
 function TimeCell({ value }: { value: string | null }) {
   const formatTime = useTimeFormat()
   return <span className='text-sm'>{value ? formatTime(value) : '—'}</span>
 }
 
-// Resolves the shift's attached policy ids against the policy store — the
-// names live there, not on the shift, so this has to read at render time.
 // Ids with no matching record (a policy deleted after being attached) are
 // skipped rather than rendered as a blank badge.
 // eslint-disable-next-line react-refresh/only-export-components

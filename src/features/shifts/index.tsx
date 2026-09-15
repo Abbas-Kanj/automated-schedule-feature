@@ -12,8 +12,6 @@ import { ShiftsProvider } from './components/shifts-provider'
 import { ShiftsTable } from './components/shifts-table'
 import { useShiftsStore } from './stores/shifts-store'
 
-// Navigates to the "Create shift" page instead of opening a dialog — see
-// `pages/create/shift-create-page.tsx`.
 function ShiftsPrimaryButtons() {
   return (
     <Button className='space-x-1' asChild>

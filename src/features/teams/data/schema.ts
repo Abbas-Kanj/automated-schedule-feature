@@ -1,9 +1,7 @@
 import { z } from 'zod'
 
-// A team is a named group of employees. `employee_ids` references the
-// employee directory (see `features/employees`) by id — the member picker
-// resolves them to names, and a stored id that no longer matches an
-// employee is simply skipped when rendering.
+// A stored `employee_ids` id that no longer matches an employee is skipped
+// when rendering, not treated as an error.
 const teamFieldsSchema = z.object({
   name: z.string().min(1, 'Team name is required').max(60),
   description: z.string().max(200).optional(),

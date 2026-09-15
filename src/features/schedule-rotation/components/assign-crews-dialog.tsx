@@ -54,9 +54,8 @@ function crewStatusLabel(schedule: RotateSchedule): string {
     : `${count} crew${count === 1 ? '' : 's'} assigned`
 }
 
-// Mounted fresh (via `key={schedule.id}` at the call site) every time the
-// picker above switches schedules, so this form's `defaultValues` never has
-// to reset itself mid-life — react-hook-form only reads them once, on mount.
+// Mounted fresh (via `key={schedule.id}`) per schedule so `defaultValues`
+// never needs to reset mid-life — react-hook-form only reads them on mount.
 export function AssignToPanel({
   schedule,
   onSaved,
@@ -65,9 +64,8 @@ export function AssignToPanel({
   onSaved?: () => void
 }) {
   const updateSchedule = useSchedulesStore((s) => s.updateSchedule)
-  // Same commit hook the wizard used to call from "Next" — see
-  // `schedule-assign-to-fields.tsx#commitPendingSuggestion`. Here "Save"
-  // plays that role instead.
+  // Triggers commitPendingSuggestion so a picked-but-unapplied suggestion is
+  // saved (see schedule-assign-to-fields.tsx).
   const commitRef = useRef<(() => void) | null>(null)
   const form = useForm<AssignFormValues>({
     defaultValues: {
@@ -85,17 +83,15 @@ export function AssignToPanel({
     const values = form.getValues()
     updateSchedule(schedule.id, {
       ...schedule,
-      // `pattern` is included defensively — the assign-to fields never
-      // actually mutate it — but `updateSchedule` replaces the whole
-      // record, so everything either section could plausibly have touched
-      // has to come from the form, not the stale `schedule` closure.
+      // updateSchedule replaces the whole record, so every field either
+      // section could touch must come from the form, not the stale closure.
       pattern: values.pattern,
       day_coverage: values.day_coverage,
       crew_placements: values.crew_placements,
       start_date: values.start_date,
       end_settings: values.end_settings,
-      // Keeps the wizard's "Assign to" pick in step with the roster edited
-      // here, so editing the schedule afterwards opens on these crews.
+      // Keeps the wizard's "Assign to" pick in step so re-editing opens on
+      // these crews.
       ...crewSelectionFromDayCoverage(values.day_coverage),
     })
     toast.success(`Crew assignment saved for "${schedule.name}".`)
@@ -121,9 +117,8 @@ export function AssignToPanel({
 type AssignCrewsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  // The schedule the rotation screen is currently showing. Only a fallback:
-  // the picker opens on a schedule nobody has staffed yet when there is one,
-  // since that is the job this dialog exists to get done.
+  // Fallback only — the picker defaults to the first unstaffed schedule when
+  // one exists, since staffing it is the point of this dialog.
   scheduleId?: string
 }
 
@@ -138,9 +133,7 @@ export function AssignCrewsDialog({
     [schedules]
   )
 
-  // Unassigned first, and that ordering decides the default selection too —
-  // the whole point of opening this is usually to staff something that is not
-  // staffed yet.
+  // Unassigned first — that ordering also decides the default selection.
   const { unassigned, assigned } = useMemo(() => {
     const byName = (a: RotateSchedule, b: RotateSchedule) =>
       a.name.localeCompare(b.name)
@@ -161,13 +154,9 @@ export function AssignCrewsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className='sm:max-w-4xl'
-        // These pickers render their menu inline today, so Radix already
-        // counts a click on an option as inside. The guard is here for the
-        // moment one of them is given `menuPortalTarget` — the menu then
-        // moves out of the dialog's DOM and every pick reads as an
-        // outside-click, which is what happened to `team-form-dialog.tsx`
-        // (fixed in 1fed0b6). Verified inline-and-unclipped in Chromium,
-        // including the bottom-most picker of the manual grid.
+        // Guards against a portaled picker menu reading a click on it as
+        // outside the dialog (bit team-form-dialog.tsx). These pickers render
+        // inline today, so this is currently a no-op safety net.
         onInteractOutside={(event) => {
           const target = event.detail.originalEvent.target as HTMLElement | null
           if (target?.closest('.multi-select-menu-portal'))

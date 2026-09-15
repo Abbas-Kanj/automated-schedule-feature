@@ -11,24 +11,19 @@ import { teamSchema } from '@/features/teams/data/schema'
 import { defaultTeams } from '@/features/teams/data/teams'
 import { type RotateSchedule, buildRotation, isRotateSchedule } from './utils'
 
-// Locks the sample rotation scenarios in `schedules/data/schedules.fixtures.ts`.
-// They are fixtures, not seeds — the app ships with no schedules — but they are
-// the worked examples the rotate model is documented and reasoned about with,
-// so they stay pinned. The two small demo rotations are the same
-// shape at different sizes: one cycle position per shift plus a rest slot,
-// one crew per position, advancing one position per week — so every crew
-// covers every shift and exactly one is off at a time.
+// Locks the sample rotation scenarios in `schedules/data/schedules.fixtures.ts`
+// — fixtures, not seeds (the app ships with no schedules), but the worked
+// examples the rotate model is documented against.
 //
 //   Shift Rotation    Team A, 4 crew, Morning / Afternoon / Night / Off
 //   Desk Alternation  Team B, 3 crew, Early / Late / Off
 //
-// The rest of the sample set (Panama, and the security / factory / hospital
-// rosters) is checked more lightly here — that it parses, and that every
-// rotate cycle staffs every selected shift on every day.
+// The rest of the sample set is checked more lightly: that it parses, and that
+// every rotate cycle staffs every selected shift on every day.
 //
-// Shifts, teams and employees *are* still seeded, so checking those against
-// their own zod schemas here is load-bearing: the stores parse them at runtime
-// and would silently fall back to the bundled defaults otherwise.
+// Shifts, teams and employees are still seeded, so checking those against
+// their own zod schemas is load-bearing: the stores parse them at runtime and
+// would silently fall back to the bundled defaults otherwise.
 
 const employees = employeeData as Employee[]
 
@@ -47,8 +42,8 @@ function startOf(schedule: RotateSchedule): Date {
   return parse(schedule.start_date, 'yyyy-MM-dd', new Date())
 }
 
-// Who is on what in the week `offsetWeeks` after the schedule's own start,
-// keyed by first name.
+// Who is on what `offsetWeeks` after the schedule's own start, keyed by first
+// name.
 function gridForWeek(
   schedule: RotateSchedule,
   offsetWeeks: number
@@ -126,10 +121,8 @@ describe('sample data', () => {
   })
 
   it('staffs every selected shift on every day of every sample cycle', () => {
-    // The rule the rework exists to keep: the pattern supplies the rhythm,
-    // `shift_ids` supplies what has to run, and nothing is left uncovered.
-    // Covers the two demo rotations, the Panama roster, and every scenario
-    // in the wider 24/7 sample (security / factory / hospital).
+    // The pattern supplies the rhythm, `shift_ids` supplies what has to run,
+    // and nothing is left uncovered.
     for (const schedule of sampleSchedules.filter(isRotateSchedule)) {
       const staffed = new Set(
         schedule.day_coverage
@@ -147,10 +140,8 @@ describe('sample data', () => {
     expect(startOf(alternation).getDay()).toBe(1)
   })
 
-  // The shifts still carry their own "Assign to" picks — Morning names Amir,
-  // and Early and Late each name the whole of Team B. None of it reaches the
-  // rotation any more, which is the point: a shift naming a team used to drop
-  // every one of its members onto the same cycle position.
+  // The shifts still carry their own "Assign to" picks (Morning names Amir,
+  // Early/Late name Team B), but none of it should reach the rotation.
   it('builds the roster from the schedule, not from the shifts', () => {
     const stripped = defaultShifts.map((shift) => ({
       ...shift,
@@ -265,12 +256,11 @@ describe('Desk Alternation — Team B, two shifts and a rest slot', () => {
   })
 })
 
-// The third sample scenario is a different shape from the two above and is
-// read on the **Daily** tab: a pure rest mask where one card is one day, with
-// crews pinned to a shift rather than rotating through the pattern's own.
+// Read on the Daily tab: a pure rest mask, one card per day, crews pinned to
+// a shift rather than rotating through the pattern.
 const panama = rotateSchedule('Plant Coverage (2-2-3)')
 
-// Who is on what on the day `offsetDays` after the schedule's own start.
+// Who is on what `offsetDays` after the schedule's own start.
 function gridForDay(
   schedule: RotateSchedule,
   offsetDays: number
@@ -309,9 +299,6 @@ describe('Plant Coverage (2-2-3) — daily, four crews, pinned shifts', () => {
   })
 
   it('covers mornings and nights on every single day', () => {
-    // The point of the pinned starting positions: the crews pair up
-    // differently from day to day, so both shifts are only ever covered
-    // because the pins alternate around the cycle those pairings form.
     for (let day = 0; day < 14; day++) {
       const working = Object.values(gridForDay(panama, day)).filter(
         (label) => label !== 'Off'
@@ -342,7 +329,6 @@ describe('Plant Coverage (2-2-3) — daily, four crews, pinned shifts', () => {
         workedDays[name] = (workedDays[name] ?? 0) + (label === 'Off' ? 0 : 1)
       })
     }
-    // Seven working cards in the mask, and every crew traverses all of them.
     expect(Object.values(workedDays)).toEqual([7, 7, 7, 7])
   })
 

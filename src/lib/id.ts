@@ -1,6 +1,4 @@
-// Client-side id for locally-created records (schedules, shifts, shift
-// policies and their rules). There's no backend today — when one arrives,
-// this is the single place that changes.
+// No backend today — this is the single place to change when one arrives.
 export function generateId() {
   return crypto.randomUUID()
 }

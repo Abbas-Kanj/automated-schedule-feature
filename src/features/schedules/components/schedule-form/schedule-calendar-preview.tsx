@@ -14,8 +14,7 @@ import {
   getScheduleCalendarCycle,
 } from '../../utils'
 
-// Monday-first, matching the calendar grid's own weekday columns (see
-// `getScheduleCalendarCycle`'s `weekdayIndex`).
+// Monday-first, matching `getScheduleCalendarCycle`'s `weekdayIndex`.
 const WEEKDAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 type ScheduleCalendarPreviewProps = {
@@ -23,13 +22,9 @@ type ScheduleCalendarPreviewProps = {
   values: any
 }
 
-// Maps a fixed/flexible/rotate schedule onto real calendar dates, one
-// cycle (rotate's own pattern length, or a plain week for fixed/flexible —
-// see `getScheduleCycleLength`) at a time, with "next/previous cycle"
-// paging instead of trying to render the whole — possibly unbounded —
-// schedule at once. Sits in the Summary step in place of a flat
-// position/weekday list so "what actually happens on, say, the Monday
-// three weeks from now" is a straight read instead of mental math.
+// Maps a schedule onto real calendar dates, one cycle at a time, with
+// "next/previous cycle" paging instead of rendering the whole — possibly
+// unbounded — schedule at once.
 export function ScheduleCalendarPreview({
   values,
 }: ScheduleCalendarPreviewProps) {
@@ -63,8 +58,7 @@ export function ScheduleCalendarPreview({
       ? format(firstDay.date, 'MMM d, yyyy')
       : `${format(firstDay.date, 'MMM d, yyyy')} – ${format(lastDay.date, 'MMM d, yyyy')}`
 
-  // Pad the grid out to full weeks so every day lands under its real
-  // weekday column, same as a real calendar month view.
+  // Pad to full weeks so every day lands under its real weekday column.
   const leadingBlanks = firstDay.weekdayIndex
   const trailingBlanks = (7 - ((leadingBlanks + cycle.days.length) % 7)) % 7
 

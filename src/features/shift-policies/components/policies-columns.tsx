@@ -16,10 +16,8 @@ import {
 } from '../data/schema'
 import { DataTableRowActions } from './data-table-row-actions'
 
-// Earliest start / latest end across a policy's rules — a summary of when
-// the policy applies, not a promise every rule shares that window. Only
-// window rules have a from/to span; missed-punch (occurrence count) and
-// holiday-work (flat hours) rules sit this one out.
+// A summary of when the policy applies, not a promise every rule shares it —
+// missed-punch and holiday-work rules have no from/to span, so they sit out.
 function getRuleWindow(rules: PolicyRule[]) {
   const windows = rules.filter(isWindowRule)
   if (!windows.length) return null
@@ -35,9 +33,8 @@ function getRuleWindow(rules: PolicyRule[]) {
   }
 }
 
-// Hosts the time-format hook for the Window column; coexists with this
-// file's non-component `policiesColumns` export, which fast refresh doesn't
-// support — acceptable for a column-def module (same as `shifts-columns`).
+// Coexists with this file's non-component `policiesColumns` export, which
+// fast refresh doesn't support — acceptable for a column-def module.
 // eslint-disable-next-line react-refresh/only-export-components
 function WindowCell({ rules }: { rules: PolicyRule[] }) {
   const formatTime = useTimeFormat()
@@ -69,8 +66,7 @@ export const policiesColumns: ColumnDef<ShiftPolicy>[] = [
     ),
   },
   {
-    // The policy has no type of its own any more — it's whatever its rules
-    // cover, which can be several things at once.
+    // The policy has no type of its own — it's whatever its rules cover.
     id: 'policy_types',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='Type' />
@@ -117,9 +113,8 @@ export const policiesColumns: ColumnDef<ShiftPolicy>[] = [
     ),
     enableSorting: false,
     cell: ({ row }) => {
-      // Holiday-work rules book a different attendance vocabulary (and none
-      // at all for the day-off overtime case), so resolve each rule's label
-      // by its shape. Blanks ('—') drop out.
+      // Holiday-work rules book a different attendance vocabulary; resolve
+      // each rule's label by its shape. Blanks ('—') drop out.
       const labels = [
         ...new Set(
           row.original.rules.map((r) =>

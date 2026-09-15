@@ -6,13 +6,9 @@ type UnsavedChangesDialogProps = {
   onConfirm: () => void
 }
 
-// Reusable "discard unsaved changes?" confirmation for any form dialog.
-// Pair it with a dirty check in the owning dialog's own `onOpenChange`:
-// intercept the `state === false` case (fired by an outside click,
-// Escape, or the built-in close button — Radix's Dialog routes all three
-// through the same callback) and, if the form is dirty, open this instead
-// of closing directly; only call the real close once the user confirms.
-// See `ShiftFormDialog` for the reference wiring.
+// Pair with a dirty check in the owning dialog's `onOpenChange`: Radix routes
+// outside-click, Escape and the close button all through `state === false`,
+// so intercept that case and open this instead of closing when dirty.
 export function UnsavedChangesDialog({
   open,
   onOpenChange,

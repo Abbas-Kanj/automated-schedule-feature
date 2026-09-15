@@ -11,9 +11,8 @@ export const EmployeeSchema = z.object({
     label: z.string(),
   }),
   address: z.string().trim().min(1).max(250),
-  // Optional — not collected by the create/edit form (only Personal
-  // information is), but still present on the seeded records and shown in the
-  // employees list.
+  // Not collected by the create/edit form, but present on seeded records
+  // and shown in the employees list.
   punch_code: z.string().trim().min(1).max(30).optional(),
   schedule: z.string().trim().min(1).optional(),
   email: z.email(),

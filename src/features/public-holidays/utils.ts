@@ -1,9 +1,7 @@
 import { type PublicHoliday } from './data/schema'
 
-// Holiday ids are the human-readable code shown in the table (HOL-2026-07),
-// not a uuid — so a new one continues that year's sequence instead of coming
-// from `lib/id.ts`. Scanning the year's existing ids keeps it collision-free
-// after deletes.
+// Ids are a human-readable code (HOL-2026-07), not a uuid — scanning the
+// year's existing ids keeps a new one collision-free after deletes.
 export function nextHolidayId(holidays: PublicHoliday[], year: number): string {
   const prefix = `HOL-${year}-`
   const highest = holidays

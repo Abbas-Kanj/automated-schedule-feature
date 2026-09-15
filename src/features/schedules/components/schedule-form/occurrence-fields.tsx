@@ -24,10 +24,8 @@ const EXCEPTIONS = [
   { name: 'occurrence.exceptions.sick_leave', label: 'Sick leave' },
 ] as const
 
-// "Occurrence" step, fixed only — how often the schedule's working days come
-// round, the fixed counterpart of rotate's Pattern step. The next step,
-// "Assign to", staffs the days this describes. End settings live in
-// "Start & End", so they are not repeated here.
+// Fixed only — the counterpart of rotate's Pattern step. End settings live in
+// "Start & End", so they aren't repeated here.
 export function OccurrenceFields({ disabled }: OccurrenceFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control } = useFormContext<any>()

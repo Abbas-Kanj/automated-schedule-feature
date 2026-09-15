@@ -85,9 +85,8 @@ const night = makeShift({
   team_ids: ['team-night'],
 })
 
-// These three keep their own "Assign to" picks (Alice on Morning, Bob on
-// Afternoon, the Night Crew team on Night) purely so the tests below can
-// show the roster no longer reads them.
+// These three keep their own "Assign to" picks so the tests below can show
+// the roster doesn't read them.
 const shifts = [morning, afternoon, night]
 const employees = [
   makeEmployee('e-alice', 'Alice'),
@@ -110,7 +109,6 @@ const schedule: RotateSchedule = {
   temporary_schedule: false,
   cycle_type: 'pattern_shifts',
   cycle_length: { unit: 'custom_days', days: 4 },
-  // The pattern is only the template — one crew's journey through the cycle.
   pattern: [
     { position: 1, shift_id: 'shift-morning', is_off: false },
     { position: 2, shift_id: 'shift-afternoon', is_off: false },
@@ -118,10 +116,8 @@ const schedule: RotateSchedule = {
     { position: 4, is_off: true },
   ],
   shift_repeat: [],
-  // The whole roster, stated on the schedule rather than inferred from the
-  // shifts: four crews staggered one card apart, so every shift is covered
-  // every day and exactly one crew is resting. Charlie arrives through a
-  // team rather than by name.
+  // Four crews staggered one card apart, so every shift is covered every day
+  // and exactly one crew rests. Charlie arrives through a team, not by name.
   crew_placements: [],
   day_coverage: [
     {
@@ -213,8 +209,6 @@ describe('getRotationPositions', () => {
 describe('getRotationRoster', () => {
   it('derives every employee from day_coverage, teams resolved to members', () => {
     const roster = getRotationRoster(schedule, employees, teams)
-    // `offset` is now just the first cycle day each one works — a sort key,
-    // not a stagger into a shared pattern.
     expect(roster.map((r) => [r.employeeId, r.offset])).toEqual([
       ['e-alice', 0],
       ['e-bob', 0],
@@ -234,8 +228,6 @@ describe('getRotationRoster', () => {
   })
 
   it("ignores crew assigned to a shift's own Assign-to tab", () => {
-    // Same shifts, all still naming Alice/Bob/the Night Crew in their own
-    // "Assign to" tab — but an empty matrix, so nobody rotates.
     expect(
       getRotationRoster({ ...schedule, day_coverage: [] }, employees, teams)
     ).toEqual([])
@@ -336,9 +328,8 @@ describe('buildRotation', () => {
   })
 })
 
-// The daily step is what makes a day-based pattern (2-2-3, 4-on-4-off, DuPont)
-// mean what it says. Read through the weekly step the same cards would
-// describe a cycle seven times longer.
+// Makes a day-based pattern (2-2-3, 4-on-4-off, DuPont) mean what it says —
+// read weekly the same cards would describe a cycle seven times longer.
 describe('daily period type', () => {
   it('advances exactly one position per calendar day', () => {
     const start = new Date(2026, 7, 17)
@@ -356,15 +347,12 @@ describe('daily period type', () => {
         .label
     })
 
-    // Alice starts on Morning and walks the four-card cycle a day at a time,
-    // wrapping on the fifth day.
     expect(labels).toEqual(['Morning', 'Afternoon', 'Night', 'Off', 'Morning'])
   })
 
   it('composes into the plain modulo the pattern describes', () => {
-    // `(daysSinceStart + offset) mod cycleLength` — the same arithmetic the
-    // period helpers arrive at, spelled out here so a change to either side
-    // has to break this deliberately.
+    // `(daysSinceStart + offset) mod cycleLength`, spelled out so a change to
+    // either side breaks this deliberately.
     const cycleLength = 4
     for (const days of [-9, -1, 0, 1, 13]) {
       for (const offset of [0, 1, 2, 3]) {
@@ -391,10 +379,8 @@ describe('daily period type', () => {
   })
 })
 
-// The three period granularities the screen offers. Each has to agree with
-// itself: a period's start, its end, and the step to the next one all have to
-// describe the same unit, or paging lands somewhere the rotation math does not
-// expect.
+// A period's start, end, and step to the next one all have to describe the
+// same unit, or paging lands somewhere the rotation math doesn't expect.
 describe('period boundaries', () => {
   // A Wednesday, deliberately mid-week and mid-month.
   const viewDate = new Date(2026, 0, 14, 15, 30)
@@ -426,9 +412,6 @@ describe('period boundaries', () => {
     expect(shiftPeriod(viewDate, 'monthly', -1).getMonth()).toBe(11)
   })
 
-  // Stepping one period forward must advance the index by exactly one,
-  // whichever granularity is showing — that is what makes one step of the
-  // pager equal one card of the pattern.
   it('advances the period index by exactly one per step', () => {
     const schedule = {
       start_date: '2026-01-05',
@@ -445,8 +428,6 @@ describe('period boundaries', () => {
     })
   })
 
-  // Viewing before the schedule begins is allowed; the rotation wraps either
-  // way, so the index simply goes negative rather than clamping.
   it('goes negative before the schedule starts', () => {
     const schedule = { start_date: '2026-01-05' } as RotateSchedule
     expect(getPeriodIndex(schedule, new Date(2026, 0, 1), 'daily')).toBe(-4)

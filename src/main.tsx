@@ -13,9 +13,7 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
-// Generated Routes
 import { routeTree } from './routeTree.gen'
-// Styles
 import './styles/index.css'
 
 const queryClient = new QueryClient({
@@ -34,7 +32,7 @@ const queryClient = new QueryClient({
         )
       },
       refetchOnWindowFocus: import.meta.env.PROD,
-      staleTime: 10 * 1000, // 10s
+      staleTime: 10 * 1000,
     },
     mutations: {
       onError: (error) => {
@@ -59,7 +57,7 @@ const queryClient = new QueryClient({
         }
         if (error.response?.status === 500) {
           toast.error('Internal Server Error!')
-          // Only navigate to error page in production to avoid disrupting HMR in development
+          // Avoid disrupting HMR in dev.
           if (import.meta.env.PROD) {
             router.navigate({ to: '/500' })
           }
@@ -72,7 +70,6 @@ const queryClient = new QueryClient({
   }),
 })
 
-// Create a new router instance
 export const router = createRouter({
   routeTree,
   context: { queryClient },
@@ -81,14 +78,12 @@ export const router = createRouter({
   basepath: import.meta.env.BASE_URL,
 })
 
-// Register the router instance for type safety
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router
   }
 }
 
-// Render the app
 const rootElement = document.getElementById('root')!
 if (!rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)

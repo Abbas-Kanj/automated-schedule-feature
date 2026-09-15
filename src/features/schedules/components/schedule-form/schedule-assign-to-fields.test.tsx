@@ -6,17 +6,10 @@ import { sampleSchedules } from '../../data/schedules.fixtures'
 import { type RotateDayCoverage } from '../../data/schema'
 import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 
-// The "Assign to" step is the only place a rotation's roster can be set (see
-// the component's own comment and
-// `features/schedule-rotation/utils.ts#getRotationRoster`). Two paths through
-// it are worth locking: the suggestion writing a whole coverage matrix, and
-// the manual grid behind its toggle — which now offers one row per selected
-// shift on every cycle day, so a hole is a visibly empty picker.
-
 const rotation = sampleSchedules.find((s) => s.id === 'sched-rotation')!
 
-// The stored matrix is echoed into the DOM so a pick can be asserted on as
-// form state rather than as a rendered chip.
+// Echoes the stored matrix into the DOM so a pick can be asserted as form
+// state rather than a rendered chip.
 function CoverageState() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const coverage = useWatch<any>({ name: 'day_coverage' }) as
@@ -66,8 +59,6 @@ function Harness() {
 
 type Screen = Awaited<ReturnType<typeof render>>
 
-// The step shows one view at a time — "Suggest" by default, since that is the
-// intended path. Switching to "Assign manually" swaps in the day grid.
 async function enableManual(screen: Screen) {
   await userEvent.click(screen.getByRole('button', { name: 'Assign manually' }))
 }
@@ -99,8 +90,8 @@ describe('ScheduleAssignToFields', () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
-    // Three selected shifts, so three pickers per card — including on the
-    // pattern's rest card, which the schedule still has to staff.
+    // Three selected shifts, so three pickers per card — even the rest card,
+    // which still has to be staffed.
     for (const day of [0, 3]) {
       const card = screen.getByTestId(`assign-day-${day}`)
       expect(await card.getByRole('combobox').all()).toHaveLength(3)
@@ -114,9 +105,8 @@ describe('ScheduleAssignToFields', () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
-    // Rendered from `day_coverage` through the employees store, so this covers
-    // the id -> full name resolution as well as the binding. Scoped to the
-    // card: a crew name also appears in the pool picker and the coverage grid.
+    // Scoped to the card: a crew name also appears in the pool picker and
+    // the coverage grid.
     await expect
       .element(
         screen.getByTestId('assign-day-0').getByText('Amir Nabil Haddad')
@@ -134,7 +124,7 @@ describe('ScheduleAssignToFields', () => {
     await enableManual(screen)
 
     // The seed staffs cells with `employee_ids`, so the cards offer employees
-    // only — the old two-picker (Employees *and* Teams) row is gone.
+    // only.
     const card = screen.getByTestId('assign-day-0')
     await expect.element(card.getByText('Team A')).not.toBeInTheDocument()
     await expect.element(card.getByText('Amir Nabil Haddad')).toBeVisible()
@@ -144,8 +134,8 @@ describe('ScheduleAssignToFields', () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
-    // Day 4's Morning cell — seeded with Bilal. Adding Dana to it must not
-    // disturb any other cell: no journey follows a crew around any more.
+    // Day 4's Morning cell — seeded with Bilal. Adding Dana must not disturb
+    // any other cell.
     const cell = screen
       .getByTestId('assign-day-3')
       .getByRole('combobox')

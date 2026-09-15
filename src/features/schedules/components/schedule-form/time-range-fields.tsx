@@ -17,8 +17,8 @@ type TimeRangeFieldsProps = {
   control: Control<any>
   name: string
   disabled?: boolean
-  // When set, the range count is externally controlled (e.g. by a split
-  // number elsewhere in the form) so add/remove controls are hidden.
+  // When set, the range count is externally controlled, so add/remove
+  // controls are hidden.
   fixedCount?: boolean
 }
 

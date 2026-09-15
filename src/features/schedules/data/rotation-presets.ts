@@ -1,20 +1,8 @@
-// Ready-made rotation patterns covering the shift systems that actually get
-// used in the field, so a 14- or 28-day roster is a dropdown pick rather than
-// twenty-eight hand-set cards.
-//
-// A preset is just a card list: each entry is an index into the schedule's own
-// `shift_ids` (the shifts picked back on the "Shifts" step), or `null` for a
-// rest card. That single shape covers both families:
-//
-//   - single-shift masks (5-2, 4-4, plain 2-2-3) — every work card is index 0,
-//     and the rotation is purely about *which days* each crew rests;
-//   - multi-shift systems (DuPont, Southern Swing, Metropolitan) — work cards
-//     name different shifts, so crews rotate through days/swings/nights as
-//     they advance around the cycle.
-//
-// Nothing here knows about crews or offsets. Who starts where is decided
-// afterwards on the "Assign to" step (see `rotation-suggestion.ts`), which is
-// what staggers the crews so they are not all resting on the same day.
+// Each entry is an index into the schedule's own `shift_ids`, or `null` for a
+// rest card — covers both single-shift masks (every work card is index 0) and
+// multi-shift systems (cards name different shifts). Nothing here knows about
+// crews or offsets; that's decided on the "Assign to" step, see
+// `rotation-suggestion.ts`.
 
 const on = (count: number, shift = 0): (number | null)[] =>
   Array.from({ length: count }, () => shift)
@@ -35,14 +23,11 @@ export type RotationPreset = {
   label: string
   group: RotationPresetGroup
   description: string
-  // How many distinct shifts the pattern actually names. A preset is offered
-  // only once the schedule has at least this many shifts selected.
+  // Preset is offered only once this many shifts are selected.
   minShifts: number
-  // The crew count this system is designed around — shown as a hint on the
-  // "Assign to" step, never enforced.
+  // Hint shown on the "Assign to" step, never enforced.
   suggestedCrews: number
-  // Built from the shift count so the one dynamic preset (one card per shift
-  // plus a rest slot) can size itself; every other preset ignores the argument.
+  // Only `per_shift_plus_rest` uses shiftCount to size itself; others ignore it.
   buildCards: (shiftCount: number) => (number | null)[]
 }
 
@@ -187,14 +172,13 @@ export const ROTATION_PRESETS: RotationPreset[] = [
     minShifts: 2,
     suggestedCrews: 4,
     buildCards: () => [
-      // First half — every working card on the first selected shift.
+      // First half on shift 1, second half the same mask flipped to shift 2.
       ...on(2, 0),
       ...off(2),
       ...on(3, 0),
       ...off(2),
       ...on(2, 0),
       ...off(3),
-      // Second half — the identical rest mask, flipped to the second shift.
       ...on(2, 1),
       ...off(2),
       ...on(3, 1),
@@ -241,9 +225,8 @@ export const ROTATION_PRESETS: RotationPreset[] = [
     minShifts: 3,
     suggestedCrews: 7,
     buildCards: () => [
-      // Two weeks per shift, the second phased to the back half of the week,
-      // so the two rest days walk across the weekend rather than sitting on
-      // the same pair of days for a fortnight.
+      // Second week per shift phased to the back half, so rest days walk
+      // across the weekend instead of repeating.
       ...on(5, 0),
       ...off(2),
       ...off(2),

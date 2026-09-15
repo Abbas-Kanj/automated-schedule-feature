@@ -2,17 +2,13 @@ import { SHIFT_BADGE_COLOR_OPTIONS } from '@/features/shifts/data/data'
 import { type ShiftBadgeColor } from '@/features/shifts/data/schema'
 import { type TimelineSpan } from './timeline'
 
-// How much calendar the screen shows at once — the only thing it asks the
-// user to choose. Both views on the page read this one range.
 export const SPAN_OPTIONS: { value: TimelineSpan; label: string }[] = [
   { value: 'week', label: 'Weekly' },
   { value: 'month', label: 'Monthly' },
 ]
 
-// Soft, theme-aware pill classes for each shift badge color — the "Assigned
-// shift" badges and the current-position chip. Tailwind's JIT scanner needs
-// the full class strings spelled out (no `bg-${color}-100` templating), same
-// constraint the swatch maps in the shifts/schedules `data.ts` files call out.
+// Full class strings spelled out, not templated (`bg-${color}-100`) — Tailwind's
+// JIT scanner can't see through string interpolation.
 export const SHIFT_SOFT_BADGE_CLASSES: Record<ShiftBadgeColor, string> = {
   red: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
   orange:
@@ -38,12 +34,10 @@ export const SHIFT_SOFT_BADGE_CLASSES: Record<ShiftBadgeColor, string> = {
   rose: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
 }
 
-// The muted look for an "Off" period — no shift color to draw from.
 export const OFF_BADGE_CLASS = 'bg-muted text-muted-foreground dark:bg-muted/50'
 
-// Solid fills for the timeline's per-day dots. Derived from the shift form's
-// own color swatches rather than spelled out a third time — the whole point of
-// the dot is that it is the same color the shift wears everywhere else.
+// Derived from the shift form's own swatches, not redefined, so a dot is
+// always the same color the shift wears everywhere else.
 export const SHIFT_DOT_CLASSES = Object.fromEntries(
   SHIFT_BADGE_COLOR_OPTIONS.map((option) => [
     option.value,
@@ -51,7 +45,6 @@ export const SHIFT_DOT_CLASSES = Object.fromEntries(
   ])
 ) as Record<ShiftBadgeColor, string>
 
-// An off day is drawn as an empty ring, not a grey disc: the row should read
-// as "colored where somebody is working", so rest has to recede rather than
-// compete with the shifts for attention.
+// An empty ring, not a grey disc — rest should recede rather than compete
+// visually with the shift colors.
 export const OFF_DOT_CLASS = 'border-2 border-muted-foreground/35'

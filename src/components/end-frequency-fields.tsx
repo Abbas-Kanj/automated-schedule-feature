@@ -18,23 +18,14 @@ export type EndFrequencyDateFieldProps = {
 type EndFrequencyFieldsProps = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: Control<any>
-  // Field path prefix — reads/writes `${name}.end_type`, `${name}.end_occurrences`
-  // and `${name}.end_date`. Lets `shifts` (`repeat`) and `schedules`
-  // (`end_settings`) share this component despite their different field
-  // names — same pattern as `RecurrenceFrequencyFields`.
+  // Field path prefix, so `shifts` and `schedules` can share this despite different field names.
   name: string
   disabled?: boolean
-  // Each feature owns its own `DateField` (identical implementations kept
-  // separate per-feature — `shifts` is a standalone feature, see
-  // CLAUDE.md) — passed in rather than importing one across the feature
-  // boundary.
+  // Passed in rather than imported, since shifts and schedules are separate
+  // features each keeping their own DateField implementation.
   DateField: React.ComponentType<EndFrequencyDateFieldProps>
 }
 
-// Shared "End frequency" block — never ends / ends after N occurrences /
-// ends on a specific date. Used by shifts' `RepeatFields` and schedules'
-// end-settings/start-end steps alike so both features render the exact
-// same component instead of two hand-kept copies.
 export function EndFrequencyFields({
   control,
   name,
@@ -74,10 +65,8 @@ export function EndFrequencyFields({
               <FormLabel className='cursor-pointer font-normal'>
                 End after
               </FormLabel>
-              {/* Always rendered (just disabled until "End after" is the
-                  selected option) rather than mounted/unmounted with it —
-                  so the field, and its default value, are visible instead
-                  of appearing out of nowhere the moment it's selected. */}
+              {/* Always rendered but disabled, so the field and its default
+                  value aren't hidden until this option is selected. */}
               <FormField
                 control={control}
                 name={`${name}.end_occurrences`}
@@ -113,8 +102,7 @@ export function EndFrequencyFields({
               <FormLabel className='cursor-pointer font-normal'>
                 End on
               </FormLabel>
-              {/* Same always-rendered/disabled treatment as "End after"
-                  above. */}
+              {/* Same always-rendered/disabled treatment as "End after". */}
               <FormField
                 control={control}
                 name={`${name}.end_date`}

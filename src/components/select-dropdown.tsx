@@ -14,11 +14,7 @@ type SelectDropdownProps = {
   defaultValue: string | undefined
   placeholder?: string
   isPending?: boolean
-  // `icon` is optional per-item — only rotate's per-day shift picker uses it
-  // today (see `pattern-builder.tsx`), every other call site keeps passing
-  // plain `{ label, value }` pairs. `disabled` greys out a single option
-  // while leaving it visible (e.g. the not-yet-supported "Monthly" cycle
-  // length unit — see `schedules/data/data.ts`).
+  // `disabled` greys out a single option while leaving it visible, for options not yet supported.
   items:
     | { label: string; value: string; icon?: LucideIcon; disabled?: boolean }[]
     | undefined

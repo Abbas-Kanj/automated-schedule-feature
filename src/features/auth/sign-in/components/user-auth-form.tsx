@@ -59,19 +59,16 @@ export function UserAuthForm({
       success: () => {
         setIsLoading(false)
 
-        // Mock successful authentication with expiry computed at success time
         const mockUser = {
           accountNo: 'ACC001',
           email: data.email,
           role: ['user'],
-          exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours from now
+          exp: Date.now() + 24 * 60 * 60 * 1000,
         }
 
-        // Set user and access token
         auth.setUser(mockUser)
         auth.setAccessToken('mock-access-token')
 
-        // Redirect to the stored location or default to dashboard
         const targetPath = redirectTo || '/'
         navigate({ to: targetPath, replace: true })
 

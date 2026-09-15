@@ -30,11 +30,6 @@ type HolidayWorkRuleFieldsProps = {
   index: number
 }
 
-// The inputs a "Working on day off" / "Working on public holiday" rule takes
-// in place of a window: a flat hours count, how that time is treated (the
-// three radios), and then the case-specific booking. Rendered by
-// `PolicyRuleRow` for those two types only; the rule is already seeded in the
-// right shape by `retypeRule`, so this just binds to it.
 export function HolidayWorkRuleFields({ index }: HolidayWorkRuleFieldsProps) {
   const form = useFormContext<ShiftPolicyFormValues>()
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
@@ -54,10 +49,9 @@ export function HolidayWorkRuleFields({ index }: HolidayWorkRuleFieldsProps) {
       : 'Working hours of day off'
   const attendanceOptions = getHolidayAttendanceOptions(policyType, workMode)
 
-  // The day-off overtime case books an hourly rate rather than an attendance
-  // type; every other case books an attendance type (normal work offers none
-  // yet). Switching mode resets whichever of those two the new case doesn't
-  // use, so a stale value can't linger and fail validation.
+  // Day-off overtime books an hourly rate, not an attendance type; every
+  // other case is the reverse. Switching mode resets whichever the new case
+  // doesn't use, so a stale value can't linger and fail validation.
   const isDayOffOvertime =
     workMode === 'overtime' && policyType === 'working_on_day_off'
 
@@ -113,8 +107,6 @@ export function HolidayWorkRuleFields({ index }: HolidayWorkRuleFieldsProps) {
         )}
       />
 
-      {/* Normal work / apply overtime / substitute day off — swaps the case
-          fields below. Defaults to normal work. */}
       <FormField
         control={form.control}
         name={`rules.${index}.work_mode`}

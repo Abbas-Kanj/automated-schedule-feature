@@ -8,9 +8,6 @@ type ShiftBadgeProps = {
   className?: string
 }
 
-// The soft, colored pill used for a resolved rotation position (a shift or
-// an off day) — its color comes from the shift's own `badge_color`, its icon
-// from the shift's `icon`.
 export function ShiftBadge({ position, className }: ShiftBadgeProps) {
   const Icon = position.shift
     ? SHIFT_ICON_COMPONENTS[position.shift.icon]

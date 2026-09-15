@@ -1,9 +1,7 @@
 import { useDisplayPreferencesStore } from '@/stores/display-preferences-store'
 
-// Formats a stored "HH:mm" time for display — either as-is (24-hour) or
-// converted to 12-hour with a lowercase am/pm suffix, e.g. "15:30" ->
-// "3:30 pm". Anything that isn't a well-formed "HH:mm" string is passed
-// through untouched (empty values, partially typed input, etc.).
+// Formats stored "HH:mm" as 24-hour or 12-hour ("15:30" -> "3:30 pm");
+// malformed input passes through untouched.
 export function formatClockTime(time: string, hour12: boolean): string {
   const match = /^(\d{2}):(\d{2})$/.exec(time)
   if (!match) return time

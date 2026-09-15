@@ -20,10 +20,8 @@ import {
   type TimeRange,
 } from './data/schema'
 
-// "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line —
-// the three end-settings shapes never coexist, so they don't need three
-// separate rows. Shared by the wizard's Summary step and the Schedule
-// Rotation screen, which is where a rotation's end is now edited.
+// "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line, since
+// the three end-settings shapes never coexist.
 export function formatEndSettings(
   endSettings: EndSettings | undefined
 ): string | undefined {
@@ -195,10 +193,9 @@ export function getScheduleSummary(
 
 // --- regular schedules' real-date calendar preview (Summary step) ---
 //
-// Maps a fixed/flexible/rotate schedule onto actual calendar dates, one cycle
-// (page) at a time. A cycle is the schedule's own repeat unit: rotate's pattern
-// length, or a plain calendar week for fixed/flexible, whose selected shifts'
-// `days` simply repeat every 7 days with no pattern to cycle through.
+// Maps a fixed/flexible/rotate schedule onto real calendar dates, one cycle
+// (page) at a time — rotate's pattern length, or a plain 7-day week for
+// fixed/flexible.
 
 export type ScheduleCalendarEntry = {
   shift: Shift
@@ -246,10 +243,8 @@ export type CalendarScheduleInput = {
   }
 }
 
-// A pattern card's real-day span: 7 for a card whose shift has a matching
-// `weekly`-frequency repeat entry, 1 for everything else — off cards,
-// daily/monthly cards, and cards with no repeat entry at all, which is what
-// keeps `pattern_shifts` mode on one-card-one-day with no special case.
+// 7 days for a card whose shift has a matching `weekly` repeat entry, else 1
+// — keeps `pattern_shifts` mode on one-card-one-day with no special case.
 function getCardDayCount(
   entry: { shift_id?: string; is_off: boolean },
   shiftRepeatByShiftId: Map<string, { frequency: string }>
@@ -284,20 +279,15 @@ function getRotatePatternDayCount(
 }
 
 // Expands a custom_shifts pattern into real calendar-day units. A daily card
-// (or an off card, or one with no repeat entry) stays a single day, always
-// active if it has a shift. A weekly card spans 7 real days, active only on
-// that shift's own selected weekdays. `monthly` is out of scope for now and
-// takes the same 1-day path as `daily`.
-//
-// `startDate` only decides which real weekday each expanded day lands on; the
-// running offset is read off the output array's length as it is built, since
-// every prior card has already pushed its exact contribution.
+// stays one day; a weekly card spans 7 real days, active only on its shift's
+// selected weekdays. `monthly` takes the same 1-day path as `daily` for now.
+// `startDate` only fixes which weekday each day lands on — the running
+// offset is read off the output array's length as it's built.
 type ExpandedRotateDay = {
   shiftId: string | undefined
   isOff: boolean
-  // True when this day came from a weekly card's 7-day expansion, which is when
-  // the real weekday is meaningful — the caller can then read the shift's
-  // actual per-weekday hours instead of a generic summary.
+  // True for a day from a weekly card's expansion — lets the caller read the
+  // shift's real per-weekday hours instead of a generic summary.
   fromWeeklyCard: boolean
 }
 
@@ -357,9 +347,8 @@ export function getScheduleCycleLength(
 }
 
 // True once `cycleIndex`'s cycle is the last one `end_settings` allows.
-// `after_occurrences` reads as "N repeats of the cycle" — N weeks for
-// fixed/flexible, N pattern repeats for rotate — the only unit meaningful to
-// both.
+// `after_occurrences` means "N repeats of the cycle" — the only unit
+// meaningful to both fixed/flexible (weeks) and rotate (pattern repeats).
 function isLastAllowedCycle(
   schedule: CalendarScheduleInput,
   cycleIndex: number,
@@ -388,16 +377,11 @@ function isLastAllowedCycle(
 const MAX_CALENDAR_PREVIEW_DAYS = 28
 
 // Builds one page ("cycle") of a regular schedule's real-date calendar.
-// `cycleIndex` 0 is the cycle starting at `start_date`, 1 the next
-// `cycleLength`-day block, and so on — never before `start_date`.
-//
-// - rotate: the pattern's card order is what shows on the calendar, starting at
-//   `start_date`, each card spanning the days `expandRotatePatternDays` gives
-//   it. A weekly-expanded day shows the shift's real per-weekday hours, since
-//   the weekday is known; anything else falls back to `getShiftTimeRange`,
-//   because a daily card places a shift on a cycle day, not a weekday.
-// - fixed/flexible: each selected shift's own `days` entry for that weekday,
-//   with its exact hours, and more than one shift may be active the same day.
+// `cycleIndex` 0 starts at `start_date`, 1 the next `cycleLength`-day block.
+// Rotate shows a weekly-expanded day's real per-weekday hours (weekday is
+// known); a daily card falls back to `getShiftTimeRange` since it places a
+// shift on a cycle day, not a weekday. Fixed/flexible may show several
+// shifts active the same day.
 export function getScheduleCalendarCycle(
   schedule: CalendarScheduleInput,
   shifts: Shift[],
@@ -509,10 +493,8 @@ export function getScheduleCalendarCycle(
   }
 }
 
-// The cycle day a crew starts on, in the units the pattern was written in.
-// "Week 2" is the phrase the real-world write-ups use, so it is said out loud
-// rather than left as arithmetic on a day number. Lives here so the schedule
-// form and the Schedule Rotation screen read a crew's start the same way.
+// "Week 2" is the phrase real-world write-ups use for a crew's start day, so
+// it's said out loud rather than left as day-number arithmetic.
 export function describeStartDay(day: number, cycleLength: number): string {
   if (cycleLength > 7 && cycleLength % 7 === 0) {
     return `Day ${day + 1} · week ${Math.floor(day / 7) + 1}`

@@ -5,13 +5,10 @@ import {
   getRotationPreset,
 } from './rotation-presets'
 
-// A preset is a card list plus two numbers the UI trusts: `minShifts` gates
-// whether it is offered at all, and `suggestedCrews` is the hint shown next to
-// it. Nothing checks either at runtime, so a preset naming a shift it never
-// declared would silently build a pattern pointing at `undefined`.
-//
-// How well each preset actually rosters is covered in
-// `rotation-suggestion.test.ts`; this is about the data being well formed.
+// `minShifts`/`suggestedCrews` are trusted, not checked at runtime, so a
+// preset naming an undeclared shift would silently build a pattern pointing
+// at `undefined`. Roster quality is covered in `rotation-suggestion.test.ts`;
+// this is about the data being well formed.
 
 function cardsFor(preset: (typeof ROTATION_PRESETS)[number]) {
   return preset.buildCards(preset.minShifts)
@@ -50,8 +47,7 @@ describe('every rotation preset', () => {
     })
   })
 
-  // The gate the picker uses. A preset offered at `minShifts` shifts must not
-  // name a shift beyond that, or the pattern points at nothing.
+  // A preset offered at `minShifts` shifts must not name a shift beyond that.
   it('never names a shift beyond its own minShifts', () => {
     ROTATION_PRESETS.forEach((preset) => {
       expect(preset.minShifts, preset.id).toBeGreaterThanOrEqual(1)
@@ -65,9 +61,7 @@ describe('every rotation preset', () => {
     })
   })
 
-  // A multi-shift preset that only ever names one shift is indistinguishable
-  // from a single-shift one, so its higher `minShifts` would gate it out of
-  // the picker for no reason.
+  // Otherwise a higher `minShifts` gates it out of the picker for no reason.
   it('uses every shift it demands', () => {
     ROTATION_PRESETS.forEach((preset) => {
       const named = new Set(
@@ -85,8 +79,7 @@ describe('every rotation preset', () => {
     })
   })
 
-  // `buildCards` takes the schedule's real shift count, and every preset but
-  // one ignores it. The one that does not must grow with it.
+  // Every preset but `per_shift_plus_rest` ignores shift count entirely.
   it('is stable across shift counts unless it is meant to size itself', () => {
     ROTATION_PRESETS.forEach((preset) => {
       const atMin = preset.buildCards(preset.minShifts)

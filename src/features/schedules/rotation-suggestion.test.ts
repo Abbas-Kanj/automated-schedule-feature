@@ -14,8 +14,7 @@ import {
   suggestRotationCoverage,
 } from './rotation-suggestion'
 
-// Builds slots the way the form does: a card list of shift ids, `null` meaning
-// a rest card.
+// A card list of shift ids, `null` meaning a rest card.
 function makeSlots(cards: (string | null)[]): SuggestionSlot[] {
   return cards.map((shiftId, index) => ({
     index,
@@ -55,7 +54,6 @@ function uncoveredCells(coverage: { uncoveredShiftIds: string[] }[]): number {
   return coverage.reduce((sum, day) => sum + day.uncoveredShiftIds.length, 0)
 }
 
-// Hand-built placements, so a suggestion can be compared against one.
 function place(
   crews: SuggestionCrew[],
   pairs: [number, number][]
@@ -68,9 +66,9 @@ function place(
 }
 
 describe('crewRequirement', () => {
-  // Every case here is a number that a *counting* argument gets wrong. The
-  // requirement is what the search can actually place, so each one is pinned
-  // against `suggestRotationCoverage` rather than against arithmetic.
+  // Each case is pinned against `suggestRotationCoverage` (what the search can
+  // actually place) rather than against a counting argument, which gets these
+  // wrong.
   function coversWith(
     slots: SuggestionSlot[],
     shifts: string[],
@@ -84,9 +82,8 @@ describe('crewRequirement', () => {
     return uncoveredCells(coverage) === 0
   }
 
-  // The trap the 2026-09-06 session recorded: 3 crews is 15 crew-days for 14
-  // cells and still cannot do it, because a crew is on one shift for its
-  // whole journey. "No red 0" needs 4.
+  // 3 crews is 15 crew-days for 14 cells and still can't do it, because a
+  // crew is on one shift for its whole journey. "No red 0" needs 4.
   it('does not mistake crew-days for coverage', () => {
     const shifts = ['a', 'b']
     const slots = makeSlots(['a', 'a', 'a', 'a', 'a', null, null])
@@ -102,10 +99,8 @@ describe('crewRequirement', () => {
     })
   })
 
-  // Reported from a screenshot: the note said 3 teams, the user picked 3, and
-  // day 5 came back with 2 Morning and 0 Afternoon. Counting per shift says 3
-  // is enough — 3 crews do own exactly 7 Afternoon-days for 7 cycle days —
-  // but no offsets land them on 7 different days.
+  // Counting per shift says 3 is enough — 3 crews own exactly 7 Afternoon-days
+  // for 7 cycle days — but no offsets land them on 7 different days.
   it('counts days, not just totals, when a pattern mixes shifts', () => {
     const shifts = ['m', 'a']
     const slots = makeSlots(['m', 'm', 'a', 'a', 'm', null, null])
@@ -162,9 +157,6 @@ describe('crewRequirement', () => {
 })
 
 describe('the requirement decides whether a hole reads as fixable', () => {
-  // The other half of the screenshot bug: under the requirement the panel was
-  // telling someone who had just pressed Suggest that there were enough crews
-  // and to press it again.
   const shifts = ['m', 'a']
   const slots = makeSlots(['m', 'm', 'a', 'a', 'm', null, null])
 
@@ -194,8 +186,7 @@ describe('the requirement decides whether a hole reads as fixable', () => {
   })
 
   it('still calls a genuinely fixable hole fixable', () => {
-    // Enough crews, placed badly on purpose — the same message must come back
-    // as a warning telling the user to suggest.
+    // Enough crews, placed badly on purpose.
     const badly = analyzeDayCoverage(
       placementsToCoverageCrews(
         slots,
@@ -245,12 +236,9 @@ describe('suggestRotationCoverage', () => {
     expect(codes(result.warnings)).not.toContain('uncovered-shift')
   })
 
-  // The seven-week master rotation cannot reach a spread of 1 and it is not
-  // the search's fault: thirty working cards across seven crews is 210
-  // crew-days over a 49-day cycle, so the mean is 4.29 and *some* day has to
-  // differ from *some* other. It is listed here rather than waved through by
-  // a looser rule for every preset, so the invariant stays tight on the
-  // fourteen that can meet it.
+  // master_49 can't reach a spread of 1 — 210 crew-days over 49 days is a
+  // mean of 4.29, not the search's fault. Listed as an exception rather than
+  // loosening the rule for every preset.
   const FLATNESS_EXCEPTIONS: Record<string, number> = { master_49: 2 }
 
   it('keeps coverage flat on every preset at its suggested crew count', () => {
@@ -301,9 +289,9 @@ describe('suggestRotationCoverage', () => {
   })
 })
 
-// The reason this whole model exists: the pattern is a template for one crew,
-// so the shifts it happens to name must not decide which shifts the schedule
-// runs. Every case here starts from a pattern that names *only* Morning.
+// The pattern is a template for one crew; the shifts it happens to name must
+// not decide which shifts the schedule runs. Every case starts from a
+// pattern that names *only* Morning.
 describe('the pattern does not decide which shifts run', () => {
   const MORNING_5_2 = [
     'morning',
@@ -316,11 +304,8 @@ describe('the pattern does not decide which shifts run', () => {
   ]
 
   it('staffs a shift the pattern never mentions', () => {
-    // Four crews on an all-Morning 5-2 week, with Night also selected. Two
-    // crews cover Monday-Friday on the two shifts, two more cover the other
-    // five days — 14 cells, 20 crew-days, nothing left empty. Under the old
-    // model, where a crew simply took its card's shift, Night was unstaffable
-    // here no matter how many crews were added.
+    // Four crews on an all-Morning 5-2 week, with Night also selected: 14
+    // cells, 20 crew-days, nothing left empty.
     const shiftIds = ['morning', 'night']
     const result = suggestRotationCoverage(
       makeSlots(MORNING_5_2),
@@ -336,9 +321,8 @@ describe('the pattern does not decide which shifts run', () => {
   })
 
   it('puts one crew on each shift every day of a 2-2-3 with two shifts', () => {
-    // The seeded "Plant Coverage (2-2-3)" roster. 4 crews x 7 working cards =
-    // 28 crew-days for 14 days x 2 shifts — exactly enough, and only if two
-    // crews are moved onto nights.
+    // 4 crews x 7 working cards = 28 crew-days for 14 days x 2 shifts —
+    // exactly enough, and only if two crews are moved onto nights.
     const shiftIds = ['morning', 'night']
     const slots = slotsFromPreset('two_two_three', ['morning'])
     const result = suggestRotationCoverage(slots, makeCrews(4), shiftIds)
@@ -351,10 +335,8 @@ describe('the pattern does not decide which shifts run', () => {
   })
 
   it('fills as many cells as the crew-days allow when it cannot fill them all', () => {
-    // Two crews on the same all-Morning 5-2 week with two shifts: 10 crew-days
-    // for 14 cells, so 4 must stay empty however they are placed. Filling
-    // exactly 10 distinct cells is the best available, and anything that
-    // double-books a cell does worse.
+    // Two crews, two shifts: 10 crew-days for 14 cells, so 4 must stay empty
+    // however they are placed.
     const shiftIds = ['morning', 'night']
     const result = suggestRotationCoverage(
       makeSlots(MORNING_5_2),
@@ -369,9 +351,8 @@ describe('the pattern does not decide which shifts run', () => {
 describe('unfillable gaps stay information, not instructions', () => {
   it('leaves an unavoidable gap alone rather than chasing it', () => {
     // One crew, five working cards, seven days: two days are empty whatever
-    // offset it starts on. The penalty is paid by every candidate equally, so
-    // it must not distort the choice — and the rest days have to stay where
-    // the pattern put them.
+    // offset it starts on. Paid equally by every candidate, so it must not
+    // distort the choice.
     const slots = makeSlots([
       'morning',
       'morning',
@@ -395,9 +376,9 @@ describe('unfillable gaps stay information, not instructions', () => {
   })
 
   it('never buys shift balance with a day nobody works', () => {
-    // A 5-2 office week alternating two shifts, run by two crews. Landing them
-    // on adjacent cards keeps the shift counts very even, and shuts the place
-    // down on day 5. Covering the day comes first.
+    // A 5-2 office week alternating two shifts, run by two crews. Landing
+    // them on adjacent cards keeps shift counts even but shuts the place down
+    // on day 5 — covering the day comes first.
     const slots = makeSlots([
       'morning',
       'afternoon',
@@ -418,8 +399,7 @@ describe('unfillable gaps stay information, not instructions', () => {
 
   it('says how many crews a short-staffed rotation actually needs', () => {
     // Three crews on a three-shifts-plus-rest cycle: one crew is always off,
-    // so one shift is always empty. No arrangement fixes that, so it reads as
-    // info with the remedy spelled out rather than as something done wrong.
+    // so one shift is always empty. No arrangement fixes that.
     const shiftIds = ['morning', 'afternoon', 'night']
     const result = suggestRotationCoverage(
       makeSlots([...shiftIds, null]),
@@ -435,17 +415,15 @@ describe('unfillable gaps stay information, not instructions', () => {
   })
 
   it('does not call a correct four-crew Panama roster understaffed', () => {
-    // The regression that matters: 4 crews on a 14-day cycle is the textbook
-    // answer, and an assumption that crews should equal cycle days flags it as
-    // broken.
+    // 4 crews on a 14-day cycle is the textbook answer; assuming crews should
+    // equal cycle days would flag it as broken.
     const slots = slotsFromPreset('two_two_three', ['day'])
     const result = suggestRotationCoverage(slots, makeCrews(4), ['day'])
     expect(severities(result.warnings)).not.toContain('warning')
   })
 
   it('reports a structurally uncoverable shift as info, not a warning', () => {
-    // Two crews, three shifts and a rest card: six crew-days for twelve cells,
-    // so it cannot be staffed daily however the crews are placed.
+    // Two crews, three shifts, a rest card: six crew-days for twelve cells.
     const shiftIds = ['morning', 'afternoon', 'night']
     const result = suggestRotationCoverage(
       makeSlots([...shiftIds, null]),
@@ -499,8 +477,8 @@ describe('search behaviour', () => {
   })
 
   it('never stacks two crews on one shift while another sits empty', () => {
-    // With fewer crew-days than cells, every crew-day has to land on a cell of
-    // its own — doubling one up buys nothing and costs a shift somewhere else.
+    // Fewer crew-days than cells: doubling one up buys nothing and costs a
+    // shift somewhere else.
     const shiftIds = ['morning', 'night']
     const slots = makeSlots(['morning', 'morning', 'morning', null, null])
     const result = suggestRotationCoverage(slots, makeCrews(2), shiftIds)
@@ -642,8 +620,6 @@ describe('weekday and weekend checks', () => {
   })
 })
 
-// "No quick turnaround" — the guardrail every real rotation write-up states
-// and none of them can express as a list position.
 describe('rest between one crew’s consecutive shifts', () => {
   // Deliberately the classic three, with the night running past midnight so
   // its end lands in the next day.
@@ -661,10 +637,9 @@ describe('rest between one crew’s consecutive shifts', () => {
     return { key: 'crew-1', label: 'Crew 1', headcount: 1, byDay }
   }
 
-  // The reason this is measured in hours and not in list positions. Ordered
-  // by start time the list is morning, afternoon, night — so night -> morning
-  // steps one place *forward*, and any rule written on positions would wave
-  // through the one transition it exists to catch.
+  // Ordered by start time the list is morning/afternoon/night, so night ->
+  // morning steps one place *forward* — a rule written on positions would
+  // wave through the one transition it exists to catch.
   it('catches night into morning, which reads as a forward step', () => {
     const found = findQuickTurnarounds(
       [crewOn(['night', 'morning'])],
@@ -690,9 +665,8 @@ describe('rest between one crew’s consecutive shifts', () => {
     expect(found[0].restMinutes).toBe(8 * 60)
   })
 
-  // A rest card at the end, deliberately: on a bare three-day cycle this run
-  // wraps night straight back into morning, which the seam test below covers
-  // on purpose. Here the point is that the forward run itself is clean.
+  // A rest card at the end, deliberately — the seam test below covers the
+  // wrap; here the point is that the forward run itself is clean.
   it('leaves a forward rotation alone', () => {
     expect(
       findQuickTurnarounds(
@@ -721,8 +695,7 @@ describe('rest between one crew’s consecutive shifts', () => {
     ).toEqual([])
   })
 
-  // The cycle repeats, so the last card is followed by the first. A rotation
-  // that only breaks the rule across that seam breaks it every time round.
+  // The cycle repeats, so the last card is followed by the first.
   it('checks the seam where the cycle wraps', () => {
     const found = findQuickTurnarounds(
       [crewOn(['morning', 'night'])],
@@ -756,8 +729,6 @@ describe('rest between one crew’s consecutive shifts', () => {
     expect(warning?.message).toContain('Morning')
   })
 
-  // Without real clock times there is nothing to measure, and guessing would
-  // be worse than staying quiet.
   it('says nothing at all when the caller cannot supply shift hours', () => {
     const analysis = analyzeDayCoverage(
       [crewOn(['night', 'morning'])],
@@ -767,8 +738,6 @@ describe('rest between one crew’s consecutive shifts', () => {
     expect(codes(analysis.warnings)).not.toContain('quick-turnaround')
   })
 
-  // The tie-break's whole contract: it decides between rosters that are
-  // equally well covered, and never buys rest at the cost of a staffed shift.
   // Four crews, not three: three crews working three of four cards is nine
   // crew-days against twelve cells, so a hole would be arithmetic rather than
   // anything the tie-break did.
@@ -783,10 +752,9 @@ describe('rest between one crew’s consecutive shifts', () => {
   })
 })
 
-// The gap between "cells divided by working days" and what it really takes.
-// That division is the sum a person does in their head, so wherever the two
-// disagree the UI has to account for the difference — it used to print the
-// division and a larger headline number side by side, which reads as a bug.
+// "Cells divided by working days" is the sum a person does in their head, so
+// wherever it disagrees with the real requirement the UI has to account for
+// the difference.
 describe('the crew-day bound against the real requirement', () => {
   const ids = ['M', 'A']
 
@@ -797,10 +765,9 @@ describe('the crew-day bound against the real requirement', () => {
     expect(crewRequirement(slots, ids).crewDayBound).toBe(3)
   })
 
-  // Every crew walks the same cards offset in time. On a pattern naming one
-  // shift throughout, a crew never changes shift, so the three pairs of crews
-  // that share duty would all have to be on opposite shifts — impossible with
-  // two. Hence four, one more than the division suggests.
+  // On a pattern naming one shift throughout, a crew never changes shift, so
+  // the three pairs of crews sharing duty would all need opposite shifts —
+  // impossible with two. Hence four, one more than the division suggests.
   it('reports more than the bound when the pattern shape is the limit', () => {
     const requirement = crewRequirement(
       makeSlots(['M', 'M', 'M', 'M', 'M', null, null]),
@@ -810,8 +777,7 @@ describe('the crew-day bound against the real requirement', () => {
     expect(requirement.minimumCrews).toBeGreaterThan(requirement.crewDayBound)
   })
 
-  // The block roster: 3 crews x 4 working days = 12 = 6 days x 2 shifts. An
-  // exact fit, and the bound is the answer.
+  // 3 crews x 4 working days = 12 = 6 days x 2 shifts: an exact fit.
   it('meets the bound on a six-day two-block cycle', () => {
     const requirement = crewRequirement(
       makeSlots(['M', 'M', 'A', 'A', null, null]),
@@ -821,9 +787,8 @@ describe('the crew-day bound against the real requirement', () => {
     expect(requirement.minimumCrews).toBe(3)
   })
 
-  // Two guards against ever re-deriving "alternate the shifts" as a general
-  // rule. It rescues the 7-day 5-2 and it wrecks the 6-day block roster, so
-  // neither layout wins on its own and no UI copy may promise one.
+  // Guards against re-deriving "alternate the shifts" as a general rule: it
+  // rescues the 7-day 5-2 and wrecks the 6-day block roster below.
   it('alternating rescues a seven-day 5-2', () => {
     expect(
       crewRequirement(makeSlots(['M', 'A', 'M', 'A', 'M', null, null]), ids)

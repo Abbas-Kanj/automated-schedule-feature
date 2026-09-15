@@ -47,11 +47,8 @@ import { HolidayWorkRuleFields } from './holiday-work-fields'
 import { MissedPunchRuleFields } from './missed-punch-fields'
 import { Time24Input } from './time-24-input'
 
-// The rules a policy applies, as a collapsible list. Each rule carries its
-// own `policy_type`, so one policy can mix a tardy window with an overtime
-// one — or with a missed-punch occurrence count, which swaps the rule's
-// inputs entirely. Reads and writes through `useFormContext`, so it plugs
-// into `PolicyFormDialog`'s form without prop-drilling `control`.
+// Each rule carries its own `policy_type`, so one policy can mix a tardy
+// window with an overtime one, or a missed-punch occurrence count.
 export function PolicyRulesField() {
   const form = useFormContext<ShiftPolicyFormValues>()
   const { fields, append, remove, update } = useFieldArray({
@@ -59,16 +56,11 @@ export function PolicyRulesField() {
     name: 'rules',
   })
 
-  // Which rule (if any) is expanded for editing — the rest render as
-  // one-line summaries, mirroring the shift form's break rows. A newly
-  // added rule opens straight into editing; existing ones only on the
-  // pencil.
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   // Open with something to fill in rather than an empty panel plus an
-  // "Add at least one rule" error. Guarded on the current length so an
-  // existing policy's rules are left alone, and so clearing every rule by
-  // hand stays cleared.
+  // "Add at least one rule" error. Guarded on length so clearing every rule
+  // by hand stays cleared.
   useEffect(() => {
     if (form.getValues('rules').length === 0) {
       append(buildDefaultRule(generateId()))
@@ -90,9 +82,8 @@ export function PolicyRulesField() {
     })
   }
 
-  // Switching a rule between the two shapes replaces the whole entry, so it
-  // goes through `useFieldArray.update` rather than a per-field setValue —
-  // the fields being registered change with it.
+  // Replaces the whole entry via `update` rather than a per-field setValue,
+  // since the registered fields change with the shape.
   const changeRuleType = (index: number, next: PolicyType) => {
     const current = form.getValues(`rules.${index}`)
     if (!current || current.policy_type === next) return
@@ -153,9 +144,6 @@ type PolicyRuleSummaryProps = {
   onRemove: () => void
 }
 
-// A saved rule, collapsed: name and type on top, then the shape-specific
-// detail on one muted line, with edit/trash actions at the end — the same
-// shape as a collapsed break row.
 function PolicyRuleSummary({
   index,
   onEdit,
@@ -166,8 +154,8 @@ function PolicyRuleSummary({
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
   if (!rule) return null
 
-  // Whatever the resolver flagged for this rule, first message wins — the
-  // row is collapsed, so there's no per-field `FormMessage` to carry it.
+  // First message wins — the row is collapsed, so there's no per-field
+  // `FormMessage` to carry it.
   const fieldErrors = form.formState.errors.rules?.[index]
   const error = fieldErrors
     ? Object.values(fieldErrors)
@@ -222,9 +210,8 @@ type PolicyRuleRowProps = {
   onDone: () => void
 }
 
-// One rule, expanded for editing: its type and name, then whichever set of
-// inputs that type calls for. Watches only its own slice of the array so
-// typing in one rule doesn't re-render the others.
+// Watches only its own slice of the array so typing in one rule doesn't
+// re-render the others.
 function PolicyRuleRow({
   index,
   onTypeChange,
@@ -269,8 +256,6 @@ function PolicyRuleRow({
         </Button>
       </div>
 
-      {/* The type belongs to the rule, not the policy — changing it swaps
-          the inputs below (see `retypeRule`). */}
       <FormField
         control={form.control}
         name={`rules.${index}.policy_type`}
@@ -280,13 +265,9 @@ function PolicyRuleRow({
             <Select
               value={field.value}
               onValueChange={(value) => {
-                // Radix's hidden form-participation <select> bounces an
-                // empty value back through onValueChange when it syncs a
-                // programmatic write — and this field is written
-                // programmatically by the rule builders, which is exactly
-                // the case that gets wiped. A real pick is never empty. See
-                // the `radix-select-bubble-select-wipes-programmatic-value`
-                // skill.
+                // Radix's hidden select bounces an empty value back on a
+                // programmatic write; a real pick is never empty. See
+                // `radix-select-bubble-select-wipes-programmatic-value`.
                 if (!value) return
                 onTypeChange(value as PolicyType)
               }}
@@ -325,13 +306,10 @@ function PolicyRuleRow({
   )
 }
 
-// The window/factor half of a rule — every type except missed punch error.
 function WindowRuleFields({ index }: { index: number }) {
   const form = useFormContext<ShiftPolicyFormValues>()
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
-  // Narrow to the window shape before reading its fields — the other two rule
-  // shapes have no from/to/factor. This component is only rendered for window
-  // types, but the watched value is still the full union.
+  // Narrow to the window shape — the watched value is still the full union.
   const resultMinutes =
     rule && isWindowRule(rule)
       ? getRuleResultMinutes({
@@ -343,8 +321,6 @@ function WindowRuleFields({ index }: { index: number }) {
 
   return (
     <>
-      {/* 24-hour text fields rather than `type='time'` — see
-          `Time24Input` for why the native control can't be kept. */}
       <div className='flex items-start gap-2'>
         <FormField
           control={form.control}
@@ -409,8 +385,6 @@ function WindowRuleFields({ index }: { index: number }) {
             </FormItem>
           )}
         />
-        {/* The factor applied to the window above — read-only, it's
-            derived, not entered. */}
         <div className='flex-1 space-y-2'>
           <Label className='text-xs'>Result</Label>
           <Input
@@ -431,7 +405,7 @@ function WindowRuleFields({ index }: { index: number }) {
             <Select
               value={field.value}
               onValueChange={(value) => {
-                // Same Radix bubble-select guard as the type select above.
+                // Same Radix bubble-select guard as above.
                 if (!value) return
                 field.onChange(value)
               }}

@@ -56,9 +56,7 @@ describe('FilterableMultiSelect', () => {
 
     await pick(screen, 'Amir Haddad')
     await userEvent.keyboard('{Escape}')
-    // Z excludes Amir. react-select takes `value` separately from `options`,
-    // so narrowing the list must not drop the chip that is already chosen —
-    // otherwise the filter would silently unpick people.
+    // Z excludes Amir; narrowing options must not drop an already-chosen chip.
     await userEvent.click(screen.getByRole('button', { name: 'Z' }))
 
     await expect.element(screen.getByText('Amir Haddad')).toBeInTheDocument()

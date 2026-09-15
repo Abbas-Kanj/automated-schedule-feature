@@ -48,7 +48,6 @@ describe('ForgotPasswordForm', () => {
       expect(navigateMock).toHaveBeenCalledWith({ to: '/otp' })
     )
 
-    // Form should reset on success
     await expect.element(emailInput).toHaveValue('')
   })
 })

@@ -112,8 +112,6 @@ describe('cellsFromPlacements', () => {
 
     const cells = cellsFromPlacements(slots, placements, orderedShiftIds)
 
-    // Both crews work days 0 and 1 and rest on day 2 — one on Morning, the
-    // other transposed onto Night.
     expect(cells).toEqual([
       { day: 0, shift_id: 's-morning', employee_ids: [], team_ids: ['t1'] },
       { day: 0, shift_id: 's-night', employee_ids: ['e2'], team_ids: [] },
@@ -162,12 +160,12 @@ describe('cellsFromPlacements', () => {
   })
 })
 
-// The start days a rotation is actually written in — "Team B starts week 2".
-// They live next to the matrix rather than instead of it, so the pair has to
-// stay honest about whether one still describes the other.
+// The start days a rotation is written in — "Team B starts week 2" — live
+// next to the matrix rather than instead of it, so the pair has to stay
+// honest about whether one still describes the other.
 describe('crew placements alongside the matrix', () => {
   const orderedShiftIds = ['s-morning', 's-afternoon']
-  // Five on, two off — two crews, one on each shift, is the case the whole
+  // Five on, two off — two crews, one on each shift, is the case the
   // shift-step idea exists for.
   const slots = patternToSlots(
     Array.from({ length: 7 }, (_, i) => ({
@@ -204,8 +202,8 @@ describe('crew placements alongside the matrix', () => {
     )
 
     expect(fromStored).toEqual(fromSearch)
-    // Both shifts staffed on all five working days off an all-Morning
-    // pattern: the second crew is transposed, not re-carded.
+    // Both shifts staffed on all five working days: the second crew is
+    // transposed, not re-carded.
     expect(fromStored).toHaveLength(10)
   })
 
@@ -238,9 +236,8 @@ describe('crew placements alongside the matrix', () => {
     ).toBe(true)
   })
 
-  // The reason this is re-derived instead of tracked by a flag: one cell
-  // moved by hand is a roster no pair of offsets can describe, and every
-  // screen showing "each crew a week apart" has to stop saying so.
+  // One cell moved by hand is a roster no pair of offsets can describe, so
+  // every screen showing "each crew a week apart" has to stop saying so.
   it('stops describing it once a single cell is edited by hand', () => {
     const cells = cellsFromCrewPlacements(slots, placements, orderedShiftIds)
     const edited = cells.filter(
@@ -269,9 +266,8 @@ describe('shiftHoursById', () => {
     })
   })
 
-  // The whole point of the +1440: a night ending at 06:00 has to end *after*
-  // it starts, or the rest arithmetic against the next morning goes negative
-  // instead of landing on zero.
+  // A night ending at 06:00 has to end *after* it starts, or the rest
+  // arithmetic against the next morning goes negative instead of zero.
   it('pushes an overnight shift’s end into the next day', () => {
     const overnight = makeShift('s-on', 'Overnight', '22:00', '06:00')
     expect(shiftHoursById([overnight]).get('s-on')).toEqual({
@@ -305,8 +301,8 @@ describe('patternToSlots', () => {
     ])
   })
 
-  // A card marked working but naming no shift cannot staff anything, so it has
-  // to read as off rather than as a working card with an undefined shift.
+  // A card marked working but naming no shift can't staff anything, so it
+  // has to read as off.
   it('treats a working card with no shift as a rest card', () => {
     expect(patternToSlots([{ position: 1, is_off: false }])).toEqual([
       { index: 0, shiftId: undefined, isOff: true },

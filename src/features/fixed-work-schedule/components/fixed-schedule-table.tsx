@@ -11,7 +11,7 @@ import { type FixedEmployeeRow } from '../utils'
 
 type FixedScheduleTableProps = {
   rows: FixedEmployeeRow[]
-  // Names the one day the last column reads, same as the rotating table.
+  // Names the one day the last column reads.
   dateHeading: string
 }
 

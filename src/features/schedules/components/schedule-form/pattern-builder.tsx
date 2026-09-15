@@ -80,7 +80,7 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
 
   const { fields, replace } = useFieldArray({ control, name: 'pattern' })
 
-  // Pattern_shifts: keep pattern synced with cycle_length.days
+  // Keep `pattern` synced with `cycle_length.days`.
   useEffect(() => {
     if (isCustomShifts) return
     if (!days) return
@@ -95,18 +95,12 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     replace(next)
   }, [days, isCustomShifts])
 
-  // Custom_shifts: auto-populate pattern from shift_repeat settings.
-  //
-  // `PatternBuilder` unmounts whenever the wizard leaves the "pattern" step
-  // (see `schedule-form.tsx`'s `currentStepId === 'pattern'` gate) and
-  // remounts fresh on the way back — so this effect also runs on every
-  // return trip, not just when `shift_repeat` first changes. It must stay
-  // idempotent against a `pattern` that already matches `shift_repeat`'s
-  // composition (same shift_ids, same per-shift card counts), or it would
-  // silently blow away a manual drag-reorder every time the user leaves and
-  // returns to this step — only truly rebuild when the composition itself
-  // has changed (a shift was added/removed, or an `interval` changed),
-  // since only then does the old card order stop being valid.
+  // Auto-populate `pattern` from `shift_repeat`. This remounts every time the
+  // wizard revisits the "pattern" step, so it must stay idempotent against a
+  // `pattern` that already matches `shift_repeat`'s composition — otherwise
+  // it would blow away a manual drag-reorder on every return trip. Only
+  // rebuild when the composition itself changed (shift added/removed, or an
+  // `interval` changed).
   useEffect(() => {
     if (!isCustomShifts) return
     if (totalPatternLength <= 0) {
@@ -138,10 +132,8 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       )
     if (alreadyMatches) return
 
-    // Nothing to carry across a rebuild: the roster lives on the schedule's
-    // own `day_coverage` matrix now, not on the cards (see
-    // `schedule-assign-to-fields.tsx`), so a card is only ever a shift or a
-    // rest day.
+    // The roster lives on `day_coverage`, not the cards, so a card is only
+    // ever a shift or a rest day.
     const next: RotatePatternEntry[] = []
     let position = 1
     for (const r of shiftRepeat) {
@@ -156,14 +148,10 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     replace(next)
   }, [isCustomShifts, totalPatternLength, shiftRepeat, replace, getValues])
 
-  // Drops a ready-made roster in place of hand-setting every card. Writes
-  // `cycle_length` first and then the cards, which also keeps the
-  // `pattern_shifts` sync effect above quiet: by the time it runs, `days`
-  // already equals the new pattern length, so it early-returns instead of
-  // truncating what was just written.
-  //
-  // `unit: 'custom_days'` is deliberate — a 14- or 28-day cycle is not a whole
-  // number of the week/month units, and storing it as one would round it.
+  // Writes `cycle_length` before the cards so the sync effect above sees
+  // `days` already matching the new pattern length and early-returns instead
+  // of truncating what was just written. `unit: 'custom_days'` is deliberate:
+  // a 14- or 28-day cycle isn't a whole number of week/month units.
   function applyPreset(presetId: string) {
     const preset = getRotationPreset(presetId)
     if (!preset || shiftIds.length === 0) return
@@ -185,8 +173,6 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
     )
   }
 
-  // Every day's dropdown picks from the shifts selected back in the
-  // "Shifts" step — no more hand-authored blocks (see `data/schema.ts`).
   const shiftOptions = shiftIds
     .map((id) => shifts.find((s) => s.id === id))
     .filter((s): s is NonNullable<typeof s> => s !== undefined)
@@ -220,9 +206,8 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
             )}
           />
 
-          {/* Only for `pattern_shifts` — `custom_shifts` derives its own cards
-              from the per-shift repeat rows below, and the rebuild effect
-              would overwrite a preset the moment it ran. */}
+          {/* custom_shifts derives its own cards from the repeat rows below;
+              the rebuild effect would overwrite a preset immediately. */}
           {!isCustomShifts && (
             <PatternPresetPicker
               shiftIds={shiftIds}
@@ -375,11 +360,9 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                 shiftOptions={shiftOptions}
                 cycleLengthUnit={cycleLength?.unit}
                 disabled={disabled}
-                // "Custom alternate" cards are drag-to-swap only (each
-                // shift's own repeat "interval" already fixes how many
-                // cards it gets — see the auto-populate effect above — so
-                // reassigning by picking from a dropdown isn't offered,
-                // only reordering which day holds which shift).
+                // Reassigning by dropdown isn't offered here — each shift's
+                // repeat "interval" fixes its card count, so only reordering
+                // which day holds which shift makes sense.
                 isCustomShifts={isCustomShifts}
               />
             </CardContent>
@@ -414,12 +397,10 @@ function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
   const shifts = useShiftsStore((s) => s.shifts)
   const { replace } = useFieldArray({ control, name: 'shift_repeat' })
 
-  // Keep one repeat row per currently-selected shift, preserving existing
-  // repeat settings when a shift is already configured. Defaults to
-  // "Weekly" (pre-selected, like shifts' own Repeat tab defaults to
-  // "Daily" — see `shifts/data/defaults.ts`) with Monday pre-checked so a
-  // freshly-added row isn't immediately invalid (weekly requires at least
-  // one weekday — see the `shift_repeat` superRefine in `data/schema.ts`).
+  // Keep one repeat row per selected shift, preserving existing settings.
+  // Defaults to weekly + Monday pre-checked so a new row isn't immediately
+  // invalid (weekly requires >=1 weekday — see the `shift_repeat` superRefine
+  // in `data/schema.ts`).
   const shiftIdsKey = shiftIds.join(',')
   useEffect(() => {
     const current =
@@ -491,22 +472,17 @@ type PatternDayGridProps = {
   isCustomShifts?: boolean
 }
 
-// A monthly cycle's day count is always a multiple of this (see the
-// month-count input in the Cycle length card, which stores `count * 30`) —
-// used to split the cycle into one box per month.
+// The cycle length input stores month counts as `count * 30` (see the Cycle
+// length card), so a monthly cycle's day count is always a multiple of this.
 const DAYS_PER_MONTH_BOX = 30
 
 type DropTarget = { index: number; side: 'before' | 'after' }
 
-// "Custom alternate" cards drag-reorder like a sortable list — dragging one
-// card onto another *moves* it into that slot and shifts everything between
-// the two over by one, rather than just exchanging the two cards' shifts
-// (each shift's own repeat "interval" still fixes how many cards it holds
-// in total — see the custom_shifts auto-populate effect in
-// `PatternBuilder` — a move can't change that count any more than a swap
-// could). Lives in the grid (not each card) since a drag started on one
-// card needs to update state a sibling card renders (the drop-line
-// indicator).
+// Dragging one card onto another moves it into that slot and shifts cards
+// between over by one, rather than swapping — each shift's repeat "interval"
+// fixes how many cards it holds in total, so a move can't change that count.
+// State lives in the grid, not the card, since a drag started on one card
+// updates a sibling's drop-line indicator.
 function usePatternReorder() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { getValues, setValue } = useFormContext<any>()
@@ -540,10 +516,8 @@ function usePatternReorder() {
       if (from == null || !to || from === to.index) return
 
       const pattern = getValues('pattern') as RotatePatternEntry[]
-      // Everything a card *is*, minus its `position` — that's the slot the
-      // card sits in, so it stays with the index rather than travelling. A
-      // card is only a shift or a rest day now; the roster lives on the
-      // schedule's `day_coverage` matrix and is unaffected by a reorder.
+      // `position` is the slot, so it stays with the index rather than
+      // travelling with the card's content.
       const content = pattern.map((p) => ({
         is_off: p.is_off,
         shift_id: p.shift_id,
@@ -572,10 +546,7 @@ function usePatternReorder() {
 type PatternReorder = ReturnType<typeof usePatternReorder>
 
 // Drag-to-reorder is only discoverable by trying it, so say so out loud
-// wherever the draggable cards render (inline grid and the per-month
-// dialog alike). Only shown when the cards are actually draggable —
-// "Rotate pattern" mode uses per-day dropdowns instead, and a read-only
-// form can't reorder anything.
+// wherever the draggable cards render.
 function PatternDragHint() {
   return (
     <p className='flex items-center gap-1.5 text-xs text-muted-foreground'>
@@ -596,8 +567,6 @@ function PatternDayGrid({
   const isMonthly = cycleLengthUnit === 'monthly'
   const reorder = usePatternReorder()
 
-  // Weekly/custom-days cycles are short enough (max 7 per row) to show
-  // directly.
   if (!isMonthly) {
     return (
       <div className='space-y-2'>
@@ -618,9 +587,8 @@ function PatternDayGrid({
     )
   }
 
-  // Monthly cycles can span several months — too many day cards to show
-  // inline, so they're split into one box per month; clicking a box opens
-  // just that month's days in a modal.
+  // Too many day cards to show inline, so split into one box per month;
+  // clicking a box opens just that month's days in a modal.
   const months = Array.from(
     { length: Math.ceil(fields.length / DAYS_PER_MONTH_BOX) },
     (_, i) => {
@@ -821,12 +789,9 @@ function PatternDayCard({
   )
 }
 
-// Drops a named shift system into the pattern grid in one pick, instead of
-// hand-setting twenty-eight cards and hoping the rest days line up.
-//
-// A preset only names shift *slots* (first selected shift, second, ...), so it
-// is offered once the schedule has selected enough shifts to fill them —
-// Southern Swing needs three, DuPont two, a plain 2-2-3 mask only one.
+// A preset only names shift *slots* (first selected shift, second, ...), so
+// it's offered once enough shifts are selected to fill them — Southern Swing
+// needs three, DuPont two, a plain 2-2-3 mask only one.
 function PatternPresetPicker({
   shiftIds,
   disabled,
@@ -844,9 +809,8 @@ function PatternPresetPicker({
       <Select
         value={presetId}
         onValueChange={(value) => {
-          // Radix re-emits an empty value when a Select is set programmatically
-          // — see the `recurrence-frequency-fields` note and the
-          // `radix-select-bubble-select-wipes-programmatic-value` skill.
+          // Radix re-emits an empty value when a Select is set
+          // programmatically (radix-select-bubble-select-wipes-programmatic-value).
           if (!value) return
           setPresetId(value)
           onApply(value)

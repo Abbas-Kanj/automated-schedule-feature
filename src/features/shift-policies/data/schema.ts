@@ -1,8 +1,7 @@
 import { z } from 'zod'
 import { toMinutes } from '@/lib/time'
 
-// The policy kinds a *rule* can describe. A policy is just a named bag of
-// rules, so one policy can mix several of these — see `policyRuleSchema`.
+// A policy is a named bag of rules, so one policy can mix several of these.
 export const POLICY_TYPES = [
   'tardy',
   'departure',
@@ -12,29 +11,20 @@ export const POLICY_TYPES = [
   'overtime',
 ] as const
 
-// A rule takes one of three shapes, discriminated on `policy_type`:
-//   - window types describe a from–to window with a factor (below),
-//   - the two "worked when off" types take a flat hours count instead
-//     (`holidayWorkRuleSchema`),
-//   - "Missed punch error" counts occurrences over a span of days/months
-//     (`missedPunchRuleSchema`).
-// Each set is its own tuple (rather than filtered from `POLICY_TYPES`) so
-// `z.enum` gets literal types.
+// A rule takes one of three shapes, discriminated on `policy_type`: window
+// types describe a from-to window with a factor; the two "worked when off"
+// types take a flat hours count instead; "missed punch error" counts
+// occurrences over a span of days/months. Each set is its own tuple (rather
+// than filtered from `POLICY_TYPES`) so `z.enum` gets literal types.
 export const WINDOW_POLICY_TYPES = ['tardy', 'departure', 'overtime'] as const
 const windowPolicyTypeSchema = z.enum(WINDOW_POLICY_TYPES)
 
-// The two "worked when you shouldn't have been" types. They don't describe a
-// time window like the others — they take a flat number of hours worked plus
-// how that time is treated (normal / overtime / substitute day off), so they
-// carry their own rule shape (see `holidayWorkRuleSchema`).
 export const HOLIDAY_WORK_POLICY_TYPES = [
   'working_on_day_off',
   'working_on_public_holiday',
 ] as const
 const holidayWorkPolicyTypeSchema = z.enum(HOLIDAY_WORK_POLICY_TYPES)
 
-// Which of the three rule shapes a type selects. Used by the form to swap a
-// rule's inputs and by the summary row to pick what to show.
 export function isMissedPunchRuleType(type: PolicyType | undefined): boolean {
   return type === 'missed_punch_error'
 }
@@ -62,10 +52,9 @@ const attendanceTypeSchema = z.enum(ATTENDANCE_TYPES)
 export const HOLIDAY_WORK_MODES = ['normal', 'overtime', 'substitute'] as const
 const holidayWorkModeSchema = z.enum(HOLIDAY_WORK_MODES)
 
-// How the holiday/day-off hours are booked. Which of these are actually
-// offered depends on the policy type *and* the work mode (see
-// `getHolidayAttendanceOptions` in data.ts), so the field is optional on the
-// schema and its presence is enforced per-case in the policy `superRefine`.
+// Which of these are offered depends on policy type *and* work mode (see
+// `getHolidayAttendanceOptions` in data.ts) — optional here, enforced
+// per-case in the policy `superRefine`.
 export const HOLIDAY_ATTENDANCE_TYPES = [
   'paid',
   'keep_track_overtime',
@@ -106,9 +95,6 @@ function getRuleSpanMinutes(from_time: string, to_time: string): number {
   return toMinutes(to_time) - toMinutes(from_time)
 }
 
-// The rule's payable/deductible result: its own span multiplied by the
-// factor, in minutes. This is what the dialog shows next to the factor
-// input.
 export function getRuleResultMinutes(rule: {
   from_time: string
   to_time: string
@@ -136,13 +122,10 @@ const windowRuleSchema = z.object({
   attendance_type: attendanceTypeSchema,
 })
 
-// The day-off / public-holiday rule shape: a flat number of hours worked,
-// how that time is treated (`work_mode`), and the case-specific booking.
-// Unlike a window rule it has no from/to span — the hours are entered
-// directly. `rate_per_hour` only applies to the day-off overtime case;
-// `holiday_attendance_type` only to the cases that offer a dropdown
-// (everything but day-off overtime). Both are optional here and pinned
-// per-case in the policy `superRefine`.
+// Unlike a window rule, hours are entered directly, no from/to span.
+// `rate_per_hour` only applies to the day-off overtime case;
+// `holiday_attendance_type` to every other case. Both optional here,
+// pinned per-case in the policy `superRefine`.
 const holidayWorkRuleSchema = z.object({
   id: z.string(),
   policy_type: holidayWorkPolicyTypeSchema,
@@ -160,9 +143,7 @@ const holidayWorkRuleSchema = z.object({
     .optional(),
 })
 
-// The other rule shape: how many missed punches over what window, and what
-// that costs. Always booked as a deduction — the form shows that as a
-// disabled select rather than a choice.
+// Always booked as a deduction — the form shows that as a disabled select.
 const missedPunchRuleSchema = z.object({
   id: z.string(),
   policy_type: z.literal('missed_punch_error'),
@@ -233,8 +214,7 @@ const policyFieldsSchema = z
       }
       if (isHolidayWorkRule(rule)) {
         // Day-off overtime books an hourly rate; every other case books an
-        // attendance type from a case-specific list. Normal work offers no
-        // attendance options yet, so nothing is required there.
+        // attendance type. Normal work offers none, so nothing required there.
         if (rule.work_mode === 'overtime') {
           if (rule.policy_type === 'working_on_day_off') {
             if (rule.rate_per_hour == null) {
@@ -295,10 +275,8 @@ export type PolicyRule = z.infer<typeof policyRuleSchema>
 export type ShiftPolicy = z.infer<typeof shiftPolicySchema>
 export type ShiftPolicyFormValues = z.infer<typeof shiftPolicyFormSchema>
 
-// Rule-level guards, so callers can narrow a `PolicyRule` to a concrete
-// shape before reading shape-specific fields. Needed because the discriminant
-// is spread across a literal and two enum members, which type-narrowing a
-// single `policy_type` comparison doesn't always collapse cleanly.
+// Needed because the discriminant is spread across a literal and two enum
+// members, which a single `policy_type` comparison doesn't narrow cleanly.
 export function isHolidayWorkRule(rule: PolicyRule): rule is HolidayWorkRule {
   return isHolidayWorkRuleType(rule.policy_type)
 }
@@ -310,9 +288,8 @@ export function isWindowRule(rule: PolicyRule): rule is WindowRule {
   )
 }
 
-// Every distinct type across a policy's rules, in first-seen order — what
-// the table and the picker label a policy by now that the policy itself has
-// no type of its own.
+// In first-seen order — what the table and picker label a policy by, since
+// the policy itself has no type of its own.
 export function getPolicyRuleTypes(rules: PolicyRule[]): PolicyType[] {
   return [...new Set(rules.map((rule) => rule.policy_type))]
 }

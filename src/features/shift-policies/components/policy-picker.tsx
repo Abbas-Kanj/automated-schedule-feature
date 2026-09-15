@@ -17,7 +17,6 @@ type PolicyPickerProps = {
   disabled?: boolean
 }
 
-// The type badges + rule count shown for a policy in both lists.
 function PolicyMeta({ policy }: { policy: ShiftPolicy }) {
   return (
     <>
@@ -35,20 +34,15 @@ function PolicyMeta({ policy }: { policy: ShiftPolicy }) {
   )
 }
 
-// Search + attach + create UI for shift policies, shared by the shift
-// form's "Shift policy" tab (writing to the form) and the shifts table's
-// "Modify policy" drawer (writing straight to the store). Owns the create,
-// edit and details dialogs so both hosts get them for free.
+// Shared by the shift form's "Shift policy" tab (writing to the form) and
+// the shifts table's "Modify policy" drawer (writing straight to the store).
 export function PolicyPicker({ value, onChange, disabled }: PolicyPickerProps) {
   const policies = usePoliciesStore((s) => s.policies)
   const [query, setQuery] = useState('')
-  // The catalogue lives in a dropdown under the search box rather than
-  // inline, so the tab opens on this shift's own policies.
   const [searchOpen, setSearchOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState<ShiftPolicy | null>(null)
-  // Attached rows the eye has expanded, by id — the details open in place
-  // rather than in a dialog, so several can be compared at once.
+  // Attached rows expanded by id, so several can be compared at once.
   const [expandedIds, setExpandedIds] = useState<string[]>([])
   const searchRef = useRef<HTMLDivElement>(null)
   const formatTime = useTimeFormat()
@@ -58,8 +52,6 @@ export function PolicyPicker({ value, onChange, disabled }: PolicyPickerProps) {
     [policies, value]
   )
 
-  // What the dropdown offers: everything not already attached, narrowed by
-  // the query against a policy's name or any of its rule types.
   const available = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return policies.filter((policy) => {
@@ -174,8 +166,6 @@ export function PolicyPicker({ value, onChange, disabled }: PolicyPickerProps) {
         </Button>
       </div>
 
-      {/* What's attached to this shift — the default view, with the
-          catalogue tucked into the dropdown above. */}
       <div className='space-y-2'>
         {attached.map((policy) => {
           const isExpanded = expandedIds.includes(policy.id)

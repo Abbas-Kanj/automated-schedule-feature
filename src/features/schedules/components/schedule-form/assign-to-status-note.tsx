@@ -9,9 +9,8 @@ type AssignToStatusNoteProps = {
   dayCoverage: RotateDayCoverage[] | undefined
 }
 
-// One-line recap of the "Assign to" step for the wizard's Summary, sized from
-// whatever `day_coverage` holds. Rotate rosters can also be edited later from
-// the "Assign crews" dialog on `/schedule-rotation`.
+// One-line recap of the "Assign to" step, sized from whatever `day_coverage`
+// holds.
 export function AssignToStatusNote({ dayCoverage }: AssignToStatusNoteProps) {
   const teams = useTeamsStore((s) => s.teams)
   const employees = useEmployeesStore((s) => s.employees)

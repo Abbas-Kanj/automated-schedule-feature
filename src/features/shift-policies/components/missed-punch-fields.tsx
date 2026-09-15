@@ -33,11 +33,6 @@ type MissedPunchRuleFieldsProps = {
   index: number
 }
 
-// The inputs a "Missed punch error" rule takes in place of the window and
-// factor every other type uses — how many missed punches over what span,
-// and what that costs. Rendered by `PolicyRuleRow` for that type only; the
-// rule is already seeded in the right shape by `retypeRule`, so this just
-// binds to it.
 export function MissedPunchRuleFields({ index }: MissedPunchRuleFieldsProps) {
   const form = useFormContext<ShiftPolicyFormValues>()
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
@@ -60,11 +55,7 @@ export function MissedPunchRuleFields({ index }: MissedPunchRuleFieldsProps) {
                 <Select
                   value={field.value}
                   onValueChange={(value) => {
-                    // Radix's hidden form-participation <select> bounces an
-                    // empty value back when it syncs the value this field is
-                    // seeded with programmatically. See the
-                    // `radix-select-bubble-select-wipes-programmatic-value`
-                    // skill.
+                    // See `radix-select-bubble-select-wipes-programmatic-value`.
                     if (!value) return
                     field.onChange(value)
                   }}
@@ -118,8 +109,6 @@ export function MissedPunchRuleFields({ index }: MissedPunchRuleFieldsProps) {
         </div>
       </div>
 
-      {/* The unit picked here renames the two inputs under it — the window
-          is the same field either way, counted in days or in months. */}
       <div className='space-y-2'>
         <FormField
           control={form.control}

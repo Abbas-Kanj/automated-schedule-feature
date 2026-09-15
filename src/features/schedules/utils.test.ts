@@ -29,10 +29,8 @@ function makeShift(
     timezone_mode: 'local',
     timezone: undefined,
     hours_mode: 'same',
-    // A shift actually sitting in the store is always fully configured
-    // (unlike `emptyShiftFormValues`'s blank in-progress form, whose days
-    // all start disabled) — default every fixture shift to enabled all
-    // week, same as `getShiftTimeRange`'s real callers expect.
+    // A stored shift is always fully configured, unlike a blank in-progress
+    // form — default every fixture shift to enabled all week.
     days: buildDefaultDays(
       { from_time: '09:00', to_time: '17:00', overnight: false },
       true
@@ -110,7 +108,6 @@ describe('getScheduleCalendarCycle — rotate', () => {
       '2026-01-05',
       '2026-01-06',
     ])
-    // Same 3-position pattern repeats: shift a, off, shift b.
     expect(cycle.days[0].entries[0]?.shift.id).toBe('a')
     expect(cycle.days[1].isOff).toBe(true)
     expect(cycle.days[2].entries[0]?.shift.id).toBe('b')
@@ -232,14 +229,10 @@ describe('getScheduleCalendarCycle — rotate custom_shifts follows plain patter
   const shiftA = makeShift({ id: 'a', name: 'Shift A' })
   const shiftB = makeShift({ id: 'b', name: 'Shift B' })
 
-  // Kanj (Aug 2026): the calendar must follow the Pattern step's card
-  // order directly. This fixture has no `shift_repeat` at all, so every
-  // card falls through the "no matching repeat rule" path — one card, one
-  // day, always active, same plain position-modulo mapping `pattern_shifts`
-  // uses (which never populates `shift_repeat` either). This describes
-  // that fallback path specifically, not a general law — see the
-  // `— weekly frequency expands to a real week` describe block below for
-  // the case where `shift_repeat` *is* present with `frequency: 'weekly'`.
+  // No `shift_repeat` at all, so every card falls through the "no matching
+  // repeat rule" path: one card, one day, always active — the same
+  // position-modulo mapping `pattern_shifts` uses. See the weekly-frequency
+  // describe block below for the case where `shift_repeat` is present.
   const schedule: CalendarScheduleInput = {
     type: 'rotate',
     start_date: '2026-08-24', // Monday
@@ -295,12 +288,9 @@ describe('getScheduleCalendarCycle — rotate custom_shifts, weekly frequency ex
   const shiftA = makeShift({ id: 'a', name: 'Shift A' })
   const shiftB = makeShift({ id: 'b', name: 'Shift B' })
 
-  // Kanj's worked example (Aug 20 2026): Shift A weekly/interval 2/
-  // Mon,Wed,Fri,Sat, Shift B weekly/interval 3/Mon,Fri, pattern reordered
-  // to B,A,B,A,B (card counts match each shift's own interval — 2 A cards,
-  // 3 B cards — per the "locked count, auto-populated" decision). Each
-  // card now spans a real 7-day week, active only on that shift's own
-  // selected weekdays.
+  // Card counts match each shift's own repeat interval (2 A cards, 3 B
+  // cards); each card spans a real 7-day week, active only on that shift's
+  // own selected weekdays.
   const schedule: CalendarScheduleInput = {
     type: 'rotate',
     start_date: '2026-08-24', // Monday
@@ -499,9 +489,7 @@ describe('calculateHours', () => {
     ).toBe(7.25)
   })
 
-  // A range whose end reads earlier than its start is an overnight, not a
-  // negative day — the one case worth pinning, since the naive subtraction
-  // gives back a number that looks plausible and is wrong by 24 hours.
+  // Naive subtraction gives a plausible but wrong-by-24h answer here.
   it('reads a range that ends before it starts as crossing midnight', () => {
     expect(calculateHours([{ from_time: '22:00', to_time: '06:00' }])).toBe(8)
   })

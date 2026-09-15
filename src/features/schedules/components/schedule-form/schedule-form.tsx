@@ -57,11 +57,9 @@ import { ShiftPickerField } from './shift-picker-field'
 import { WeeklyFields } from './weekly-fields'
 import { WeeklyOneFields } from './weekly-one-fields'
 
-// `parent_type: 'daily'` (weekly / weekly_one / monthly) is no longer
-// offered when creating or editing a schedule — the form only builds
-// `regular` schedules (fixed/rotate/flexible) now. The 'daily' branches
-// below are kept only so pre-existing daily schedules (view/edit) still
-// render correctly; there's no UI path left to create a new one.
+// `parent_type: 'daily'` isn't offered when creating/editing a schedule — the
+// 'daily' branches below exist only so pre-existing daily schedules still
+// render correctly on view/edit.
 function getSteps(
   parentType: string,
   regularType?: RegularType
@@ -74,12 +72,6 @@ function getSteps(
     ]
   }
 
-  // rotate gets its own pattern step (cycle/pattern config) — the template
-  // one crew's journey follows — then "Assign to", which staffs it, PLUS the
-  // same shared "Start & End" step as fixed/flexible (start date + end
-  // frequency; see `schedule-start-end-fields.tsx`). The same "Assign to"
-  // component also backs the "Assign crews" dialog on Schedule Rotation, for
-  // editing the roster after the schedule exists.
   if (regularType === 'rotate') {
     return [
       { id: 'basics', label: 'Basics' },
@@ -91,11 +83,9 @@ function getSteps(
       { id: 'summary', label: 'Summary' },
     ]
   }
-  // fixed's "Occurrence" plays the part rotate's Pattern does, and "Work
-  // fixed" reads it as one. "Start & End" is the last step before Summary for
-  // both types. The occurrence pattern is anchored on the start date (which
-  // defaults to today), so changing it there re-lines the weekdays under an
-  // already-assigned roster — the coverage panel reflects that if revisited.
+  // The occurrence pattern is anchored on the start date, so changing it
+  // re-lines the weekdays under an already-assigned roster — the coverage
+  // panel reflects that if revisited.
   if (regularType === 'fixed') {
     return [
       { id: 'basics', label: 'Basics' },
@@ -147,11 +137,8 @@ function getTypeDefaults(type: ScheduleType) {
   }
 }
 
-// "Never ends" is the "Start & End" step's default — pre-selected rather
-// than starting blank. `end_occurrences` gets a default too, so the "End
-// after" input isn't empty the moment it's switched to (see
-// `EndFrequencyFields`'s always-visible end-settings inputs; mirrors
-// shifts' own `repeat` defaults, see `shifts/data/defaults.ts`).
+// `end_occurrences` gets a default too, so the "End after" input isn't empty
+// the moment it's switched to.
 const DEFAULT_END_SETTINGS = {
   end_type: 'never' as const,
   end_occurrences: 1,
@@ -529,10 +516,8 @@ export function ScheduleForm({
                           <TabsTrigger
                             key={t.value}
                             value={t.value}
-                            // Monthly is legacy-only: an existing monthly
-                            // schedule still renders, but it can't be
-                            // switched to. Same call as the other greyed-out
-                            // monthly options (see `data/data.ts`).
+                            // Monthly is legacy-only: renders if already
+                            // saved, but can't be switched to.
                             disabled={disabled || t.value === 'monthly'}
                           >
                             {t.label}

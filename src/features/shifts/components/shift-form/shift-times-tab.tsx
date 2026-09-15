@@ -45,10 +45,8 @@ const DEFAULT_TIME: TimeRangeEntry = {
   overnight: false,
 }
 
-// Duration defaults to this range's own span (30 min) rather than being
-// left blank — it's no longer required input (see the schema's dropped
-// "Enter a break duration" check), just editable. `break_type` defaults to
-// 'paid' — the common case — same as the old shift-wide toggle did.
+// Duration defaults to this range's own span rather than being left blank —
+// it's editable, not required.
 const DEFAULT_BREAK: BreakEntry = {
   break_type: 'paid',
   from_time: '12:00',
@@ -58,14 +56,10 @@ const DEFAULT_BREAK: BreakEntry = {
   icon: 'coffee',
 }
 
-// A break-duration input formatted as "H:MM" (e.g. "1:30") instead of raw
-// minutes. Keeps its own text buffer so a partial, not-yet-parseable edit
-// (e.g. "1:") isn't clobbered by the formatted value on every keystroke —
-// only a fully-parsed value is pushed up to the form, and the field snaps
-// back to the canonical formatting on blur. Re-syncing that buffer when
-// `value` changes out from under it (e.g. the from/to range narrowing and
-// clearing it — see `updateBreak`) is done during render rather than in an
-// effect, per React's own guidance for "reset state when a prop changes".
+// Keeps its own text buffer so a partial edit (e.g. "1:") isn't clobbered by
+// the formatted "H:MM" value on every keystroke; only a fully-parsed value
+// reaches the form. Re-syncs during render (not an effect) per React's
+// "reset state when a prop changes" guidance.
 function BreakDurationInput({
   value,
   onChange,
@@ -98,10 +92,6 @@ function BreakDurationInput({
   )
 }
 
-// "Shift times" tab of `ShiftFormDialog` — hours mode, per-day time ranges
-// and break time, all inline in the tab (this used to live behind a
-// click-to-open "Edit hours" dialog inside `GeneralTab`; now every change
-// writes straight to the form, same as any other field on this form).
 export function ShiftTimesTab() {
   const form = useFormContext<ShiftFormValues>()
 
@@ -109,26 +99,17 @@ export function ShiftTimesTab() {
   const days = useWatch({ control: form.control, name: 'days' }) ?? []
   const breaks = useWatch({ control: form.control, name: 'breaks' }) ?? []
   const category = useWatch({ control: form.control, name: 'category' })
-  // The "Select at least one day" error is real the instant every day is
-  // off, but showing it before the user has even tried to submit reads as
-  // the form scolding them for a blank slate — only surface it once a
-  // submit's actually been attempted, same as the rest of the app's
-  // validation.
+  // Only surface "select at least one day" after a submit attempt, not on
+  // a blank slate.
   const isSubmitted = form.formState.isSubmitted
-  // Which break row (if any) is expanded for editing — see `BreakRow`
-  // below. Newly-added breaks open straight into this; existing ones only
-  // open when their pencil icon is clicked.
+  // Which break row is expanded for editing; new breaks open straight into it.
   const [editingBreakIndex, setEditingBreakIndex] = useState<number | null>(
     null
   )
   const formatTime = useTimeFormat()
 
-  // The "Overnight" category implies every time range on this shift
-  // crosses midnight — see the "Check next day" indicator on the General
-  // tab, right under the Category field. This only ever forces `overnight`
-  // *on*; picking a different category never forces it back off, so a
-  // shift under e.g. the "Night" category that was set up to cross
-  // midnight some other way keeps working.
+  // Forces every range's `overnight` on, but never back off — a shift under
+  // another category set up to cross midnight some other way keeps working.
   const isOvernightCategory = category === 'overnight'
 
   const firstEnabled = days.find((d) => d.enabled)
@@ -137,15 +118,12 @@ export function ShiftTimesTab() {
   const setDays = (next: DayTimeEntry[]) =>
     form.setValue('days', next, { shouldValidate: true, shouldDirty: true })
 
-  // A brand-new time range, seeded as overnight when the category already
-  // calls for it.
   function defaultTime(): TimeRangeEntry {
     return { ...DEFAULT_TIME, overnight: isOvernightCategory }
   }
 
-  // Reshapes `days` for the new mode: 'same' collapses every enabled day
-  // onto the first enabled day's range, 'different' just keeps each day's
-  // existing ranges (seeding an empty one with that same shared range).
+  // 'same' collapses every enabled day onto the first enabled day's range;
+  // 'different' keeps each day's existing ranges.
   const switchMode = (nextMode: ShiftHoursMode) => {
     const nextMaster: TimeRangeEntry = firstEnabled?.times[0]
       ? { ...firstEnabled.times[0] }
@@ -164,9 +142,8 @@ export function ShiftTimesTab() {
     )
   }
 
-  // Retroactively flips every existing range's `overnight` on the moment
-  // the category becomes "Overnight" (e.g. picked after hours were already
-  // set up) — never runs the other direction.
+  // Flips existing ranges' `overnight` on when category becomes "Overnight";
+  // never runs the other direction.
   useEffect(() => {
     if (!isOvernightCategory) return
     if (days.every((d) => d.times.every((t) => t.overnight))) return
@@ -243,11 +220,8 @@ export function ShiftTimesTab() {
       )
     )
 
-  // Copies this day's time ranges onto every day *after* it in the week
-  // (`days` is always mon->sun — see `buildDefaultDays`) — reuse a fully
-  // set-up day instead of re-entering the same ranges one by one, without
-  // touching days earlier in the week that may already be set up
-  // differently on purpose.
+  // Copies this day's ranges onto every day after it (`days` is mon->sun),
+  // leaving earlier days untouched since they may be set up differently.
   const copyDayForward = (day: DayOfWeek) => {
     const sourceIndex = days.findIndex((d) => d.day === day)
     if (sourceIndex === -1) return
@@ -316,8 +290,7 @@ export function ShiftTimesTab() {
   const masterDuration = calculateShiftHours(master.from_time, master.to_time)
 
   // Mirrors the schema's `superRefine` break checks, for live feedback
-  // without waiting on a submit/validate cycle. `break_type` is per-break
-  // (see `breakEntrySchema`), not a shift-wide setting.
+  // without waiting on a submit/validate cycle.
   const getBreakEntryError = (b: BreakEntry): string | null => {
     if (!b.break_type) return 'Select a break type.'
     if (!(b.to_time > b.from_time)) return 'End time must be after start time.'
@@ -345,23 +318,11 @@ export function ShiftTimesTab() {
                 onValueChange={(value) => switchMode(value as ShiftHoursMode)}
                 className='gap-2'
               >
-                {/*
-                  Radix's RadioGroupItem renders a hidden native radio input
-                  for native-form compatibility, and whenever its checked
-                  state changes for ANY reason — including `switchMode`
-                  flipping `mode` here — it dispatches a synthetic
-                  (untrusted) bubbling `click` on that hidden input. That
-                  event bubbles into these labels and would otherwise
-                  re-trigger this same onClick, calling `switchMode` again
-                  on the *other* option, flipping `mode` back, which
-                  dispatches another synthetic click, and so on —
-                  cascading into an infinite update loop that crashes the
-                  page. The `isTrusted` guard filters out Radix's own
-                  re-dispatch; real user clicks are always trusted. See
-                  `radix-radio-group-bubble-input-reopens-dialog` (global
-                  skill) — this is the same landmine, just a crash instead
-                  of a reopened dialog since there's no dialog here.
-                */}
+                {/* Radix's hidden native radio input re-dispatches a
+                    synthetic bubbling click on every `mode` change,
+                    which would re-trigger this onClick and flip `mode`
+                    back forever. `isTrusted` filters that out — see
+                    `radix-radio-group-bubble-input-reopens-dialog`. */}
                 <Label
                   onClick={(event) => {
                     if (event.nativeEvent.isTrusted && mode !== 'same') {
@@ -377,9 +338,6 @@ export function ShiftTimesTab() {
                   Same hours every day
                 </Label>
 
-                {/* A separate block directly below the "Same hours" option
-                    instead of nested inside its own card — keeps both radio
-                    options themselves plain, un-expanded controls. */}
                 {mode === 'same' && (
                   <div className='space-y-1.5 rounded-md border p-3'>
                     <div className='flex items-start gap-2'>
@@ -572,9 +530,8 @@ export function ShiftTimesTab() {
         </p>
       )}
 
-      {/* Free-standing day-length definitions — not derived from the day
-          ranges above (a shift can count a "full day" as something other
-          than its own scheduled span), so they're plain optional inputs. */}
+      {/* Not derived from the day ranges above — a shift can count a "full
+          day" as something other than its own scheduled span. */}
       <div className='space-y-2'>
         <Label className='text-base font-semibold'>Day duration</Label>
         <div className='space-y-2'>
@@ -622,11 +579,8 @@ export function ShiftTimesTab() {
         </div>
       </div>
 
-      {/* No "Start date" field here any more. `start_date` stays on the
-          shift schema — optional, and referenced by no validation rule — but
-          a shift definition is reusable without one, and the date that
-          actually decides when work happens is the schedule's, not the
-          shift's. */}
+      {/* `start_date` stays on the schema though not shown here — the
+          schedule's date decides when work happens, not the shift's. */}
 
       <FormField
         control={form.control}
@@ -655,9 +609,6 @@ export function ShiftTimesTab() {
                     const isEditing = editingBreakIndex === i
 
                     if (!isEditing) {
-                      // Saved/collapsed row: icon leads, then name, then a
-                      // compact time summary, with edit/trash actions at
-                      // the end.
                       return (
                         <div
                           key={i}

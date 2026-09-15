@@ -21,10 +21,6 @@ import { useDeriveShortCode } from '../../hooks/use-derive-short-code'
 import { useShiftsStore } from '../../stores/shifts-store'
 import { normalizeShiftFormValues } from '../../utils'
 
-// Full-page "Create shift" screen, replacing the old create dialog (see
-// `shift-form-dialog.tsx`, now edit-only). Mirrors `schedules`'
-// `ScheduleCreatePage` — own header/back link instead of dialog chrome,
-// same tab body via the shared `ShiftFormTabs`.
 export function ShiftCreatePage() {
   const navigate = useNavigate()
   const addShift = useShiftsStore((s) => s.addShift)
@@ -39,9 +35,7 @@ export function ShiftCreatePage() {
 
   const goBack = () => navigate({ to: '/shifts' })
 
-  // Same "confirm before discarding" guard the old create dialog had —
-  // routed through a plain button instead of a `Link` so a dirty form can
-  // intercept it (see `UnsavedChangesDialog`).
+  // A plain button instead of a `Link`, so a dirty form can intercept it.
   const handleBack = () => {
     if (isDirty) {
       setConfirmLeaveOpen(true)

@@ -40,16 +40,11 @@ const WARNING_STYLES: Record<
   info: { icon: Info, className: 'text-muted-foreground' },
 }
 
-// Shows what the current assignment actually produces, and it is the *only*
-// place a coverage hole is reported: leaving a shift unstaffed is not a
-// validation error (whether a hole is fixable depends on the crew count, not on
-// the shape of the data), so "Next" always advances and this panel carries the
-// whole message.
-//
-// Two grids, answering different questions: the shift rows say whether every
-// selected shift is covered every day, the crew rows say what each crew's week
-// looks like. Both are driven by what is in the form right now rather than by
-// the last suggestion, so a hand edit updates them immediately.
+// The only place a coverage hole is reported: leaving a shift unstaffed is a
+// warning, not a validation error, so "Next" always advances and this panel
+// carries the message. Two grids: shift rows show whether every selected
+// shift is covered every day; crew rows show each crew's week. Both are
+// driven by live form state, so a hand edit updates them immediately.
 export function RotationCoveragePanel({
   crews,
   analysis,
@@ -65,12 +60,11 @@ export function RotationCoveragePanel({
   const minOnDuty = onDutyCounts.length ? Math.min(...onDutyCounts) : 0
   const maxOnDuty = onDutyCounts.length ? Math.max(...onDutyCounts) : 0
 
-  // Everything to act on, plus the `info` notes that explain something already
-  // visible: an unstaffed shift (which drops to `info` precisely when no
-  // assignment can fix it, so the red 0 above needs explaining) and the weekday
-  // notes (the start date is set two steps away, where nothing connects them).
-  // The nobody-in-today line stays hidden — the "On duty" row already shows the
-  // zero. `analysis.warnings` still carries every line for callers and tests.
+  // `info`-severity warnings are hidden except the two kinds that explain
+  // something already on screen: an unstaffed shift (the red 0 above) and
+  // weekday alignment (the start date lives on a different step). The
+  // nobody-in-today line stays hidden — the "On duty" row already shows the
+  // zero. `analysis.warnings` still carries every line for callers/tests.
   const shownWarnings = analysis.warnings.filter(
     (warning) =>
       warning.severity !== 'info' || SHOWN_INFO_CODES.has(warning.code)
@@ -136,8 +130,7 @@ export function RotationCoveragePanel({
                   key={day.index}
                   className={cn(
                     'px-1 py-1.5 text-center font-mono text-xs tabular-nums',
-                    // Only call out the dips once the cycle actually varies —
-                    // a flat rotation should read as calm.
+                    // Only call out dips once the cycle actually varies.
                     minOnDuty !== maxOnDuty &&
                       day.onDuty === minOnDuty &&
                       'text-amber-600 dark:text-amber-400',
@@ -195,8 +188,8 @@ export function RotationCoveragePanel({
                             .join(', ')}
                           className={cn(
                             'inline-flex items-center justify-center gap-1 font-mono text-xs font-semibold',
-                            // Two shifts on one day is only reachable by hand,
-                            // and it is a mistake — say so in place.
+                            // Two shifts in one day is only reachable by hand
+                            // and is a mistake.
                             worked.length > 1 && 'text-destructive'
                           )}
                         >

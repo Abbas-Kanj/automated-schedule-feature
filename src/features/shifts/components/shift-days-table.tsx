@@ -14,14 +14,8 @@ type ShiftDaysTableProps = {
   formatTime: (time: string) => string
 }
 
-// A shift's enabled days as a "Day | Times" table, with consecutive days
-// sharing the exact same times collapsed into a single row (e.g.
-// "Mon → Fri  09:00–17:00") instead of N identical rows.
-//
-// Shared between the schedule wizard's "Shifts" step (see
-// `schedules/.../shift-picker-field.tsx`) and its Summary step (see
-// `schedules/.../schedule-summary.tsx`) so a shift reads identically in
-// both places.
+// Consecutive days sharing the exact same times collapse into a single row
+// (e.g. "Mon → Fri  09:00–17:00") instead of N identical rows.
 export function ShiftDaysTable({ days, formatTime }: ShiftDaysTableProps) {
   const rows: { days: DayTimeEntry[]; key: string }[] = []
   for (const day of days) {

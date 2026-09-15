@@ -21,10 +21,8 @@ type IconPickerFieldProps = {
   value: ShiftIcon | undefined
   onChange: (value: ShiftIcon | undefined) => void
   disabled?: boolean
-  // Break rows always carry an icon (defaults to 'coffee' — see
-  // `DEFAULT_BREAK` in `shift-times-tab.tsx`) and have no real "no icon"
-  // state worth clearing to, so that usage hides this button; the General
-  // tab's own shift icon field keeps it since a shift's icon is optional.
+  // Break rows always carry an icon with no real "no icon" state, so that
+  // usage hides this button; a shift's own icon is optional and keeps it.
   showClear?: boolean
 }
 
@@ -61,11 +59,9 @@ export function IconPickerField({
             <CommandInput placeholder='Search icons...' />
             <CommandList>
               <CommandEmpty>No icon found.</CommandEmpty>
-              {/* cmdk renders a group's items inside a nested
-                  `[cmdk-group-items]` div, not the element `className`
-                  lands on — target that descendant directly, or a
-                  grid/flex layout here is a no-op and icons stay a
-                  single-column list. */}
+              {/* cmdk renders items inside a nested [cmdk-group-items] div,
+                  not the element className lands on — target it directly
+                  or a flex/grid layout here is a no-op. */}
               <CommandGroup className='**:[[cmdk-group-items]]:flex **:[[cmdk-group-items]]:flex-wrap **:[[cmdk-group-items]]:gap-1'>
                 {SHIFT_ICON_OPTIONS.map((o) => (
                   <CommandItem

@@ -6,11 +6,9 @@ import { getEmployeeFullName } from '@/features/employees/utils'
 import { type Team } from '../data/schema'
 import { DataTableRowActions } from './data-table-row-actions'
 
-// Resolves a team's member ids to display names, dropping any id that no
-// longer matches a seeded employee. Hosts the store hook for the Members
-// column; coexists with this file's non-component `teamsColumns` export,
-// which fast refresh doesn't support — acceptable for a column-def module
-// (same pattern as `policies-columns`).
+// Drops any id that no longer matches a seeded employee. Coexists with this
+// file's non-component `teamsColumns` export, which fast refresh doesn't
+// support — acceptable for a column-def module.
 // eslint-disable-next-line react-refresh/only-export-components
 function MembersCell({ employeeIds }: { employeeIds: string[] }) {
   const employees = useEmployeesStore((s) => s.employees)

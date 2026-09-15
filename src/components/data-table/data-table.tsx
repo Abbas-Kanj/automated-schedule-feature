@@ -32,30 +32,22 @@ type DataTableProps<TData> = {
   columns: ColumnDef<TData>[]
   data: TData[]
   searchPlaceholder?: string
-  // Search a single column instead of the whole row. Leave unset for the
-  // default global search (see `globalFilterFn`); set it when the column's
-  // own `filterFn` is what should decide, as the holidays table does.
+  // Search a single column via its own `filterFn` instead of the default global search.
   searchKey?: string
-  // Faceted dropdown filters rendered next to the search box. Each entry
-  // targets a column that declares a `filterFn` — see `PublicHolidaysTable`.
+  // Faceted dropdown filters next to the search box; each targets a column with a `filterFn`.
   filters?: {
     columnId: string
     title: string
     options: { label: string; value: string }[]
   }[]
-  // Defaults to a case-insensitive match on the row's `name` column, which
-  // is what every table in this app searches by. Pass one to search more
-  // than that (see `PoliciesTable`, which also matches the type label).
+  // Defaults to a case-insensitive match on the row's `name` column.
   globalFilterFn?: FilterFn<TData>
-  // Render prop for a selection toolbar. Passing it is what turns row
-  // selection on — the `select` checkbox column still has to be in
-  // `columns` (see `publicHolidaysColumns`).
+  // Passing this turns on row selection — the `select` checkbox column still needs to be in `columns`.
   bulkActions?: (table: TableInstance<TData>) => React.ReactNode
   pageSize?: number
   className?: string
 }
 
-// Case-insensitive contains-match on the `name` column.
 function filterByName<TData>(): FilterFn<TData> {
   return (row, _columnId, filterValue) =>
     String(row.getValue('name'))
@@ -63,11 +55,6 @@ function filterByName<TData>(): FilterFn<TData> {
       .includes(String(filterValue).toLowerCase())
 }
 
-// The sortable/filterable/paginated table shell shared by the schedules,
-// shifts, shift-policies, public-holidays and schedule-templates tables —
-// toolbar on top, pagination pinned to the bottom. Everything
-// table-specific arrives through `columns`, `filters` and `globalFilterFn`;
-// the markup itself lives here once.
 export function DataTable<TData>({
   columns,
   data,

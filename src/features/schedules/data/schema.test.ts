@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { type Schedule, scheduleSchema } from './schema'
 
-// `scheduleSchema` is the source of truth for what a schedule may be, and its
-// rotate arm carries the cross-field rules nothing else enforces — pattern
-// length against cycle length, cells against the selected shifts, placements
-// against the cycle. These exercise those rules directly, since the form only
-// ever reaches them through several steps of UI.
+// Exercises the rotate arm's cross-field rules directly (pattern length vs.
+// cycle length, cells vs. selected shifts, placements vs. cycle) since the
+// form only reaches them through several steps of UI.
 
 const common = {
   id: 'sched-1',
@@ -240,9 +238,8 @@ describe('rotate crew placements', () => {
     ).toContain('Each crew can only be placed once')
   })
 
-  // Placements are a record of how the matrix was generated, not a second
-  // source of truth, so one that no longer describes the cells still parses —
-  // the "Assign to" step reports the mismatch in place.
+  // Placements record how the matrix was generated, not a second source of
+  // truth, so a stale one still parses.
   it('accepts placements that do not describe the stored matrix', () => {
     expect(
       parses(

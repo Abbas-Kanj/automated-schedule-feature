@@ -82,10 +82,8 @@ export function getHolidayAttendanceTypeLabel(
   return type ? HOLIDAY_ATTENDANCE_TYPE_LABELS[type] : '—'
 }
 
-// Which attendance options a holiday-work rule offers depends on both the
-// policy type and the chosen work mode. Normal work has none yet, and the
-// day-off overtime case books an hourly rate instead of an attendance type,
-// so it has none either — those two return an empty list.
+// Normal work and day-off overtime (which books an hourly rate instead)
+// return an empty list — every other combination of type and mode has options.
 export function getHolidayAttendanceOptions(
   policyType: HolidayWorkPolicyType,
   workMode: HolidayWorkMode

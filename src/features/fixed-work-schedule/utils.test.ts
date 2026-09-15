@@ -10,7 +10,7 @@ import {
   makeWorkingKeyOn,
 } from './utils'
 
-// Local dates, so weekday arithmetic is not at the mercy of the runner's zone.
+// Local dates so weekday arithmetic isn't at the mercy of the runner's zone.
 // 2026-08-31 is a Monday.
 const day = (month: number, date: number) => new Date(2026, month - 1, date)
 

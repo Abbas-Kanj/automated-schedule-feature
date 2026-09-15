@@ -12,9 +12,6 @@ import { SEX_OPTIONS } from '../data/data'
 import { type Employee } from '../data/schema'
 import { EmployeeSelectField } from './employee-select-field'
 
-// The employee create/edit form's fields — personal information only, on a
-// single flat shadcn form. Reads/writes through `useFormContext`, matching
-// how the shift form's tabs work.
 export function EmployeeFields() {
   const form = useFormContext<Employee>()
 

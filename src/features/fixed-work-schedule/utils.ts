@@ -38,14 +38,13 @@ export function isFixedSchedule(
   return schedule.parent_type === 'regular' && schedule.type === 'fixed'
 }
 
-// How far the calendar is walked looking for an N-th occurrence or a crew's
-// first day. A bound rather than "until found": a rule with no working day at
-// all (weekly, nothing ticked) would otherwise never stop.
+// A bound rather than "until found" — a rule with no working day at all
+// (weekly, nothing ticked) would otherwise never stop.
 const MAX_WALK_DAYS = 366 * 10
 
-// The occurrence slot each calendar day works under, or null when the schedule
-// is not running that day — before its start, past its end, or a day the rule
-// has off. The end is resolved once here, so callers can ask about many days.
+// Null when the schedule isn't running that day — before its start, past its
+// end, or a day the rule has off. The end is resolved once so callers can ask
+// about many days.
 export function makeWorkingKeyOn(
   schedule: FixedSchedule
 ): (date: Date) => number | null {
@@ -56,8 +55,7 @@ export function makeWorkingKeyOn(
     end_type === 'on_date' && end_date ? parseScheduleStart(end_date) : null
 
   if (end_type === 'after_occurrences' && end_occurrences) {
-    // Counted in working days: each day the schedule actually runs is one
-    // occurrence.
+    // Counted in working days, not calendar days.
     let seen = 0
     for (let offset = 0; offset < MAX_WALK_DAYS; offset++) {
       const date = addDays(start, offset)
@@ -105,9 +103,9 @@ function shiftLegend(
   return [...legend, toPosition(legend.length, undefined, true)]
 }
 
-// The crew-by-day grid for a fixed schedule, in the same shape the rotating
-// screen draws, so both render through `RotationTimelineGrid`. `cycleDay`
-// holds the day's occurrence slot key, or -1 on a day the schedule is off.
+// Same shape the rotating screen draws, so both render through
+// `RotationTimelineGrid`. `cycleDay` holds the day's occurrence slot key, or
+// -1 when the schedule is off.
 export function buildFixedTimeline(
   schedule: FixedSchedule,
   shifts: Shift[],
@@ -139,8 +137,7 @@ export function buildFixedTimeline(
 
   const rows = crews.map((crew) => {
     const cells = days.map((day) => {
-      // First shift wins on a hand-made double booking, as on the rotating
-      // screen.
+      // First shift wins on a hand-made double booking.
       const shiftId =
         day.cycleDay >= 0 ? crew.byDay.get(day.cycleDay)?.[0] : undefined
       return toPosition(
@@ -200,8 +197,7 @@ export function buildFixedRoster(
 
   return getRotationRoster(schedule, employees, teams).map(
     ({ employee, employeeId, byDay, crewLabel }) => {
-      // Walked in slot order so the days read Monday first. A stored key the
-      // rule no longer has is skipped — the wizard prunes those anyway.
+      // Walked in slot order so the days read Monday first.
       const daysByShift = new Map<string, string[]>()
       slotKeys.forEach((key, index) => {
         const shiftId = byDay.get(key)
@@ -235,8 +231,7 @@ export function buildFixedRoster(
   )
 }
 
-// A weekly or daily rule repeats inside a week; only a monthly one needs the
-// month to be seen whole.
+// Only a monthly rule needs the month seen whole.
 export function getFixedDefaultSpan(schedule: FixedSchedule): TimelineSpan {
   return schedule.occurrence.frequency === 'monthly' ? 'month' : 'week'
 }

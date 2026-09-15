@@ -8,8 +8,8 @@ import {
 } from './rotation-suggestion'
 
 // Every worked example printed in `docs/ROTATION_ALGORITHM.md` is computed
-// here, so the document cannot drift away from what the code actually does. If
-// one of these fails, the doc is now wrong and has to be updated with it.
+// here, so the doc can't drift from what the code does — a failure here means
+// the doc is now wrong.
 
 function slots(cards: (string | null)[]): SuggestionSlot[] {
   return cards.map((shiftId, index) => ({
@@ -43,7 +43,6 @@ function uncovered(coverage: { uncoveredShiftIds: string[] }[]): number {
 }
 
 describe('doc: "Sizing the crew pool"', () => {
-  // The worked example the doc leads with, and the one the UI note explains.
   it('a 5-2 over two shifts needs four crews, not the three the division gives', () => {
     const shiftIds = ['morning', 'night']
     const pattern = fromPreset('five_two', ['morning'])
@@ -70,9 +69,9 @@ describe('doc: "Sizing the crew pool"', () => {
       minimumCrews: 4,
     })
 
-    // Two cells, not the one the crew-day arithmetic suggests: 3 crews x 5
-    // work days is 15 crew-days for 14 cells, but every crew walks the same
-    // cards, so crews on duty together can land on the same shift.
+    // Two cells, not the one the crew-day arithmetic suggests: every crew
+    // walks the same cards, so crews on duty together can land on the same
+    // shift.
     expect(uncovered(result.coverage)).toBe(2)
     const shortfall = result.warnings.filter(
       (w) => w.code === 'uncovered-shift' || w.code === 'coverage-gap'
@@ -101,9 +100,7 @@ describe('doc: "The pattern does not decide which shifts run"', () => {
 
 describe('doc: the preset coverage table', () => {
   // One row per preset, exactly as printed in the doc's "Preset coverage"
-  // section: does this preset, at its own suggested crew count and minimum
-  // shift count, staff every shift every day — and how many crews does it
-  // actually take? A preset added to the library without a row here fails.
+  // section. A preset added to the library without a row here fails.
   const TABLE: Record<
     string,
     { crewsNeeded: number; uncoveredAtSuggested: number }
@@ -158,8 +155,7 @@ describe('doc: the preset coverage table', () => {
     })
   })
 
-  // The doc's flatness claims: every continuous preset is flat at its suggested
-  // crew count, except the 49-day master, whose 4.29 mean puts ≤1 out of reach.
+  // master_49's 4.29 mean puts a spread of ≤1 out of reach.
   it('is flat at the suggested crew count except the 49-day master rotation', () => {
     ROTATION_PRESETS.forEach((preset) => {
       if (TABLE[preset.id].uncoveredAtSuggested > 0) return
@@ -178,7 +174,6 @@ describe('doc: the preset coverage table', () => {
 })
 
 describe('doc: "An office week is not understaffed"', () => {
-  // A single crew on a single-shift 5-2: two days nobody is in, by design.
   it('reports the weekend as information, not as a warning', () => {
     const shiftIds = ['morning']
     const pattern = fromPreset('five_two', shiftIds)

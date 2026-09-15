@@ -163,11 +163,8 @@ export const BREAK_TYPE_OPTIONS = [
   { value: 'unpaid', label: 'Unpaid' },
 ] satisfies { value: (typeof BREAK_TYPES)[number]; label: string }[]
 
-// "Assign to" tab — the single "Work type group" dropdown picks how a shift
-// is assigned. There's no backend yet (see CLAUDE.md), so this drives no
-// downstream behavior; picking "Team", say, doesn't yet cascade into a team
-// picker. The former Service resource / Service territory dropdowns are
-// hidden for now (see `assign-to-tab.tsx`).
+// Drives no downstream behavior yet — picking "Team" doesn't cascade into a
+// team picker.
 export const WORK_TYPE_GROUP_OPTIONS = [
   { value: 'team', label: 'Team' },
   { value: 'employee', label: 'Employee' },
@@ -189,11 +186,8 @@ export const DAY_LABELS: Record<(typeof DAYS_OF_WEEK)[number], string> = {
 // "Local" radio option in the timezone field.
 export const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-// The "Global" radio option's dropdown. `Intl.supportedValuesOf` covers
-// every modern evergreen browser target this app ships to, but the
-// project's `lib` target (ES2020) predates its type declaration — cast
-// narrowly instead of widening `lib` for one API. Falls back to a short
-// common list for anything older.
+// The project's `lib` target (ES2020) predates `Intl.supportedValuesOf`'s
+// type declaration — cast narrowly instead of widening `lib` for one API.
 const supportedValuesOf = (
   Intl as unknown as { supportedValuesOf?: (key: 'timeZone') => string[] }
 ).supportedValuesOf

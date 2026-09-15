@@ -2,9 +2,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SPAN_OPTIONS } from '../data'
 import { type TimelineSpan } from '../timeline'
 
-// The Weekly/Monthly control. Rendered per view rather than once for the page:
-// the grid and the table are asking different questions and are allowed to be
-// set to different spans while you compare them.
+// Rendered per view rather than once for the page: the grid and the table can
+// be set to different spans while comparing them.
 export function SpanTabs({
   value,
   onChange,

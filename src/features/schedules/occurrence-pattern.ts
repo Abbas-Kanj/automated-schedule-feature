@@ -9,25 +9,20 @@ import {
   SHIFT_REPEAT_WEEKDAYS,
 } from './data/schema'
 
-// What "Work fixed" staffs for a fixed schedule: one card per *working* day the
-// occurrence rule describes, and the stable key each card's assignments are
-// stored under in `day_coverage.day`.
+// Stable keys `day_coverage.day` stores fixed-schedule assignments under, one
+// per *working* day the occurrence rule describes. Independent of
+// `start_date` — "Team A works Tuesdays" must stay Tuesday if the start date
+// changes later — and spaced into separate ranges so a frequency switch can
+// never silently re-attach an assignment to a different kind of day (leaving
+// the Occurrence step prunes stale keys instead):
 //
-// The keys are deliberately independent of `start_date` — "Team A works
-// Tuesdays" must stay Tuesday when the start date is picked (or changed) on
-// the later "Start & End" step. They are spaced into separate ranges so an
-// assignment can never silently re-attach to a different kind of day when the
-// frequency is switched; leaving the Occurrence step prunes keys that no longer
-// exist instead.
-//
-// - daily (every N days): a single slot, key 0.
-// - weekly: the chosen weekdays, Monday first, key 1000 + weekday (Mon = 0).
+// - daily: single slot, key 0.
+// - weekly: key 1000 + weekday (Mon = 0).
 // - monthly, day of month / date specific: key 2000 + (day − 1).
-// - monthly, day position ("2nd Monday"): key 3000 + (position − 1) × 7 +
-//   weekday.
+// - monthly, day position ("2nd Monday"): key 3000 + (position − 1) × 7 + weekday.
 //
-// The interval ("every 2 weeks") changes how often the slots come round, not
-// which slots exist, so it plays no part in the keys.
+// The interval ("every 2 weeks") affects cadence, not which slots exist, so
+// it plays no part in the keys.
 export type OccurrenceSlots = {
   // Every card works `shiftId`; empty until a shift is selected.
   pattern: RotatePatternEntry[]
@@ -111,10 +106,10 @@ function slotList(
   }
 }
 
-// The slot a calendar day works under, or null when the rule has that day off
-// — the other direction from `slotList`, for screens that draw a real
-// calendar. `start` anchors the interval: "every 2 weeks" counts from the week
-// the schedule starts in. Start and end bounds are the caller's to apply.
+// The inverse of `slotList`, for screens drawing a real calendar: the slot a
+// given day works under, or null if off. `start` anchors the interval
+// ("every 2 weeks" counts from the schedule's start week); bounds are the
+// caller's to apply.
 export function occurrenceKeyOn(
   occurrence: Occurrence,
   start: Date,

@@ -28,9 +28,7 @@ import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 type ShiftPickerFieldProps = {
   disabled?: boolean
   onDialogOpenChange?: (open: boolean) => void
-  // Rotate needs >=2 shifts to actually rotate between; fixed/flexible are
-  // fine with just one. Purely a UI hint — the real gate is the schema's
-  // own superRefine on `shift_ids` (see `data/schema.ts`).
+  // UI hint only — the real gate is the schema's superRefine on `shift_ids`.
   minSelection?: number
 }
 
@@ -51,13 +49,11 @@ export function ShiftPickerField({
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  // Snapshot of the shifts store's ids at the moment "Add new shift" is
-  // clicked — used to detect which shift the create dialog just added.
+  // Snapshot of the shifts store's ids when "Add new shift" is clicked, to
+  // detect which shift the create dialog just added.
   const idsBeforeCreateRef = useRef<string[]>([])
 
   const normalizedQuery = query.trim().toLowerCase()
-  // Empty query shows every shift — the dropdown opens on click, not just
-  // once you start typing, so there needs to be something to show.
   const filteredShifts = normalizedQuery
     ? shifts.filter((s) => s.name.toLowerCase().includes(normalizedQuery))
     : shifts
@@ -70,9 +66,8 @@ export function ShiftPickerField({
     if (disabled) return
     const current = selectedIds ?? []
     if (!current.includes(id)) onChange([...current, id])
-    // Selecting finishes that search — clear it so the list resets to
-    // showing everything for the next pick, but leave the dropdown open so
-    // multiple shifts can be picked in one go.
+    // Clear the search but leave the dropdown open so multiple shifts can be
+    // picked in one go.
     setQuery('')
   }
 
@@ -94,10 +89,8 @@ export function ShiftPickerField({
     onDialogOpenChange?.(open)
     if (open) return
 
-    // The dialog closes itself on submit after calling `addShift`, which
-    // appends the new Shift at the end of the store's array. Diff the
-    // store's ids against the snapshot taken when the dialog was opened to
-    // find what was just created, then select it automatically.
+    // Diff the store's ids against the snapshot taken on open to find what
+    // was just created, then select it automatically.
     const before = new Set(idsBeforeCreateRef.current)
     const newIds = useShiftsStore
       .getState()
@@ -127,9 +120,8 @@ export function ShiftPickerField({
                   <Popover
                     open={isOpen}
                     onOpenChange={(open) => {
-                      // Fires for Radix-initiated opens/closes (Escape,
-                      // outside click). Our own trigger click below handles
-                      // opening explicitly, so this mainly catches closes.
+                      // Catches Radix-initiated closes (Escape, outside
+                      // click) — our own trigger click handles opening.
                       setIsOpen(open)
                       if (!open) setQuery('')
                     }}
@@ -138,11 +130,9 @@ export function ShiftPickerField({
                       <div
                         className='relative flex-1'
                         onClick={(e) => {
-                          // PopoverTrigger toggles open/closed on every
-                          // click by default. Once open, clicking back into
-                          // the input (e.g. to reposition the cursor while
-                          // typing) shouldn't close the dropdown — only
-                          // swallow the toggle when it would close it.
+                          // PopoverTrigger toggles on every click by default;
+                          // swallow it once open so clicking back into the
+                          // input doesn't close the dropdown.
                           if (disabled || isOpen) e.preventDefault()
                         }}
                       >
