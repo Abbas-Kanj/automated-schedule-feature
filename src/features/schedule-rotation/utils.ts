@@ -138,8 +138,12 @@ export function getRotationPositions(
 //
 // A shift's own "Assign to" picks are deliberately ignored here — those say who
 // may work that shift in general, not who covers which day of this rotation.
-export function getRotationRoster(
-  schedule: RotateSchedule,
+// Only the matrix is read, so fixed schedules — which store the same shape
+// under occurrence slot keys — go through here too.
+export function getRotationRoster<
+  S extends Pick<RotateSchedule, 'day_coverage'>,
+>(
+  schedule: S,
   employees: Employee[],
   teams: Team[]
 ): {

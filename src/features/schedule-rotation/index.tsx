@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   eachDayOfInterval,
   format,
@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -33,10 +32,11 @@ import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { type Team } from '@/features/teams/data/schema'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import { AssignCrewsDialog } from './components/assign-crews-dialog'
+import { EmptyState } from './components/empty-state'
 import { RotationTimelineGrid } from './components/rotation-timeline'
 import { ScheduleRotationTable } from './components/schedule-rotation-table'
 import { ShiftBadge } from './components/shift-badge'
-import { SPAN_OPTIONS } from './data'
+import { SpanTabs } from './components/span-tabs'
 import { type TimelineSpan, buildRotationTimeline } from './timeline'
 import {
   type RotateSchedule,
@@ -365,49 +365,3 @@ export function ScheduleRotation() {
   )
 }
 
-// The Weekly/Monthly control. Rendered per view rather than once for the page:
-// the grid and the table are asking different questions and are allowed to be
-// set to different spans while you compare them.
-function SpanTabs({
-  value,
-  onChange,
-  className,
-}: {
-  value: TimelineSpan
-  onChange: (span: TimelineSpan) => void
-  className?: string
-}) {
-  return (
-    <Tabs
-      value={value}
-      onValueChange={(next) => onChange(next as TimelineSpan)}
-      className={className}
-    >
-      <TabsList>
-        {SPAN_OPTIONS.map((option) => (
-          <TabsTrigger key={option.value} value={option.value}>
-            {option.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
-  )
-}
-
-function EmptyState({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode
-  title: string
-  description: string
-}) {
-  return (
-    <div className='flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-12 text-center'>
-      <div className='text-muted-foreground'>{icon}</div>
-      <p className='font-medium'>{title}</p>
-      <p className='max-w-sm text-sm text-muted-foreground'>{description}</p>
-    </div>
-  )
-}

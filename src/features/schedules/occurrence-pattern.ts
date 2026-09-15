@@ -1,4 +1,9 @@
 import {
+  differenceInCalendarDays,
+  differenceInCalendarMonths,
+  differenceInCalendarWeeks,
+} from 'date-fns'
+import {
   type Occurrence,
   type RotatePatternEntry,
   SHIFT_REPEAT_WEEKDAYS,
@@ -103,6 +108,63 @@ function slotList(
     }
     default:
       return []
+  }
+}
+
+// The slot a calendar day works under, or null when the rule has that day off
+// — the other direction from `slotList`, for screens that draw a real
+// calendar. `start` anchors the interval: "every 2 weeks" counts from the week
+// the schedule starts in. Start and end bounds are the caller's to apply.
+export function occurrenceKeyOn(
+  occurrence: Occurrence,
+  start: Date,
+  date: Date
+): number | null {
+  const interval =
+    Number.isFinite(occurrence.interval) && occurrence.interval > 1
+      ? Math.floor(occurrence.interval)
+      : 1
+  const onCadence = (elapsed: number) =>
+    ((elapsed % interval) + interval) % interval === 0
+  // Monday = 0, matching `SHIFT_REPEAT_WEEKDAYS`.
+  const weekday = (date.getDay() + 6) % 7
+
+  if (occurrence.frequency === 'daily') {
+    return onCadence(differenceInCalendarDays(date, start)) ? 0 : null
+  }
+
+  if (occurrence.frequency === 'weekly') {
+    if (!onCadence(differenceInCalendarWeeks(date, start, { weekStartsOn: 1 })))
+      return null
+    return (occurrence.weekdays ?? []).includes(SHIFT_REPEAT_WEEKDAYS[weekday])
+      ? WEEKLY_BASE + weekday
+      : null
+  }
+
+  if (!onCadence(differenceInCalendarMonths(date, start))) return null
+  const dayOfMonth = date.getDate()
+  switch (occurrence.monthly_mode) {
+    case 'day_month':
+      return occurrence.day_of_month === dayOfMonth
+        ? DAY_OF_MONTH_BASE + dayOfMonth - 1
+        : null
+    case 'date_specific':
+      return occurrence.date_specific_1 === dayOfMonth ||
+        occurrence.date_specific_2 === dayOfMonth
+        ? DAY_OF_MONTH_BASE + dayOfMonth - 1
+        : null
+    case 'day_position': {
+      const rule = occurrence.day_position_rules?.[0]
+      if (
+        !rule ||
+        SHIFT_REPEAT_WEEKDAYS.indexOf(rule.weekday) !== weekday ||
+        Math.ceil(dayOfMonth / 7) !== rule.position
+      )
+        return null
+      return DAY_POSITION_BASE + (rule.position - 1) * 7 + weekday
+    }
+    default:
+      return null
   }
 }
 

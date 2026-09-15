@@ -1991,7 +1991,16 @@ export const defaultSchedules: Schedule[] = [
       weekdays: ['mon', 'tue', 'wed', 'thu', 'fri'],
       exceptions: { public_holiday: false, sick_leave: false },
     },
-    day_coverage: [],
+    crew_kind: 'team',
+    crew_ids: ['team-office'],
+    // Keyed by weekday slot (1000 + weekday, Mon = 0) — see
+    // `occurrence-pattern.ts`. Read it on Work schedule → Fixed.
+    day_coverage: [1000, 1001, 1002, 1003, 1004].map((day) => ({
+      day,
+      shift_id: 'shift-office',
+      employee_ids: [],
+      team_ids: ['team-office'],
+    })),
     crew_placements: [],
   },
 ]

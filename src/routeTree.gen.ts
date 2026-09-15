@@ -23,19 +23,21 @@ import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-p
 import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
 import { Route as AuthenticatedEmployeesListRouteRouteImport } from './routes/_authenticated/employees-list/route'
 import { Route as AuthenticatedEmployeesRouteRouteImport } from './routes/_authenticated/employees/route'
+import { Route as AuthenticatedWorkScheduleIndexRouteImport } from './routes/_authenticated/work-schedule/index'
 import { Route as AuthenticatedTeamsIndexRouteImport } from './routes/_authenticated/teams/index'
 import { Route as AuthenticatedShiftsIndexRouteImport } from './routes/_authenticated/shifts/index'
 import { Route as AuthenticatedShiftPoliciesIndexRouteImport } from './routes/_authenticated/shift-policies/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedSchedulesIndexRouteImport } from './routes/_authenticated/schedules/index'
 import { Route as AuthenticatedScheduleTemplatesIndexRouteImport } from './routes/_authenticated/schedule-templates/index'
-import { Route as AuthenticatedScheduleRotationIndexRouteImport } from './routes/_authenticated/schedule-rotation/index'
 import { Route as AuthenticatedPublicHolidaysIndexRouteImport } from './routes/_authenticated/public-holidays/index'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
+import { Route as AuthenticatedWorkScheduleRotatingIndexRouteImport } from './routes/_authenticated/work-schedule/rotating/index'
+import { Route as AuthenticatedWorkScheduleFixedIndexRouteImport } from './routes/_authenticated/work-schedule/fixed/index'
 import { Route as AuthenticatedShiftsNewIndexRouteImport } from './routes/_authenticated/shifts/new/index'
 import { Route as AuthenticatedSchedulesNewIndexRouteImport } from './routes/_authenticated/schedules/new/index'
 import { Route as AuthenticatedSchedulesScheduleIdIndexRouteImport } from './routes/_authenticated/schedules/$scheduleId/index'
@@ -113,6 +115,12 @@ const AuthenticatedEmployeesRouteRoute =
     path: '/employees',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedWorkScheduleIndexRoute =
+  AuthenticatedWorkScheduleIndexRouteImport.update({
+    id: '/work-schedule/',
+    path: '/work-schedule/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedTeamsIndexRoute = AuthenticatedTeamsIndexRouteImport.update({
   id: '/teams/',
   path: '/teams/',
@@ -146,12 +154,6 @@ const AuthenticatedScheduleTemplatesIndexRoute =
   AuthenticatedScheduleTemplatesIndexRouteImport.update({
     id: '/schedule-templates/',
     path: '/schedule-templates/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedScheduleRotationIndexRoute =
-  AuthenticatedScheduleRotationIndexRouteImport.update({
-    id: '/schedule-rotation/',
-    path: '/schedule-rotation/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPublicHolidaysIndexRoute =
@@ -188,6 +190,18 @@ const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
     path: '/errors/$error',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWorkScheduleRotatingIndexRoute =
+  AuthenticatedWorkScheduleRotatingIndexRouteImport.update({
+    id: '/work-schedule/rotating/',
+    path: '/work-schedule/rotating/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWorkScheduleFixedIndexRoute =
+  AuthenticatedWorkScheduleFixedIndexRouteImport.update({
+    id: '/work-schedule/fixed/',
+    path: '/work-schedule/fixed/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedShiftsNewIndexRoute =
@@ -235,16 +249,18 @@ export interface FileRoutesByFullPath {
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/public-holidays/': typeof AuthenticatedPublicHolidaysIndexRoute
-  '/schedule-rotation/': typeof AuthenticatedScheduleRotationIndexRoute
   '/schedule-templates/': typeof AuthenticatedScheduleTemplatesIndexRoute
   '/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/shift-policies/': typeof AuthenticatedShiftPoliciesIndexRoute
   '/shifts/': typeof AuthenticatedShiftsIndexRoute
   '/teams/': typeof AuthenticatedTeamsIndexRoute
+  '/work-schedule/': typeof AuthenticatedWorkScheduleIndexRoute
   '/schedules/$scheduleId/': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/schedules/new/': typeof AuthenticatedSchedulesNewIndexRoute
   '/shifts/new/': typeof AuthenticatedShiftsNewIndexRoute
+  '/work-schedule/fixed/': typeof AuthenticatedWorkScheduleFixedIndexRoute
+  '/work-schedule/rotating/': typeof AuthenticatedWorkScheduleRotatingIndexRoute
   '/schedules/$scheduleId/edit/': typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
 }
 export interface FileRoutesByTo {
@@ -266,16 +282,18 @@ export interface FileRoutesByTo {
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/public-holidays': typeof AuthenticatedPublicHolidaysIndexRoute
-  '/schedule-rotation': typeof AuthenticatedScheduleRotationIndexRoute
   '/schedule-templates': typeof AuthenticatedScheduleTemplatesIndexRoute
   '/schedules': typeof AuthenticatedSchedulesIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/shift-policies': typeof AuthenticatedShiftPoliciesIndexRoute
   '/shifts': typeof AuthenticatedShiftsIndexRoute
   '/teams': typeof AuthenticatedTeamsIndexRoute
+  '/work-schedule': typeof AuthenticatedWorkScheduleIndexRoute
   '/schedules/$scheduleId': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/schedules/new': typeof AuthenticatedSchedulesNewIndexRoute
   '/shifts/new': typeof AuthenticatedShiftsNewIndexRoute
+  '/work-schedule/fixed': typeof AuthenticatedWorkScheduleFixedIndexRoute
+  '/work-schedule/rotating': typeof AuthenticatedWorkScheduleRotatingIndexRoute
   '/schedules/$scheduleId/edit': typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
 }
 export interface FileRoutesById {
@@ -300,16 +318,18 @@ export interface FileRoutesById {
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/public-holidays/': typeof AuthenticatedPublicHolidaysIndexRoute
-  '/_authenticated/schedule-rotation/': typeof AuthenticatedScheduleRotationIndexRoute
   '/_authenticated/schedule-templates/': typeof AuthenticatedScheduleTemplatesIndexRoute
   '/_authenticated/schedules/': typeof AuthenticatedSchedulesIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/shift-policies/': typeof AuthenticatedShiftPoliciesIndexRoute
   '/_authenticated/shifts/': typeof AuthenticatedShiftsIndexRoute
   '/_authenticated/teams/': typeof AuthenticatedTeamsIndexRoute
+  '/_authenticated/work-schedule/': typeof AuthenticatedWorkScheduleIndexRoute
   '/_authenticated/schedules/$scheduleId/': typeof AuthenticatedSchedulesScheduleIdIndexRoute
   '/_authenticated/schedules/new/': typeof AuthenticatedSchedulesNewIndexRoute
   '/_authenticated/shifts/new/': typeof AuthenticatedShiftsNewIndexRoute
+  '/_authenticated/work-schedule/fixed/': typeof AuthenticatedWorkScheduleFixedIndexRoute
+  '/_authenticated/work-schedule/rotating/': typeof AuthenticatedWorkScheduleRotatingIndexRoute
   '/_authenticated/schedules/$scheduleId/edit/': typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
 }
 export interface FileRouteTypes {
@@ -334,16 +354,18 @@ export interface FileRouteTypes {
     | '/settings/display'
     | '/settings/notifications'
     | '/public-holidays/'
-    | '/schedule-rotation/'
     | '/schedule-templates/'
     | '/schedules/'
     | '/settings/'
     | '/shift-policies/'
     | '/shifts/'
     | '/teams/'
+    | '/work-schedule/'
     | '/schedules/$scheduleId/'
     | '/schedules/new/'
     | '/shifts/new/'
+    | '/work-schedule/fixed/'
+    | '/work-schedule/rotating/'
     | '/schedules/$scheduleId/edit/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -365,16 +387,18 @@ export interface FileRouteTypes {
     | '/settings/display'
     | '/settings/notifications'
     | '/public-holidays'
-    | '/schedule-rotation'
     | '/schedule-templates'
     | '/schedules'
     | '/settings'
     | '/shift-policies'
     | '/shifts'
     | '/teams'
+    | '/work-schedule'
     | '/schedules/$scheduleId'
     | '/schedules/new'
     | '/shifts/new'
+    | '/work-schedule/fixed'
+    | '/work-schedule/rotating'
     | '/schedules/$scheduleId/edit'
   id:
     | '__root__'
@@ -398,16 +422,18 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
     | '/_authenticated/public-holidays/'
-    | '/_authenticated/schedule-rotation/'
     | '/_authenticated/schedule-templates/'
     | '/_authenticated/schedules/'
     | '/_authenticated/settings/'
     | '/_authenticated/shift-policies/'
     | '/_authenticated/shifts/'
     | '/_authenticated/teams/'
+    | '/_authenticated/work-schedule/'
     | '/_authenticated/schedules/$scheduleId/'
     | '/_authenticated/schedules/new/'
     | '/_authenticated/shifts/new/'
+    | '/_authenticated/work-schedule/fixed/'
+    | '/_authenticated/work-schedule/rotating/'
     | '/_authenticated/schedules/$scheduleId/edit/'
   fileRoutesById: FileRoutesById
 }
@@ -524,6 +550,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEmployeesRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/work-schedule/': {
+      id: '/_authenticated/work-schedule/'
+      path: '/work-schedule'
+      fullPath: '/work-schedule/'
+      preLoaderRoute: typeof AuthenticatedWorkScheduleIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/teams/': {
       id: '/_authenticated/teams/'
       path: '/teams'
@@ -566,13 +599,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedScheduleTemplatesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/schedule-rotation/': {
-      id: '/_authenticated/schedule-rotation/'
-      path: '/schedule-rotation'
-      fullPath: '/schedule-rotation/'
-      preLoaderRoute: typeof AuthenticatedScheduleRotationIndexRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/public-holidays/': {
       id: '/_authenticated/public-holidays/'
       path: '/public-holidays'
@@ -613,6 +639,20 @@ declare module '@tanstack/react-router' {
       path: '/errors/$error'
       fullPath: '/errors/$error'
       preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/work-schedule/rotating/': {
+      id: '/_authenticated/work-schedule/rotating/'
+      path: '/work-schedule/rotating'
+      fullPath: '/work-schedule/rotating/'
+      preLoaderRoute: typeof AuthenticatedWorkScheduleRotatingIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/work-schedule/fixed/': {
+      id: '/_authenticated/work-schedule/fixed/'
+      path: '/work-schedule/fixed'
+      fullPath: '/work-schedule/fixed/'
+      preLoaderRoute: typeof AuthenticatedWorkScheduleFixedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/shifts/new/': {
@@ -676,15 +716,17 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedPublicHolidaysIndexRoute: typeof AuthenticatedPublicHolidaysIndexRoute
-  AuthenticatedScheduleRotationIndexRoute: typeof AuthenticatedScheduleRotationIndexRoute
   AuthenticatedScheduleTemplatesIndexRoute: typeof AuthenticatedScheduleTemplatesIndexRoute
   AuthenticatedSchedulesIndexRoute: typeof AuthenticatedSchedulesIndexRoute
   AuthenticatedShiftPoliciesIndexRoute: typeof AuthenticatedShiftPoliciesIndexRoute
   AuthenticatedShiftsIndexRoute: typeof AuthenticatedShiftsIndexRoute
   AuthenticatedTeamsIndexRoute: typeof AuthenticatedTeamsIndexRoute
+  AuthenticatedWorkScheduleIndexRoute: typeof AuthenticatedWorkScheduleIndexRoute
   AuthenticatedSchedulesScheduleIdIndexRoute: typeof AuthenticatedSchedulesScheduleIdIndexRoute
   AuthenticatedSchedulesNewIndexRoute: typeof AuthenticatedSchedulesNewIndexRoute
   AuthenticatedShiftsNewIndexRoute: typeof AuthenticatedShiftsNewIndexRoute
+  AuthenticatedWorkScheduleFixedIndexRoute: typeof AuthenticatedWorkScheduleFixedIndexRoute
+  AuthenticatedWorkScheduleRotatingIndexRoute: typeof AuthenticatedWorkScheduleRotatingIndexRoute
   AuthenticatedSchedulesScheduleIdEditIndexRoute: typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
 }
 
@@ -695,18 +737,21 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedPublicHolidaysIndexRoute: AuthenticatedPublicHolidaysIndexRoute,
-  AuthenticatedScheduleRotationIndexRoute:
-    AuthenticatedScheduleRotationIndexRoute,
   AuthenticatedScheduleTemplatesIndexRoute:
     AuthenticatedScheduleTemplatesIndexRoute,
   AuthenticatedSchedulesIndexRoute: AuthenticatedSchedulesIndexRoute,
   AuthenticatedShiftPoliciesIndexRoute: AuthenticatedShiftPoliciesIndexRoute,
   AuthenticatedShiftsIndexRoute: AuthenticatedShiftsIndexRoute,
   AuthenticatedTeamsIndexRoute: AuthenticatedTeamsIndexRoute,
+  AuthenticatedWorkScheduleIndexRoute: AuthenticatedWorkScheduleIndexRoute,
   AuthenticatedSchedulesScheduleIdIndexRoute:
     AuthenticatedSchedulesScheduleIdIndexRoute,
   AuthenticatedSchedulesNewIndexRoute: AuthenticatedSchedulesNewIndexRoute,
   AuthenticatedShiftsNewIndexRoute: AuthenticatedShiftsNewIndexRoute,
+  AuthenticatedWorkScheduleFixedIndexRoute:
+    AuthenticatedWorkScheduleFixedIndexRoute,
+  AuthenticatedWorkScheduleRotatingIndexRoute:
+    AuthenticatedWorkScheduleRotatingIndexRoute,
   AuthenticatedSchedulesScheduleIdEditIndexRoute:
     AuthenticatedSchedulesScheduleIdEditIndexRoute,
 }

@@ -1,5 +1,7 @@
 import {
+  CalendarCheck,
   CalendarClock,
+  CalendarRange,
   CalendarDays,
   AudioWaveform,
   Clock,
@@ -50,7 +52,19 @@ export const sidebarData: SidebarData = {
               items: [
                 { title: 'General schedule', url: '/schedules' },
                 { title: 'Flexible schedule', url: '/schedules' },
-                { title: 'Schedule rotation', url: '/schedule-rotation' },
+                {
+                  title: 'Work schedule',
+                  items: [
+                    {
+                      title: 'Rotating work schedule',
+                      url: '/work-schedule/rotating',
+                    },
+                    {
+                      title: 'Fixed work schedule',
+                      url: '/work-schedule/fixed',
+                    },
+                  ],
+                },
                 { title: 'Schedule templates', url: '/schedule-templates' },
               ],
             },
@@ -65,9 +79,20 @@ export const sidebarData: SidebarData = {
           ],
         },
         {
-          title: 'Schedule Rotation',
-          url: '/schedule-rotation',
-          icon: RotateCw,
+          title: 'Work schedule',
+          icon: CalendarRange,
+          items: [
+            {
+              title: 'Rotating work schedule',
+              url: '/work-schedule/rotating',
+              icon: RotateCw,
+            },
+            {
+              title: 'Fixed work schedule',
+              url: '/work-schedule/fixed',
+              icon: CalendarCheck,
+            },
+          ],
         },
         {
           title: 'Employee Management',

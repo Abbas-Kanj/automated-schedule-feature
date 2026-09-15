@@ -128,7 +128,8 @@ function crewStartDate(
   return start
 }
 
-function spanDays(viewDate: Date, span: TimelineSpan): Date[] {
+// Exported for the Fixed work schedule screen, which draws the same grid.
+export function spanDays(viewDate: Date, span: TimelineSpan): Date[] {
   if (span === 'week') {
     const start = startOfWeek(viewDate, { weekStartsOn: 1 })
     return Array.from({ length: 7 }, (_, i) => addDays(start, i))
@@ -138,7 +139,10 @@ function spanDays(viewDate: Date, span: TimelineSpan): Date[] {
   return Array.from({ length }, (_, i) => addDays(start, i))
 }
 
-function toBlocks(days: TimelineDay[], span: TimelineSpan): TimelineBlock[] {
+export function toBlocks(
+  days: TimelineDay[],
+  span: TimelineSpan
+): TimelineBlock[] {
   const blocks: TimelineBlock[] = []
   for (let i = 0; i < days.length; i += DAYS_PER_BLOCK) {
     const slice = days.slice(i, i + DAYS_PER_BLOCK)
