@@ -6,7 +6,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import { FilterableMultiSelect } from '@/components/multi-select/filterable-multi-select'
+import { MultiSelect } from '@/components/multi-select'
 import { ToggleButton } from '@/components/toggle-button'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { getEmployeeFullName } from '@/features/employees/utils'
@@ -94,7 +94,7 @@ export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>{crewKind === 'team' ? 'Teams' : 'Employees'}</FormLabel>
-              <FilterableMultiSelect
+              <MultiSelect
                 options={options}
                 value={options.filter((option) =>
                   ((field.value as string[] | undefined) ?? []).includes(
