@@ -27,7 +27,10 @@ import {
   type RotateDayCoverage,
   type RotatePatternEntry,
 } from '@/features/schedules/data/schema'
-import { crewKeysFromDayCoverage } from '@/features/schedules/rotation-crews'
+import {
+  crewKeysFromDayCoverage,
+  crewSelectionFromDayCoverage,
+} from '@/features/schedules/rotation-crews'
 import { useSchedulesStore } from '@/features/schedules/stores/schedules-store'
 import { type RotateSchedule, isRotateSchedule } from '../utils'
 
@@ -91,6 +94,9 @@ export function AssignToPanel({
       crew_placements: values.crew_placements,
       start_date: values.start_date,
       end_settings: values.end_settings,
+      // Keeps the wizard's "Assign to" pick in step with the roster edited
+      // here, so editing the schedule afterwards opens on these crews.
+      ...crewSelectionFromDayCoverage(values.day_coverage),
     })
     toast.success(`Crew assignment saved for "${schedule.name}".`)
     onSaved?.()

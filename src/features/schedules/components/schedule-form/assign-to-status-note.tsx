@@ -9,13 +9,9 @@ type AssignToStatusNoteProps = {
   dayCoverage: RotateDayCoverage[] | undefined
 }
 
-// Crew assignment for a rotate schedule no longer happens in this form — it
-// moved to the "Assign crews" dialog on `/schedule-rotation` (see
-// `schedule-rotation/components/assign-crews-dialog.tsx`), which is the only
-// place `day_coverage`/`crew_placements` get edited now. This is
-// just a status line pointing there, sized from whatever the schedule
-// already holds — shown both in the wizard's Summary step and on the
-// read-only View page.
+// One-line recap of the "Assign to" step for the wizard's Summary, sized from
+// whatever `day_coverage` holds. Rotate rosters can also be edited later from
+// the "Assign crews" dialog on `/schedule-rotation`.
 export function AssignToStatusNote({ dayCoverage }: AssignToStatusNoteProps) {
   const teams = useTeamsStore((s) => s.teams)
   const employees = useEmployeesStore((s) => s.employees)
@@ -41,8 +37,8 @@ export function AssignToStatusNote({ dayCoverage }: AssignToStatusNoteProps) {
   return (
     <p className='text-sm text-muted-foreground'>
       {crews.length === 0
-        ? 'Not yet assigned — assign crews from Schedule Rotation after saving.'
-        : `${crews.length} crew${crews.length === 1 ? '' : 's'} assigned. Manage the roster from Schedule Rotation.`}
+        ? 'Not yet assigned.'
+        : `${crews.length} crew${crews.length === 1 ? '' : 's'} assigned.`}
     </p>
   )
 }

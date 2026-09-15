@@ -24,6 +24,7 @@ import {
   SHIFT_REPEAT_WEEKDAYS,
   type CYCLE_LENGTH_UNITS,
   type CYCLE_TYPES,
+  type OCCURRENCE_FREQUENCIES,
   type RECURRENCE_END_TYPES,
   type REGULAR_TYPES,
   type ShiftRepeatFrequency,
@@ -195,6 +196,19 @@ export const RECURRENCE_END_TYPE_OPTIONS = [
   { value: 'after_occurrences', label: 'End after' },
   { value: 'on_date', label: 'End on' },
 ] satisfies { value: (typeof RECURRENCE_END_TYPES)[number]; label: string }[]
+
+// Fixed schedules' "Occurrence" step. Unlike the other monthly options above,
+// monthly is selectable here — `occurrencePattern` reads it as a 30-day month,
+// the same flat approximation `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS` uses.
+export const OCCURRENCE_FREQUENCY_OPTIONS = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+] satisfies {
+  value: (typeof OCCURRENCE_FREQUENCIES)[number]
+  label: string
+  disabled?: boolean
+}[]
 
 export const SHIFT_REPEAT_FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Days' },

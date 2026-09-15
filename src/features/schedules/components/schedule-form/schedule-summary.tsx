@@ -10,11 +10,15 @@ import {
 } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
+import { useEmployeesStore } from '@/features/employees/stores/employees-store'
+import { getEmployeeFullName } from '@/features/employees/utils'
+import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import {
   CYCLE_TYPE_OPTIONS,
   MONTHS,
   REGULAR_TYPE_OPTIONS,
   SCHEDULE_TYPES,
+  SHIFT_REPEAT_WEEKDAY_OPTIONS,
 } from '../../data/data'
 import { calculateHours, formatTimes } from '../../utils'
 import { AssignToStatusNote } from './assign-to-status-note'
@@ -255,14 +259,83 @@ function ShiftsSummary({ values }: { values: any }) {
   )
 }
 
-// Rotate only. Crew assignment moved out of this wizard entirely — see
-// `AssignToStatusNote` — so this is just that same status line, not a
-// recap of a step that no longer exists here.
+// Rotate and fixed — who was picked, then a crew count for the work step,
+// not a second copy of its coverage grid.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AssignToSummary({ values }: { values: any }) {
+  const teams = useTeamsStore((s) => s.teams)
+  const employees = useEmployeesStore((s) => s.employees)
+  const ids: string[] = values.crew_ids ?? []
+  const isTeam = (values.crew_kind ?? 'team') === 'team'
+  const names = isTeam
+    ? teams.filter((team) => ids.includes(team.id)).map((team) => team.name)
+    : employees
+        .filter((employee) => employee.id && ids.includes(employee.id))
+        .map(getEmployeeFullName)
+
   return (
     <SummarySection title='Assign to'>
+      <SummaryRow
+        inline
+        label={isTeam ? 'Teams' : 'Employees'}
+        value={names.join(', ')}
+      />
       <AssignToStatusNote dayCoverage={values.day_coverage} />
+    </SummarySection>
+  )
+}
+
+// Fixed only — the "Occurrence" step as one line, plus its exceptions.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function OccurrenceSummary({ values }: { values: any }) {
+  const occurrence = values.occurrence
+  if (!occurrence) return null
+
+  const interval = occurrence.interval || 1
+  const unit =
+    occurrence.frequency === 'daily'
+      ? 'day'
+      : occurrence.frequency === 'weekly'
+        ? 'week'
+        : 'month'
+  const every = interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`
+  const weekdayLabel = (value?: string) =>
+    SHIFT_REPEAT_WEEKDAY_OPTIONS.find((o) => o.value === value)?.label
+  const positionRule = occurrence.day_position_rules?.[0]
+  const days =
+    occurrence.frequency === 'weekly'
+      ? SHIFT_REPEAT_WEEKDAY_OPTIONS.filter((o) =>
+          (occurrence.weekdays ?? []).includes(o.value)
+        )
+          .map((o) => o.label)
+          .join(', ')
+      : occurrence.frequency !== 'monthly'
+        ? ''
+        : occurrence.monthly_mode === 'day_month' && occurrence.day_of_month
+          ? `day ${occurrence.day_of_month}`
+          : occurrence.monthly_mode === 'date_specific'
+            ? [occurrence.date_specific_1, occurrence.date_specific_2]
+                .filter(Boolean)
+                .map((d) => `day ${d}`)
+                .join(' and ')
+            : occurrence.monthly_mode === 'day_position' && positionRule
+              ? `week ${positionRule.position}'s ${weekdayLabel(positionRule.weekday)}`
+              : ''
+  const exceptions = [
+    occurrence.exceptions?.public_holiday && 'Public holiday',
+    occurrence.exceptions?.sick_leave && 'Sick leave',
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+  return (
+    <SummarySection title='Occurrence'>
+      <SummaryRow
+        inline
+        label='Repeats'
+        value={days ? `${every} on ${days}` : every}
+      />
+      <SummaryRow inline label='Exceptions' value={exceptions || 'None'} />
     </SummarySection>
   )
 }
@@ -284,7 +357,10 @@ export function ScheduleSummary({ control }: ScheduleSummaryProps) {
       {values.parent_type === 'regular' && (
         <>
           <ShiftsSummary values={values} />
-          {values.type === 'rotate' && <AssignToSummary values={values} />}
+          {values.type === 'fixed' && <OccurrenceSummary values={values} />}
+          {(values.type === 'rotate' || values.type === 'fixed') && (
+            <AssignToSummary values={values} />
+          )}
           <SummarySection title='Calendar preview'>
             {values.type === 'rotate' && (
               // The preview walks the *pattern*, which is one crew's journey

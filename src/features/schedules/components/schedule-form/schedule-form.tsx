@@ -1,6 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { format } from 'date-fns'
-import { type Control, type Resolver, useForm, useWatch } from 'react-hook-form'
+import {
+  type Control,
+  type Resolver,
+  type UseFormReturn,
+  useForm,
+  useWatch,
+} from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { generateId } from '@/lib/id'
 import { showSubmittedData } from '@/lib/show-submitted-data'
@@ -24,16 +30,26 @@ import {
 import { SCHEDULE_TYPES } from '../../data/data'
 import {
   type DailySchedule,
+  DEFAULT_OCCURRENCE,
+  type Occurrence,
   type RegularType,
+  type RotateCrewPlacement,
   type RotateDayCoverage,
   type Schedule,
   type ScheduleType,
   scheduleSchema,
 } from '../../data/schema'
-import { AssignToStatusNote } from './assign-to-status-note'
+import { occurrencePattern } from '../../occurrence-pattern'
+import {
+  crewSelectionFromDayCoverage,
+  pruneRosterToCrews,
+} from '../../rotation-crews'
+import { AssignToCrewFields } from './assign-to-crew-fields'
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { MonthlyFields } from './monthly-fields'
+import { OccurrenceFields } from './occurrence-fields'
 import { PatternBuilder } from './pattern-builder'
+import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 import { ScheduleBasicsFields } from './schedule-basics-fields'
 import { ScheduleStartEndFields } from './schedule-start-end-fields'
 import { ScheduleSummary } from './schedule-summary'
@@ -59,17 +75,34 @@ function getSteps(
   }
 
   // rotate gets its own pattern step (cycle/pattern config) — the template
-  // one crew's journey follows — PLUS the same shared "Start & End" step as
-  // fixed/flexible (start date + end frequency; see
-  // `schedule-start-end-fields.tsx`). Naming the crew on each position of
-  // that pattern (`day_coverage`/`crew_placements`) no longer happens here:
-  // it moved to the "Assign crews" dialog on the Schedule Rotation screen
-  // — see `schedule-rotation/components/assign-crews-dialog.tsx`.
+  // one crew's journey follows — then "Assign to", which staffs it, PLUS the
+  // same shared "Start & End" step as fixed/flexible (start date + end
+  // frequency; see `schedule-start-end-fields.tsx`). The same "Assign to"
+  // component also backs the "Assign crews" dialog on Schedule Rotation, for
+  // editing the roster after the schedule exists.
   if (regularType === 'rotate') {
     return [
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'pattern', label: 'Pattern' },
+      { id: 'assign-to', label: 'Assign to' },
+      { id: 'work', label: 'Work rotation' },
+      { id: 'end-settings', label: 'Start & End' },
+      { id: 'summary', label: 'Summary' },
+    ]
+  }
+  // fixed's "Occurrence" plays the part rotate's Pattern does, and "Work
+  // fixed" reads it as one. "Start & End" is the last step before Summary for
+  // both types. The occurrence pattern is anchored on the start date (which
+  // defaults to today), so changing it there re-lines the weekdays under an
+  // already-assigned roster — the coverage panel reflects that if revisited.
+  if (regularType === 'fixed') {
+    return [
+      { id: 'basics', label: 'Basics' },
+      { id: 'shifts', label: 'Shifts' },
+      { id: 'occurrence', label: 'Occurrence' },
+      { id: 'assign-to', label: 'Assign to' },
+      { id: 'work', label: 'Work fixed' },
       { id: 'end-settings', label: 'Start & End' },
       { id: 'summary', label: 'Summary' },
     ]
@@ -136,6 +169,8 @@ function getRegularTypeDefaults(type: RegularType) {
       shift_ids: [] as string[],
       temporary_schedule: false,
       cycle_type: 'pattern_shifts' as const,
+      crew_kind: 'team' as const,
+      crew_ids: [] as string[],
       cycle_length: { unit: 'weekly' as const, days: 6 },
       pattern: Array.from({ length: 7 }, (_, i) => ({
         position: i + 1,
@@ -161,7 +196,7 @@ function getRegularTypeDefaults(type: RegularType) {
     }
   }
 
-  return {
+  const shared = {
     parent_type: 'regular' as const,
     type,
     start_date: startDate,
@@ -169,6 +204,32 @@ function getRegularTypeDefaults(type: RegularType) {
     shift_ids: [] as string[],
     temporary_schedule: false,
   }
+
+  if (type === 'fixed') {
+    return {
+      ...shared,
+      occurrence: DEFAULT_OCCURRENCE,
+      crew_kind: 'team' as const,
+      crew_ids: [] as string[],
+      day_coverage: [] as RotateDayCoverage[],
+      crew_placements: [] as RotateCrewPlacement[],
+    }
+  }
+
+  return shared
+}
+
+// A schedule saved before the "Assign to" step stored its pick still has a
+// roster; recover the pick from it so editing opens on the right crews.
+function withCrewSelection(schedule: Schedule): Schedule {
+  if (schedule.parent_type !== 'regular' || schedule.type === 'flexible') {
+    return schedule
+  }
+  if (schedule.crew_ids?.length) return schedule
+  const derived = crewSelectionFromDayCoverage(schedule.day_coverage)
+  return derived.crew_ids.length
+    ? { ...schedule, ...derived }
+    : { ...schedule, crew_kind: schedule.crew_kind ?? 'team', crew_ids: [] }
 }
 
 type ScheduleFormProps = {
@@ -196,6 +257,19 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   if (stepId === 'pattern') {
     return ['cycle_type', 'cycle_length', 'pattern', 'shift_repeat']
   }
+  if (stepId === 'occurrence') {
+    return ['occurrence']
+  }
+  // At least one crew is required too, but checked in `handleNext` rather
+  // than the schema, so schedules saved without a pick still load.
+  if (stepId === 'assign-to') {
+    return ['crew_kind', 'crew_ids']
+  }
+  // Only well-formedness is checked — an unstaffed shift is a warning in the
+  // coverage panel, never a reason to block "Next".
+  if (stepId === 'work') {
+    return ['day_coverage', 'crew_placements']
+  }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
     if (type === 'weekly_one') return ['type', 'days']
@@ -215,7 +289,7 @@ export function ScheduleForm({
     resolver: zodResolver(scheduleSchema) as Resolver<Schedule>,
     mode: 'onChange',
     defaultValues:
-      defaultValues ??
+      (defaultValues && withCrewSelection(defaultValues)) ??
       ({
         id: generateId(),
         name: '',
@@ -232,30 +306,79 @@ export function ScheduleForm({
   // open — locks all step navigation so the user can't jump away from
   // underneath it. See `ShiftPickerField`'s `onDialogOpenChange`.
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
+  // Set by the "Assign to" step while it is mounted, so leaving the step
+  // accepts the crew assignment it is showing — see
+  // `schedule-assign-to-fields.tsx#commitPendingSuggestion`.
+  const assignToCommitRef = useRef<(() => void) | null>(null)
 
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const looseControl = form.control as unknown as Control<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const looseForm = form as unknown as UseFormReturn<any>
   const regularType = useWatch({ control: looseControl, name: 'type' }) as
     | RegularType
     | undefined
-  // Only read for the disabled/View-page status note below — the wizard
-  // itself never edits this field anymore (see `AssignToStatusNote`).
-  const dayCoverage = useWatch({
+  const occurrence = useWatch({
     control: looseControl,
-    name: 'day_coverage',
-  }) as RotateDayCoverage[] | undefined
+    name: 'occurrence',
+  }) as Occurrence | undefined
+  const startDate = useWatch({ control: looseControl, name: 'start_date' }) as
+    | string
+    | undefined
+  const shiftIds = useWatch({ control: looseControl, name: 'shift_ids' }) as
+    | string[]
+    | undefined
+
+  // What "Assign to" staffs for a fixed schedule; rotate reads its own
+  // `pattern` field instead.
+  const fixedPattern =
+    regularType === 'fixed'
+      ? occurrencePattern(occurrence, startDate, shiftIds?.[0])
+      : undefined
 
   const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
   const isLastStep = step === steps.length - 1
 
+  // Leaving "Assign to" drops anybody no longer picked from the roster, so the
+  // work step never shows crews that are not on the schedule.
+  const pruneRosterToSelection = () => {
+    const values = looseForm.getValues()
+    const pruned = pruneRosterToCrews(
+      values.day_coverage ?? [],
+      values.crew_placements ?? [],
+      values.crew_kind ?? 'team',
+      values.crew_ids ?? []
+    )
+    looseForm.setValue('day_coverage', pruned.day_coverage)
+    looseForm.setValue('crew_placements', pruned.crew_placements)
+  }
+
   const goToStep = (index: number) => {
+    if (currentStepId === 'work') assignToCommitRef.current?.()
+    if (currentStepId === 'assign-to') pruneRosterToSelection()
     setStep(Math.min(Math.max(index, 0), steps.length - 1))
   }
 
   const handleNext = async () => {
+    // Before validating, not after: the commit writes `day_coverage`, and
+    // `trigger` has to see the values the user is actually advancing with.
+    if (currentStepId === 'work') assignToCommitRef.current?.()
+
+    if (currentStepId === 'assign-to') {
+      const crewIds = looseForm.getValues('crew_ids') as string[] | undefined
+      if (!crewIds?.length) {
+        looseForm.setError('crew_ids', {
+          type: 'manual',
+          message: 'Select at least one team or employee',
+        })
+        return
+      }
+      pruneRosterToSelection()
+    }
+
     const valid = await form.trigger(
       getStepFields(currentStepId, parentType, type)
     )
@@ -430,18 +553,36 @@ export function ScheduleForm({
                 <PatternBuilder disabled={disabled} />
               )}
 
-            {/* Crew assignment itself lives in the "Assign crews" dialog on
-                Schedule Rotation now (see `AssignToStatusNote`) — this
-                never shows as a
-                wizard step, only as a status line on the read-only View
-                page, since `ScheduleSummary` (which carries the same note)
-                doesn't render in disabled mode. */}
-            {disabled && parentType === 'regular' && regularType === 'rotate' && (
-              <div className='space-y-1.5'>
-                <FormLabel>Assign to</FormLabel>
-                <AssignToStatusNote dayCoverage={dayCoverage} />
-              </div>
-            )}
+            {(disabled || currentStepId === 'occurrence') &&
+              parentType === 'regular' &&
+              regularType === 'fixed' && (
+                <OccurrenceFields disabled={disabled} />
+              )}
+
+            {(disabled || currentStepId === 'assign-to') &&
+              parentType === 'regular' &&
+              (regularType === 'rotate' || regularType === 'fixed') && (
+                <AssignToCrewFields disabled={disabled} />
+              )}
+
+            {(disabled || currentStepId === 'work') &&
+              parentType === 'regular' &&
+              (regularType === 'rotate' || regularType === 'fixed') && (
+                <div className='space-y-1.5'>
+                  {disabled && (
+                    <FormLabel>
+                      {regularType === 'rotate' ? 'Work rotation' : 'Work fixed'}
+                    </FormLabel>
+                  )}
+                  <ScheduleAssignToFields
+                    disabled={disabled}
+                    commitRef={assignToCommitRef}
+                    pattern={fixedPattern}
+                    manualOnly={regularType === 'fixed'}
+                    poolFromForm
+                  />
+                </div>
+              )}
 
             {(disabled || currentStepId === 'end-settings') &&
               parentType === 'regular' && (

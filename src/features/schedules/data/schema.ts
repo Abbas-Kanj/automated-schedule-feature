@@ -339,6 +339,102 @@ const rotateFieldsSchema = z.object({
   crew_placements: z.array(rotateCrewPlacementSchema).default([]),
 })
 
+// --- rotate / fixed: who the roster is drawn from ---
+//
+// The "Assign to" step's pick: teams or employees, and which. Optional so
+// schedules saved before the step existed still load — the form recovers the
+// pick from `day_coverage` (see `crewSelectionFromDayCoverage`).
+export const CREW_KINDS = ['team', 'employee'] as const
+
+const crewSelectionSchema = z.object({
+  crew_kind: z.enum(CREW_KINDS).optional(),
+  crew_ids: z.array(z.string()).optional(),
+})
+
+// --- fixed: occurrence ---
+//
+// How often a fixed schedule's working days come round — the fixed
+// counterpart of rotate's pattern. The "Assign to" step reads it as a pattern
+// (see `occurrencePattern` in `utils.ts`) so both types share one roster
+// editor. End settings are not repeated here; "Start & End" owns them.
+export const OCCURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
+
+export const DEFAULT_OCCURRENCE = {
+  frequency: 'weekly' as const,
+  interval: 1,
+  weekdays: ['mon', 'tue', 'wed', 'thu', 'fri'] as ShiftRepeatWeekday[],
+  exceptions: { public_holiday: false, sick_leave: false },
+}
+
+const occurrenceSchema = z
+  .object({
+    frequency: z.enum(OCCURRENCE_FREQUENCIES),
+    interval: z.number().min(1),
+    weekdays: z.array(shiftRepeatWeekdaySchema).optional(),
+    // Monthly only — the same sub-modes as rotate's per-shift repeat rows,
+    // rendered by the shared `RepeatMonthlyFields`.
+    monthly_mode: shiftRepeatMonthlyModeSchema.optional(),
+    day_of_month: z.number().min(1).max(28).optional(),
+    date_specific_1: z.number().min(1).max(28).optional(),
+    date_specific_2: z.number().min(1).max(28).optional(),
+    day_position_rules: z
+      .array(shiftRepeatDayPositionRuleSchema)
+      .max(1)
+      .optional(),
+    exceptions: z.object({
+      public_holiday: z.boolean().default(false),
+      sick_leave: z.boolean().default(false),
+    }),
+  })
+  .superRefine((val, ctx) => {
+    if (val.frequency === 'weekly' && !val.weekdays?.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Select at least one day',
+        path: ['weekdays'],
+      })
+    }
+
+    if (val.frequency !== 'monthly') return
+    if (!val.monthly_mode) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Select how it repeats monthly',
+        path: ['monthly_mode'],
+      })
+    } else if (val.monthly_mode === 'day_month' && !val.day_of_month) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Select the day of the month',
+        path: ['day_of_month'],
+      })
+    } else if (val.monthly_mode === 'date_specific') {
+      if (!val.date_specific_1) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Select the first date',
+          path: ['date_specific_1'],
+        })
+      }
+      if (!val.date_specific_2) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Select the second date',
+          path: ['date_specific_2'],
+        })
+      }
+    } else if (
+      val.monthly_mode === 'day_position' &&
+      !val.day_position_rules?.length
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Add a day-position rule',
+        path: ['day_position_rules'],
+      })
+    }
+  })
+
 // --- assemble the three `regular` arms ---
 
 const regularFixedSchema = z.object({
@@ -346,6 +442,11 @@ const regularFixedSchema = z.object({
   type: z.literal('fixed'),
   ...regularSharedSchema.shape,
   ...shiftDefinitionFieldsSchema.shape,
+  // Defaulted so fixed schedules saved before these existed still load.
+  occurrence: occurrenceSchema.default(DEFAULT_OCCURRENCE),
+  ...crewSelectionSchema.shape,
+  day_coverage: z.array(rotateDayCoverageSchema).default([]),
+  crew_placements: z.array(rotateCrewPlacementSchema).default([]),
 })
 
 const regularFlexibleSchema = z.object({
@@ -363,6 +464,7 @@ const regularRotateSchema = z.object({
   type: z.literal('rotate'),
   ...shiftDefinitionFieldsSchema.shape,
   ...rotateFieldsSchema.shape,
+  ...crewSelectionSchema.shape,
   start_date: dateStringSchema,
   end_settings: endSettingsSchema,
 })
@@ -631,6 +733,8 @@ export type RotateDayCoverage = Extract<
   RegularSchedule,
   { type: 'rotate' }
 >['day_coverage'][number]
+export type Occurrence = z.infer<typeof occurrenceSchema>
+export type CrewKind = (typeof CREW_KINDS)[number]
 export type RotateCrewPlacement = Extract<
   RegularSchedule,
   { type: 'rotate' }

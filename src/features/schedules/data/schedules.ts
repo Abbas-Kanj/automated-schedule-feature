@@ -1985,5 +1985,13 @@ export const defaultSchedules: Schedule[] = [
     temporary_schedule: false,
     start_date: '2026-08-31',
     end_settings: { end_type: 'never' },
+    occurrence: {
+      frequency: 'weekly',
+      interval: 1,
+      weekdays: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      exceptions: { public_holiday: false, sick_leave: false },
+    },
+    day_coverage: [],
+    crew_placements: [],
   },
 ]

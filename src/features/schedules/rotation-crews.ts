@@ -10,6 +10,7 @@ import { toMinutes } from '@/lib/time'
 import { type Shift } from '@/features/shifts/data/schema'
 import { getShiftTimeRange } from '@/features/shifts/utils'
 import {
+  type CrewKind,
   type RotateCrewPlacement,
   type RotateDayCoverage,
   type RotatePatternEntry,
@@ -268,4 +269,52 @@ export function crewKeysFromDayCoverage(cells: RotateDayCoverage[]): string[] {
     cell.employee_ids.forEach((id) => keys.add(`employee:${id}`))
   })
   return [...keys]
+}
+
+// The "Assign to" step's pick, recovered from a roster saved before the step
+// stored it. Teams win when both kinds are present — the same tie-break the
+// work step's own pool uses. Empty `crew_ids` when nobody is assigned yet.
+export function crewSelectionFromDayCoverage(cells: RotateDayCoverage[]): {
+  crew_kind: CrewKind
+  crew_ids: string[]
+} {
+  const keys = crewKeysFromDayCoverage(cells)
+  const teamIds = keys
+    .filter((key) => key.startsWith('team:'))
+    .map((key) => key.slice('team:'.length))
+  if (teamIds.length) return { crew_kind: 'team', crew_ids: teamIds }
+  return {
+    crew_kind: 'employee',
+    crew_ids: keys
+      .filter((key) => key.startsWith('employee:'))
+      .map((key) => key.slice('employee:'.length)),
+  }
+}
+
+// Drops everybody the "Assign to" step no longer names — the other crew kind
+// entirely, and any unpicked crew of this one — so the work step never shows a
+// roster built from people who are not on the schedule anymore.
+export function pruneRosterToCrews(
+  cells: RotateDayCoverage[],
+  placements: RotateCrewPlacement[],
+  kind: CrewKind,
+  ids: string[]
+): { day_coverage: RotateDayCoverage[]; crew_placements: RotateCrewPlacement[] } {
+  const keep = new Set(ids)
+  const keepKeys = new Set(ids.map((id) => `${kind}:${id}`))
+  return {
+    day_coverage: cells
+      .map((cell) => ({
+        ...cell,
+        team_ids: kind === 'team' ? cell.team_ids.filter((id) => keep.has(id)) : [],
+        employee_ids:
+          kind === 'employee'
+            ? cell.employee_ids.filter((id) => keep.has(id))
+            : [],
+      }))
+      .filter((cell) => cell.team_ids.length || cell.employee_ids.length),
+    crew_placements: placements.filter((placement) =>
+      keepKeys.has(placement.crew)
+    ),
+  }
 }

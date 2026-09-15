@@ -47,6 +47,17 @@ type ScheduleAssignToFieldsProps = {
   // Filled in by this step, called by the wizard's "Next" button — see
   // `commitPendingSuggestion` below.
   commitRef?: RefObject<(() => void) | null>
+  // Used instead of the form's own `pattern` field. Fixed schedules have no
+  // pattern; they pass their occurrence rule read as one (see
+  // `occurrencePattern`).
+  pattern?: RotatePatternEntry[]
+  // Hand-assignment only: no Suggest mode, no toggle between the two. Fixed
+  // schedules use this — there is no rotation for the search to stagger.
+  manualOnly?: boolean
+  // Crews come from the form's `crew_kind`/`crew_ids`, picked on the wizard's
+  // own "Assign to" step, instead of this component's Teams/Employees toggle
+  // and pool picker. The "Assign crews" dialog leaves it off.
+  poolFromForm?: boolean
 }
 
 // "Assign to" step of a rotate schedule. Answers one question: who covers each
@@ -64,6 +75,9 @@ type ScheduleAssignToFieldsProps = {
 export function ScheduleAssignToFields({
   disabled,
   commitRef,
+  pattern: patternProp,
+  manualOnly = false,
+  poolFromForm = false,
 }: ScheduleAssignToFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, getValues, setValue } = useFormContext<any>()
@@ -72,7 +86,14 @@ export function ScheduleAssignToFields({
     | undefined
   // Memoised because the coverage analysis keys off it — a fresh `[]` every
   // render would re-run the grid on every keystroke elsewhere in the form.
-  const pattern = useMemo(() => patternRaw ?? [], [patternRaw])
+  const pattern = useMemo(
+    () => patternProp ?? patternRaw ?? [],
+    [patternProp, patternRaw]
+  )
+  const readPattern = (): RotatePatternEntry[] =>
+    patternProp ??
+    (getValues('pattern') as RotatePatternEntry[] | undefined) ??
+    []
   const coverageRaw = useWatch({ control, name: 'day_coverage' }) as
     | RotateDayCoverage[]
     | undefined
@@ -146,14 +167,14 @@ export function ScheduleAssignToFields({
   // The crew pool is deliberately not a form field: the union of what is already
   // assigned *is* the pool, so it round-trips through a saved schedule without
   // adding anything to the schema.
-  const [crewKind, setCrewKind] = useState<CrewKind>(() => {
+  const [localCrewKind, setCrewKind] = useState<CrewKind>(() => {
     const keys = crewKeysFromDayCoverage(dayCoverage)
     if (keys.some((key) => key.startsWith('team:'))) return 'team'
     if (keys.some((key) => key.startsWith('employee:'))) return 'employee'
     return teamOptions.length > 0 ? 'team' : 'employee'
   })
 
-  const [poolIds, setPoolIds] = useState<string[]>(() => {
+  const [localPoolIds, setPoolIds] = useState<string[]>(() => {
     const keys = crewKeysFromDayCoverage(dayCoverage)
     const teamIds = keys
       .filter((key) => key.startsWith('team:'))
@@ -164,7 +185,20 @@ export function ScheduleAssignToFields({
       .map((key) => key.slice('employee:'.length))
   })
 
-  const [manualMode, setManualMode] = useState(false)
+  const formCrewKind = useWatch({ control, name: 'crew_kind' }) as
+    | CrewKind
+    | undefined
+  const formCrewIds = useWatch({ control, name: 'crew_ids' }) as
+    | string[]
+    | undefined
+  const crewKind: CrewKind = poolFromForm
+    ? (formCrewKind ?? 'team')
+    : localCrewKind
+  const poolIds: string[] = poolFromForm ? (formCrewIds ?? []) : localPoolIds
+
+  // Starting in manual mode is also what keeps `commitPendingSuggestion` from
+  // ever running a search when `manualOnly` is set.
+  const [manualMode, setManualMode] = useState(manualOnly)
 
   const crews = useMemo(
     () => crewsFromDayCoverage(dayCoverage, teams, employeeLabels),
@@ -222,10 +256,13 @@ export function ScheduleAssignToFields({
   )
 
   const poolOptions = crewKind === 'team' ? teamOptions : employeeOptions
+  // With the pick made on its own step, the day cards offer only those crews.
+  const manualCrewOptions = poolFromForm
+    ? poolOptions.filter((option) => poolIds.includes(option.value))
+    : poolOptions
 
   function applySuggestion() {
-    const currentPattern =
-      (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
+    const currentPattern = readPattern()
     if (currentPattern.length === 0) return
 
     const suggestionCrews = poolIds.flatMap<SuggestionCrew>((id) => {
@@ -273,8 +310,7 @@ export function ScheduleAssignToFields({
   // previous arrangement to double-book a cell. Both are whole-field writes for
   // the same reason: a crew dropped from the pool has to leave the matrix too.
   function applyPlacements(next: RotateCrewPlacement[]) {
-    const currentPattern =
-      (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
+    const currentPattern = readPattern()
     if (currentPattern.length === 0) return
 
     setValue('crew_placements', next, { shouldDirty: true })
@@ -322,7 +358,9 @@ export function ScheduleAssignToFields({
   if (pattern.length === 0) {
     return (
       <p className='text-sm text-muted-foreground'>
-        Build the pattern in the previous step to assign crew to it.
+        {patternProp
+          ? 'Select a shift and set the occurrence to assign crew to it.'
+          : 'Build the pattern in the previous step to assign crew to it.'}
       </p>
     )
   }
@@ -336,6 +374,7 @@ export function ScheduleAssignToFields({
           </CardTitle>
         </CardHeader>
         <CardContent className='space-y-4 px-4'>
+          {!poolFromForm && (
           <div className='flex flex-wrap items-center gap-2'>
             <ToggleButton
               size='sm'
@@ -365,34 +404,38 @@ export function ScheduleAssignToFields({
                 : 'Each employee is their own crew.'}
             </span>
           </div>
+          )}
 
           {/* One view at a time: the suggestion controls or the manual grid,
               never both. Coverage grading sits below and applies to whichever
               is showing. */}
-          <div className='flex flex-wrap items-center gap-2'>
-            <ToggleButton
-              size='sm'
-              selected={!manualMode}
-              disabled={disabled}
-              onClick={() => setManualMode(false)}
-            >
-              Suggest
-            </ToggleButton>
-            <ToggleButton
-              size='sm'
-              selected={manualMode}
-              disabled={disabled}
-              onClick={() => setManualMode(true)}
-            >
-              Assign manually
-            </ToggleButton>
-          </div>
+          {!manualOnly && (
+            <div className='flex flex-wrap items-center gap-2'>
+              <ToggleButton
+                size='sm'
+                selected={!manualMode}
+                disabled={disabled}
+                onClick={() => setManualMode(false)}
+              >
+                Suggest
+              </ToggleButton>
+              <ToggleButton
+                size='sm'
+                selected={manualMode}
+                disabled={disabled}
+                onClick={() => setManualMode(true)}
+              >
+                Assign manually
+              </ToggleButton>
+            </div>
+          )}
 
           {!manualMode ? (
             <div className='space-y-3'>
               <p className='text-sm text-muted-foreground'>
-                Pick the crews, then let the suggestion stagger them across the
-                cycle — it reuses the pattern&apos;s rhythm and moves each crew
+                {poolFromForm
+                  ? 'Let the suggestion stagger the crews picked on the previous step across the cycle'
+                  : 'Pick the crews, then let the suggestion stagger them across the cycle'} — it reuses the pattern&apos;s rhythm and moves each crew
                 along the shift list so every selected shift is covered every
                 day.
               </p>
@@ -404,6 +447,7 @@ export function ScheduleAssignToFields({
                 crewKind={crewKind}
               />
               <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
+                {!poolFromForm && (
                 <div className='flex-1'>
                   <FilterableMultiSelect
                     options={poolOptions}
@@ -424,6 +468,7 @@ export function ScheduleAssignToFields({
                     isDisabled={disabled || poolOptions.length === 0}
                   />
                 </div>
+                )}
                 <Button
                   type='button'
                   onClick={applySuggestion}
@@ -453,10 +498,12 @@ export function ScheduleAssignToFields({
           ) : (
             <div className='space-y-3'>
               <p className='text-sm text-muted-foreground'>
-                Staff each shift on each cycle day yourself — for the rosters
-                the suggestion cannot express. One card per cycle day, one row
-                per selected shift; an empty row is a shift nobody is covering
-                that day. The grid below keeps grading whatever you set.
+                {manualOnly
+                  ? 'Staff each shift on each working day yourself.'
+                  : 'Staff each shift on each cycle day yourself — for the rosters the suggestion cannot express.'}{' '}
+                One card per cycle day, one row per selected shift; an empty row
+                is a shift nobody is covering that day. The grid below keeps
+                grading whatever you set.
               </p>
               <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-3'>
                 {pattern.map((entry, index) => (
@@ -465,9 +512,7 @@ export function ScheduleAssignToFields({
                     day={index}
                     orderedShiftIds={orderedShiftIds}
                     crewKind={crewKind}
-                    crewOptions={
-                      crewKind === 'team' ? teamOptions : employeeOptions
-                    }
+                    crewOptions={manualCrewOptions}
                     dayCoverage={dayCoverage}
                     disabled={disabled}
                   />
