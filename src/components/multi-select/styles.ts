@@ -100,15 +100,22 @@ export const VARIANT_STYLES: Record<string, SelectStyleSet> = {
 } as const
 export type Variant = keyof typeof VARIANT_STYLES
 
+// Minimum heights only: a fixed height clips a multi-select's chips once they
+// wrap past the first row, so the third pick in a narrow card vanished.
 export const COMPACT_HEIGHT_STYLES = {
-  control: (base: object) => ({ ...base, minHeight: '24px', height: '24px' }),
+  control: (base: object) => ({ ...base, minHeight: '24px' }),
   valueContainer: (base: object) => ({
     ...base,
-    height: '24px',
-    padding: '0 6px',
+    minHeight: '24px',
+    padding: '1px 6px',
+    gap: '2px',
   }),
   input: (base: object) => ({ ...base, margin: '0', padding: '2px' }),
-  indicatorsContainer: (base: object) => ({ ...base, height: '24px' }),
+  indicatorsContainer: (base: object) => ({
+    ...base,
+    minHeight: '24px',
+    alignSelf: 'stretch',
+  }),
   menu: (base: object) => ({ ...base, width: 'max-content', minWidth: '100%' }),
   menuList: (base: object) => ({ ...base, padding: '0' }),
 }

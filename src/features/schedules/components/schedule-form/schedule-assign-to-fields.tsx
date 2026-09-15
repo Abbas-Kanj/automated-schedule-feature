@@ -762,6 +762,7 @@ function ManualDayCard({
                   )
                 }
                 isMulti
+                variant='compact'
                 compactHeight
                 placeholder={crewKind === 'team' ? 'Team' : 'Employee'}
                 isDisabled={disabled || crewOptions.length === 0}
