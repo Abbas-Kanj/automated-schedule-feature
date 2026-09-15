@@ -73,7 +73,7 @@ describe('buildRotationTimeline', () => {
     expect(timeline.rows.length).toBeGreaterThan(0)
     timeline.rows.forEach((row) => {
       expect(row.cells).toHaveLength(timeline.days.length)
-      expect(row.daysOn).toBe(row.cells.filter((c) => c && !c.isOff).length)
+      expect(row.daysOn).toBe(row.cells.filter((c) => !c.isOff).length)
     })
   })
 
@@ -96,7 +96,7 @@ describe('buildRotationTimeline', () => {
 
     expect(new Set(timeline.days.map((d) => d.cycleDay)).size).toBe(1)
     timeline.rows.forEach((row) => {
-      expect(new Set(row.cells.map((c) => c?.label)).size).toBe(1)
+      expect(new Set(row.cells.map((c) => c.label)).size).toBe(1)
     })
   })
 
@@ -138,23 +138,16 @@ describe('buildRotationTimeline', () => {
     })
   })
 
-  // Every seeded rotation starts 2026-08-31, so the clamp is invisible on the
-  // seeds — it has to be given a schedule that starts mid-view to show up.
-  it('draws no column before the schedule has started', () => {
-    const midMonth: RotateSchedule = { ...panama, start_date: '2026-09-10' }
-    const timeline = build(midMonth, '2026-09-15', 'daily', 'month')
+  // Every seed starts 2026-08-31 and the screen opens on that date. Clamping
+  // days before the start once left August as a single dot per crew.
+  it('draws the whole month even when the schedule starts on its last day', () => {
+    const timeline = build(panama, '2026-08-31', 'daily', 'month')
 
-    expect(timeline.days[0].date.getDate()).toBe(10)
-    expect(timeline.days).toHaveLength(21)
-    expect(timeline.rows.every((row) => row.cells.length === 21)).toBe(true)
-  })
-
-  it('still labels the range when the whole span precedes the start', () => {
-    const future: RotateSchedule = { ...panama, start_date: '2027-01-01' }
-    const timeline = build(future, '2026-09-15', 'daily', 'month')
-
-    expect(timeline.days).toHaveLength(0)
-    expect(timeline.rangeLabel).toBeTruthy()
+    expect(timeline.days).toHaveLength(31)
+    timeline.rows.forEach((row) => {
+      expect(row.cells).toHaveLength(31)
+      expect(row.cells.every((cell) => cell !== undefined)).toBe(true)
+    })
   })
 
   // A staggered roster is the whole point of the per-crew start: the second
@@ -188,34 +181,5 @@ describe('buildRotationTimeline', () => {
     expect(timeline.rows[0].startDate.getMonth()).toBe(7)
     expect(timeline.rows[1].startDate.getDate()).toBe(5)
     expect(timeline.rows[1].startDate.getMonth()).toBe(8)
-  })
-
-  it('blanks a crew cell before that crew starts, rather than calling it off', () => {
-    const timeline = build(staggered, '2026-09-15', 'daily', 'month')
-    const late = timeline.rows[1]
-
-    timeline.days.forEach((day, i) => {
-      if (day.date < late.startDate) {
-        expect(late.cells[i]).toBeUndefined()
-      } else {
-        expect(late.cells[i]).toBeDefined()
-      }
-    })
-    // Sep 1-4 are before this crew exists.
-    expect(late.cells.slice(0, 4).every((cell) => cell === undefined)).toBe(
-      true
-    )
-  })
-
-  it('excludes blanked days from the days-on count', () => {
-    const timeline = build(staggered, '2026-09-15', 'daily', 'month')
-
-    timeline.rows.forEach((row) => {
-      expect(row.daysOn).toBe(
-        row.cells.filter((cell) => cell && !cell.isOff).length
-      )
-    })
-    // The late crew cannot have worked more days than the early one.
-    expect(timeline.rows[1].daysOn).toBeLessThanOrEqual(timeline.rows[0].daysOn)
   })
 })

@@ -31,25 +31,10 @@ function ShiftDot({
   day,
   span,
 }: {
-  // Absent for a day before this crew joined the rotation — the column still
-  // has to hold its width, or every row below would slip out of step with the
-  // dates in the header.
-  position: RotationPosition | undefined
+  position: RotationPosition
   day: TimelineDay
   span: RotationTimeline['span']
 }) {
-  if (!position) {
-    return (
-      <div
-        className={cn(
-          'flex shrink-0 items-center justify-center',
-          DAY_COLUMN[span]
-        )}
-        aria-hidden
-      />
-    )
-  }
-
   return (
     <div
       className={cn(

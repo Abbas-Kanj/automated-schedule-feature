@@ -2,7 +2,6 @@ import { type ReactNode, useMemo, useState } from 'react'
 import {
   eachDayOfInterval,
   format,
-  isBefore,
   isWithinInterval,
   parse,
 } from 'date-fns'
@@ -124,13 +123,6 @@ export function ScheduleRotation() {
   const rangeStart = getPeriodStart(viewDate, stepType)
   const rangeEnd = getPeriodEnd(viewDate, stepType)
 
-  // The grid draws nothing before the schedule starts, so stepping further
-  // back would only ever land on an empty range.
-  const atStart = schedule
-    ? rangeStart <=
-      getPeriodStart(scheduleStartDate(schedule.start_date), stepType)
-    : true
-
   // Which single day the employee table reads. Today when today is on screen —
   // that is the question somebody opening this screen is usually asking — and
   // otherwise the first day of whatever range they navigated to, so the table
@@ -176,16 +168,11 @@ export function ScheduleRotation() {
     const cycleLength = schedule.pattern.length
     if (!cycleLength) return rotation.rows
 
-    const scheduleStart = scheduleStartDate(schedule.start_date)
     const covered = new Set(
       eachDayOfInterval({
         start: getPeriodStart(viewDate, employeeStepType),
         end: getPeriodEnd(viewDate, employeeStepType),
-      })
-        // Days before the rotation began are not part of any cycle yet, the
-        // same clamp the timeline applies.
-        .filter((date) => !isBefore(date, scheduleStart))
-        .map((date) =>
+      }).map((date) =>
           getAssignedIndex(
             0,
             getPeriodIndex(schedule, date, advanceType),
@@ -274,7 +261,6 @@ export function ScheduleRotation() {
                 size='icon'
                 className='size-8'
                 onClick={() => setViewDate((d) => shiftPeriod(d, stepType, -1))}
-                disabled={atStart}
                 aria-label='Previous period'
               >
                 <ChevronLeft className='size-4' />

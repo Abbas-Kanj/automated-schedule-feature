@@ -16,7 +16,6 @@ import {
   differenceInCalendarDays,
   endOfMonth,
   format,
-  isBefore,
   isSameDay,
   parse,
   startOfDay,
@@ -72,10 +71,8 @@ export type TimelineCrewRow = {
   label: string
   headcount: number
   // One entry per day in `days`, index-aligned — so a row renders by walking
-  // the blocks and indexing into this. `undefined` means the day is before
-  // this crew joined the rotation: nothing happened, which is a different
-  // statement from an off day, where the crew exists and is resting.
-  cells: (RotationPosition | undefined)[]
+  // the blocks and indexing into this.
+  cells: RotationPosition[]
   // The first calendar day this crew actually works. Derived from the
   // schedule's own start rather than from the visible range, so navigating
   // months never changes what it says.
@@ -189,24 +186,20 @@ export function buildRotationTimeline(
       .map((e) => [e.id as string, getEmployeeFullName(e)])
   )
 
-  const scheduleStart = parseScheduleStart(schedule.start_date)
-  const spanned = spanDays(viewDate, span)
-  // A rotation does not exist before its start date, so the grid does not
-  // draw those columns at all rather than drawing empty ones nobody can act
-  // on.
-  const days: TimelineDay[] = spanned
-    .filter((date) => !isBefore(date, scheduleStart))
-    .map((date) => ({
-      date,
-      cycleDay: cycleLength
-        ? getAssignedIndex(
-            0,
-            getPeriodIndex(schedule, date, periodType),
-            cycleLength
-          )
-        : 0,
-      isToday: isSameDay(date, today),
-    }))
+  // Always the whole week or month. Days before the schedule's start are drawn
+  // too, wrapped back through the cycle — clamping them away left a schedule
+  // starting on the 31st with a one-dot month.
+  const days: TimelineDay[] = spanDays(viewDate, span).map((date) => ({
+    date,
+    cycleDay: cycleLength
+      ? getAssignedIndex(
+          0,
+          getPeriodIndex(schedule, date, periodType),
+          cycleLength
+        )
+      : 0,
+    isToday: isSameDay(date, today),
+  }))
 
   const crews = crewsFromDayCoverage(
     schedule.day_coverage,
@@ -226,9 +219,6 @@ export function buildRotationTimeline(
       cycleLength
     )
     const cells = days.map((day) => {
-      // Before this crew's own first working day there is nothing to say —
-      // not "off", which would claim they were rostered and resting.
-      if (isBefore(day.date, startDate)) return undefined
       // A hand-made double booking lands two shifts on one day; the first is
       // drawn, the same way the employee table resolves it, so the two screens
       // never disagree about what a cell shows. The form warns about it in
@@ -245,7 +235,7 @@ export function buildRotationTimeline(
       headcount: crew.headcount,
       cells,
       startDate,
-      daysOn: cells.filter((cell) => cell && !cell.isOff).length,
+      daysOn: cells.filter((cell) => !cell.isOff).length,
     }
   })
 
@@ -264,11 +254,9 @@ export function buildRotationTimeline(
     blocks: toBlocks(days, span),
     rows,
     legend: [...legend, toPosition(legend.length, undefined, true)],
-    // Labelled by what is drawn, falling back to the raw span when the
-    // clamp above left nothing — the navigator still needs a caption.
     rangeLabel: getRangeLabel(
-      days[0]?.date ?? spanned[0],
-      days[days.length - 1]?.date ?? spanned[spanned.length - 1],
+      days[0].date,
+      days[days.length - 1].date,
       span === 'week' ? 'weekly' : 'monthly'
     ),
     span,
