@@ -1,8 +1,10 @@
 import { buildDefaultDays } from '../utils'
 import { type Shift } from './schema'
 
-// The shifts behind the seeded schedules (see
-// `features/schedules/data/schedules.ts`):
+// The shifts behind the sample rotation scenarios (see
+// `features/schedules/data/schedules.fixtures.ts` — those are test fixtures;
+// the app itself ships with no schedules). These shifts *are* seeded, so a
+// schedule created by hand has something to select:
 //
 //   Morning / Afternoon / Night   8-hour continuous cover — Team A's demo
 //                                 rotation and both factory line rosters.

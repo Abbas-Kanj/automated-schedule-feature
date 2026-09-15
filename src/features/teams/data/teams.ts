@@ -1,13 +1,15 @@
 import { type Team } from './schema'
 
-// The crews the seeded schedules draw from. A team groups people; it does
+// The crews the sample rotation scenarios draw from (see
+// `features/schedules/data/schedules.fixtures.ts`; the app ships with no
+// schedules of its own). A team groups people; it does
 // not by itself decide who works when. The schedule's "Assign to" step picks
 // which crew covers which shift on which cycle day, which is what the
 // Schedule Rotation screen reads (see `features/schedule-rotation`).
 //
 // Ids are stable literals rather than `generateId()` — seeded records have
-// to keep the same identity across reloads for the schedules referencing
-// them to resolve.
+// to keep the same identity across reloads for anything referencing them to
+// resolve.
 //
 //   Team A / Team B          the two small demo rotations (Shift Rotation,
 //                            Desk Alternation) — one crew per cycle position.
@@ -18,7 +20,7 @@ import { type Team } from './schema'
 //                            Continental and the 28-day Southern Swing.
 //
 // The hospital ward rotation is staffed by four individually-picked nurses
-// (crews of one), not a team — see `schedules/data/schedules.ts`.
+// (crews of one), not a team — see `schedules/data/schedules.fixtures.ts`.
 export const defaultTeams: Team[] = [
   {
     id: 'team-a',

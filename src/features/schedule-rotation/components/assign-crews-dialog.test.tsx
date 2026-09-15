@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
-import { defaultSchedules } from '@/features/schedules/data/schedules'
+import { sampleSchedules } from '@/features/schedules/data/schedules.fixtures'
 import { type Schedule } from '@/features/schedules/data/schema'
 import { type RotateSchedule, isRotateSchedule } from '../utils'
 import { AssignCrewsDialog, AssignToPanel } from './assign-crews-dialog'
@@ -13,7 +13,7 @@ import { AssignCrewsDialog, AssignToPanel } from './assign-crews-dialog'
 // covered by `schedule-assign-to-fields.test.tsx`; what's new here is that
 // Save reads its final state and hands it to `updateSchedule` correctly.
 
-const seed = defaultSchedules.find((s) => s.id === 'sched-rotation')!
+const seed = sampleSchedules.find((s) => s.id === 'sched-rotation')!
 if (!isRotateSchedule(seed)) throw new Error('Seed is not a rotate schedule')
 const rotation = seed
 
@@ -25,7 +25,7 @@ vi.mock('@/features/schedules/stores/schedules-store', () => ({
   useSchedulesStore: (
     selector: (state: {
       updateSchedule: typeof updateSchedule
-      schedules: typeof defaultSchedules
+      schedules: typeof sampleSchedules
     }) => unknown
   ) => selector({ updateSchedule, schedules: store.schedules as never }),
 }))

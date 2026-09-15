@@ -2,7 +2,7 @@ import { parse } from 'date-fns'
 import { describe, expect, it } from 'vitest'
 import employeeData from '@/features/employees/data/data.json'
 import { type Employee } from '@/features/employees/data/schema'
-import { defaultSchedules } from '@/features/schedules/data/schedules'
+import { sampleSchedules } from '@/features/schedules/data/schedules.fixtures'
 import { defaultShifts } from '@/features/shifts/data/shifts'
 import { defaultTeams } from '@/features/teams/data/teams'
 import { buildRotationTimeline } from './timeline'
@@ -11,9 +11,9 @@ import { type RotateSchedule, getAdvanceType, isRotateSchedule } from './utils'
 const employees = employeeData as Employee[]
 
 function rotateSchedule(name: string): RotateSchedule {
-  const schedule = defaultSchedules.find((s) => s.name === name)
+  const schedule = sampleSchedules.find((s) => s.name === name)
   if (!schedule || !isRotateSchedule(schedule)) {
-    throw new Error('No seeded rotate schedule named ' + name)
+    throw new Error('No sample rotate schedule named ' + name)
   }
   return schedule
 }
@@ -123,11 +123,11 @@ describe('buildRotationTimeline', () => {
   })
 
   // The screen no longer asks how fast a rotation advances — it reads it off
-  // the schedule. Every seeded roster is a day-card pattern, so every one of
-  // them has to come back `daily`; a seed that came back `weekly` would render
+  // the schedule. Every sample roster is a day-card pattern, so every one of
+  // them has to come back `daily`; one that came back `weekly` would render
   // as a cycle seven times longer than it is.
   it('reads the advance rate off the schedule rather than asking', () => {
-    const rotates = defaultSchedules.filter(isRotateSchedule)
+    const rotates = sampleSchedules.filter(isRotateSchedule)
 
     expect(rotates.length).toBeGreaterThan(0)
     rotates.forEach((schedule) => {
@@ -138,8 +138,9 @@ describe('buildRotationTimeline', () => {
     })
   })
 
-  // Every seed starts 2026-08-31 and the screen opens on that date. Clamping
-  // days before the start once left August as a single dot per crew.
+  // Every sample schedule starts 2026-08-31 and the screen opens on that
+  // date. Clamping days before the start once left August as a single dot
+  // per crew.
   it('draws the whole month even when the schedule starts on its last day', () => {
     const timeline = build(panama, '2026-08-31', 'daily', 'month')
 

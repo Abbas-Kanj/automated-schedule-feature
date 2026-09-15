@@ -2,7 +2,7 @@ import { FormProvider, useForm, useWatch } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
-import { defaultSchedules } from '../../data/schedules'
+import { sampleSchedules } from '../../data/schedules.fixtures'
 import { type RotateDayCoverage } from '../../data/schema'
 import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 
@@ -13,7 +13,7 @@ import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 // the manual grid behind its toggle — which now offers one row per selected
 // shift on every cycle day, so a hole is a visibly empty picker.
 
-const rotation = defaultSchedules.find((s) => s.id === 'sched-rotation')!
+const rotation = sampleSchedules.find((s) => s.id === 'sched-rotation')!
 
 // The stored matrix is echoed into the DOM so a pick can be asserted on as
 // form state rather than as a rendered chip.

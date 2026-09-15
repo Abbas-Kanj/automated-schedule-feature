@@ -3,7 +3,7 @@ import { addDays, addWeeks, parse } from 'date-fns'
 import { describe, expect, it } from 'vitest'
 import employeeData from '@/features/employees/data/data.json'
 import { type Employee, EmployeeSchema } from '@/features/employees/data/schema'
-import { defaultSchedules } from '@/features/schedules/data/schedules'
+import { sampleSchedules } from '@/features/schedules/data/schedules.fixtures'
 import { scheduleSchema } from '@/features/schedules/data/schema'
 import { shiftSchema } from '@/features/shifts/data/schema'
 import { defaultShifts } from '@/features/shifts/data/shifts'
@@ -11,7 +11,10 @@ import { teamSchema } from '@/features/teams/data/schema'
 import { defaultTeams } from '@/features/teams/data/teams'
 import { type RotateSchedule, buildRotation, isRotateSchedule } from './utils'
 
-// Locks the seeded scenarios. The two small demo rotations are the same
+// Locks the sample rotation scenarios in `schedules/data/schedules.fixtures.ts`.
+// They are fixtures, not seeds — the app ships with no schedules — but they are
+// the worked examples the rotate model is documented and reasoned about with,
+// so they stay pinned. The two small demo rotations are the same
 // shape at different sizes: one cycle position per shift plus a rest slot,
 // one crew per position, advancing one position per week — so every crew
 // covers every shift and exactly one is off at a time.
@@ -19,20 +22,20 @@ import { type RotateSchedule, buildRotation, isRotateSchedule } from './utils'
 //   Shift Rotation    Team A, 4 crew, Morning / Afternoon / Night / Off
 //   Desk Alternation  Team B, 3 crew, Early / Late / Off
 //
-// The rest of the seed set (Panama, and the security / factory / hospital
+// The rest of the sample set (Panama, and the security / factory / hospital
 // rosters) is checked more lightly here — that it parses, and that every
 // rotate cycle staffs every selected shift on every day.
 //
-// The seeds are the app's real starting data, so this doubles as a check
-// that they still satisfy their own zod schemas — the stores parse them at
-// runtime and would silently fall back to the bundled defaults otherwise.
+// Shifts, teams and employees *are* still seeded, so checking those against
+// their own zod schemas here is load-bearing: the stores parse them at runtime
+// and would silently fall back to the bundled defaults otherwise.
 
 const employees = employeeData as Employee[]
 
 function rotateSchedule(name: string): RotateSchedule {
-  const schedule = defaultSchedules.find((s) => s.name === name)
+  const schedule = sampleSchedules.find((s) => s.name === name)
   if (!schedule || !isRotateSchedule(schedule)) {
-    throw new Error('No seeded rotate schedule named ' + name)
+    throw new Error('No sample rotate schedule named ' + name)
   }
   return schedule
 }
@@ -64,17 +67,17 @@ function gridForWeek(
   )
 }
 
-describe('seed data', () => {
+describe('sample data', () => {
   it('parses against its own schemas', () => {
     expect(z.array(EmployeeSchema).safeParse(employeeData).success).toBe(true)
     expect(z.array(shiftSchema).safeParse(defaultShifts).success).toBe(true)
     expect(z.array(teamSchema).safeParse(defaultTeams).success).toBe(true)
-    expect(z.array(scheduleSchema).safeParse(defaultSchedules).success).toBe(
+    expect(z.array(scheduleSchema).safeParse(sampleSchedules).success).toBe(
       true
     )
   })
 
-  it('seeds the demo rotations plus the wider 24/7 sample', () => {
+  it('covers the demo rotations plus the wider 24/7 sample', () => {
     expect(employees).toHaveLength(30)
     expect(defaultShifts.map((s) => s.name)).toEqual([
       'Morning',
@@ -86,7 +89,7 @@ describe('seed data', () => {
       'Night 12h',
       'Office',
     ])
-    expect(defaultSchedules.map((s) => s.id)).toEqual([
+    expect(sampleSchedules.map((s) => s.id)).toEqual([
       'sched-rotation',
       'sched-alternation',
       'sched-panama-223',
@@ -122,12 +125,12 @@ describe('seed data', () => {
     }
   })
 
-  it('staffs every selected shift on every day of every seeded cycle', () => {
+  it('staffs every selected shift on every day of every sample cycle', () => {
     // The rule the rework exists to keep: the pattern supplies the rhythm,
     // `shift_ids` supplies what has to run, and nothing is left uncovered.
     // Covers the two demo rotations, the Panama roster, and every scenario
     // in the wider 24/7 sample (security / factory / hospital).
-    for (const schedule of defaultSchedules.filter(isRotateSchedule)) {
+    for (const schedule of sampleSchedules.filter(isRotateSchedule)) {
       const staffed = new Set(
         schedule.day_coverage
           .filter((cell) => cell.employee_ids.length || cell.team_ids.length)
@@ -262,7 +265,7 @@ describe('Desk Alternation — Team B, two shifts and a rest slot', () => {
   })
 })
 
-// The third seeded scenario is a different shape from the two above and is
+// The third sample scenario is a different shape from the two above and is
 // read on the **Daily** tab: a pure rest mask where one card is one day, with
 // crews pinned to a shift rather than rotating through the pattern's own.
 const panama = rotateSchedule('Plant Coverage (2-2-3)')
