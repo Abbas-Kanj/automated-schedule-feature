@@ -39,7 +39,7 @@ import {
   type ScheduleType,
   scheduleSchema,
 } from '../../data/schema'
-import { occurrencePattern } from '../../occurrence-pattern'
+import { occurrenceSlots } from '../../occurrence-pattern'
 import {
   crewSelectionFromDayCoverage,
   pruneRosterToCrews,
@@ -324,19 +324,29 @@ export function ScheduleForm({
     control: looseControl,
     name: 'occurrence',
   }) as Occurrence | undefined
-  const startDate = useWatch({ control: looseControl, name: 'start_date' }) as
-    | string
-    | undefined
   const shiftIds = useWatch({ control: looseControl, name: 'shift_ids' }) as
     | string[]
     | undefined
 
-  // What "Assign to" staffs for a fixed schedule; rotate reads its own
-  // `pattern` field instead.
-  const fixedPattern =
+  // What "Work fixed" staffs: one card per working day of the occurrence, keyed
+  // independently of the start date. Rotate reads its own `pattern` instead.
+  const fixedSlots =
     regularType === 'fixed'
-      ? occurrencePattern(occurrence, startDate, shiftIds?.[0])
+      ? occurrenceSlots(occurrence, shiftIds?.[0])
       : undefined
+
+  // Leaving Occurrence drops assignments on days the rule no longer has, so a
+  // changed frequency cannot leave invisible cells behind in `day_coverage`.
+  const pruneCoverageToOccurrence = () => {
+    if (!fixedSlots) return
+    const keys = new Set(fixedSlots.slotKeys)
+    const cells = (looseForm.getValues('day_coverage') ??
+      []) as RotateDayCoverage[]
+    looseForm.setValue(
+      'day_coverage',
+      cells.filter((cell) => keys.has(cell.day))
+    )
+  }
 
   const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
@@ -359,6 +369,7 @@ export function ScheduleForm({
   const goToStep = (index: number) => {
     if (currentStepId === 'work') assignToCommitRef.current?.()
     if (currentStepId === 'assign-to') pruneRosterToSelection()
+    if (currentStepId === 'occurrence') pruneCoverageToOccurrence()
     setStep(Math.min(Math.max(index, 0), steps.length - 1))
   }
 
@@ -366,6 +377,7 @@ export function ScheduleForm({
     // Before validating, not after: the commit writes `day_coverage`, and
     // `trigger` has to see the values the user is actually advancing with.
     if (currentStepId === 'work') assignToCommitRef.current?.()
+    if (currentStepId === 'occurrence') pruneCoverageToOccurrence()
 
     if (currentStepId === 'assign-to') {
       const crewIds = looseForm.getValues('crew_ids') as string[] | undefined
@@ -577,7 +589,9 @@ export function ScheduleForm({
                   <ScheduleAssignToFields
                     disabled={disabled}
                     commitRef={assignToCommitRef}
-                    pattern={fixedPattern}
+                    pattern={fixedSlots?.pattern}
+                    slotKeys={fixedSlots?.slotKeys}
+                    dayLabels={fixedSlots?.labels}
                     manualOnly={regularType === 'fixed'}
                     poolFromForm
                   />

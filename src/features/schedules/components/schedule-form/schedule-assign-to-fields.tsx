@@ -58,6 +58,14 @@ type ScheduleAssignToFieldsProps = {
   // own "Assign to" step, instead of this component's Teams/Employees toggle
   // and pool picker. The "Assign crews" dialog leaves it off.
   poolFromForm?: boolean
+  // Fixed only: the key each card's assignments are stored under in
+  // `day_coverage.day`, index-aligned with `pattern` (see `occurrenceSlots`).
+  // The grid and coverage analysis work on card positions 0…k; only reads and
+  // writes of the stored matrix go through these keys, so a start date picked
+  // later can never move anyone.
+  slotKeys?: number[]
+  // Card and column labels ("Mon", "Day 15"), index-aligned with `pattern`.
+  dayLabels?: string[]
 }
 
 // "Assign to" step of a rotate schedule. Answers one question: who covers each
@@ -78,6 +86,8 @@ export function ScheduleAssignToFields({
   pattern: patternProp,
   manualOnly = false,
   poolFromForm = false,
+  slotKeys,
+  dayLabels,
 }: ScheduleAssignToFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, getValues, setValue } = useFormContext<any>()
@@ -97,7 +107,18 @@ export function ScheduleAssignToFields({
   const coverageRaw = useWatch({ control, name: 'day_coverage' }) as
     | RotateDayCoverage[]
     | undefined
-  const dayCoverage = useMemo(() => coverageRaw ?? [], [coverageRaw])
+  // With `slotKeys`, stored cells are translated from their stable key to the
+  // card position the grid and analysis count in; cells on keys the current
+  // occurrence no longer has are left out of the picture.
+  const dayCoverage = useMemo(() => {
+    const cells = coverageRaw ?? []
+    if (!slotKeys) return cells
+    const positionOf = new Map(slotKeys.map((key, index) => [key, index]))
+    return cells.flatMap((cell) => {
+      const position = positionOf.get(cell.day)
+      return position === undefined ? [] : [{ ...cell, day: position }]
+    })
+  }, [coverageRaw, slotKeys])
   const placementsRaw = useWatch({ control, name: 'crew_placements' }) as
     | RotateCrewPlacement[]
     | undefined
@@ -223,7 +244,9 @@ export function ScheduleAssignToFields({
   const analysis = useMemo(
     () =>
       analyzeDayCoverage(crews, orderedShiftIds, pattern.length, {
-        startDate,
+        // Card 0 is not a calendar date when cards are keyed slots, so the
+        // weekday-alignment notes would describe the wrong days.
+        startDate: slotKeys ? undefined : startDate,
         shiftLabels,
         shiftHours,
         // Without this the panel can tell someone who has just pressed
@@ -235,6 +258,7 @@ export function ScheduleAssignToFields({
       orderedShiftIds,
       pattern.length,
       startDate,
+      slotKeys,
       shiftLabels,
       shiftHours,
       requirement,
@@ -510,10 +534,12 @@ export function ScheduleAssignToFields({
                   <ManualDayCard
                     key={entry.position ?? index}
                     day={index}
+                    storageDay={slotKeys?.[index] ?? index}
+                    label={dayLabels?.[index] ?? `Day ${index + 1}`}
                     orderedShiftIds={orderedShiftIds}
                     crewKind={crewKind}
                     crewOptions={manualCrewOptions}
-                    dayCoverage={dayCoverage}
+                    dayCoverage={coverageRaw ?? []}
                     disabled={disabled}
                   />
                 ))}
@@ -527,6 +553,7 @@ export function ScheduleAssignToFields({
             orderedShiftIds={orderedShiftIds}
             cycleLength={pattern.length}
             shifts={shifts}
+            dayLabels={dayLabels}
           />
         </CardContent>
       </Card>
@@ -631,7 +658,12 @@ function CrewRequirementNote({
 }
 
 type ManualDayCardProps = {
+  // Card position, for the test id.
   day: number
+  // The `day_coverage.day` this card reads and writes — equal to `day` unless
+  // the cards are keyed slots (fixed schedules).
+  storageDay: number
+  label: string
   orderedShiftIds: string[]
   crewKind: CrewKind
   crewOptions: Option[]
@@ -645,6 +677,8 @@ type ManualDayCardProps = {
 // which is the point of storing the matrix rather than offsets per crew.
 function ManualDayCard({
   day,
+  storageDay,
+  label,
   orderedShiftIds,
   crewKind,
   crewOptions,
@@ -663,7 +697,7 @@ function ManualDayCard({
       (getValues('day_coverage') as RotateDayCoverage[] | undefined) ?? []
     const key = crewKind === 'team' ? 'team_ids' : 'employee_ids'
     const existing = current.find(
-      (cell) => cell.day === day && cell.shift_id === shiftId
+      (cell) => cell.day === storageDay && cell.shift_id === shiftId
     )
 
     const next = existing
@@ -673,7 +707,7 @@ function ManualDayCard({
       : [
           ...current,
           {
-            day,
+            day: storageDay,
             shift_id: shiftId,
             employee_ids: [],
             team_ids: [],
@@ -694,13 +728,13 @@ function ManualDayCard({
     <Card className='gap-1 py-2' data-testid={`assign-day-${day}`}>
       <CardContent className='space-y-1.5 px-2'>
         <p className='text-center text-xs font-medium text-muted-foreground'>
-          Day {day + 1}
+          {label}
         </p>
 
         {orderedShiftIds.map((shiftId) => {
           const shift = shifts.find((s) => s.id === shiftId)
           const cell = dayCoverage.find(
-            (entry) => entry.day === day && entry.shift_id === shiftId
+            (entry) => entry.day === storageDay && entry.shift_id === shiftId
           )
           const ids =
             (crewKind === 'team' ? cell?.team_ids : cell?.employee_ids) ?? []

@@ -1,83 +1,98 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_OCCURRENCE, type Occurrence } from './data/schema'
-import { occurrencePattern } from './occurrence-pattern'
+import { occurrenceSlots } from './occurrence-pattern'
 
-const working = (pattern: ReturnType<typeof occurrencePattern>) =>
-  pattern.map((card) => (card.is_off ? '.' : 'W')).join('')
+describe('occurrenceSlots', () => {
+  it('gives a weekly rule one slot per chosen weekday, Monday first', () => {
+    const slots = occurrenceSlots(
+      { ...DEFAULT_OCCURRENCE, weekdays: ['fri', 'mon', 'wed'] },
+      's1'
+    )
 
-describe('occurrencePattern', () => {
-  it('anchors a weekly rule on the start date', () => {
-    // 2026-08-31 is a Monday, so Mon–Fri is the first five cards.
-    const pattern = occurrencePattern(DEFAULT_OCCURRENCE, '2026-08-31', 's1')
-
-    expect(working(pattern)).toBe('WWWWW..')
-    expect(pattern.filter((c) => !c.is_off).every((c) => c.shift_id === 's1'))
-      .toBe(true)
-  })
-
-  it('shifts the working cards when the start is mid-week', () => {
-    // 2026-09-03 is a Thursday: Thu, Fri, then the weekend, then Mon–Wed.
-    const pattern = occurrencePattern(DEFAULT_OCCURRENCE, '2026-09-03', 's1')
-
-    expect(working(pattern)).toBe('WW..WWW')
-  })
-
-  it('makes an every-N-weeks rule a 7N-day cycle working only its first week', () => {
-    const everyTwo: Occurrence = { ...DEFAULT_OCCURRENCE, interval: 2 }
-    const pattern = occurrencePattern(everyTwo, '2026-08-31', 's1')
-
-    expect(pattern).toHaveLength(14)
-    expect(working(pattern)).toBe('WWWWW..' + '.......')
-  })
-
-  it('makes an every-N-days rule an N-day cycle working its first day', () => {
-    const everyThree: Occurrence = {
-      ...DEFAULT_OCCURRENCE,
-      frequency: 'daily',
-      interval: 3,
-    }
-
-    expect(working(occurrencePattern(everyThree, '2026-08-31', 's1'))).toBe(
-      'W..'
+    expect(slots.labels).toEqual(['Mon', 'Wed', 'Fri'])
+    expect(slots.slotKeys).toEqual([1000, 1002, 1004])
+    expect(slots.pattern.every((c) => !c.is_off && c.shift_id === 's1')).toBe(
+      true
     )
   })
 
-  it('makes an every-N-months rule a 30N-day cycle working the matching days', () => {
+  // The whole point of the keys: "Team A on Tuesday" must not move when the
+  // start date is set later, and the interval only changes the cadence.
+  it('keys weekdays without reference to the start date or interval', () => {
+    const everyWeek = occurrenceSlots(DEFAULT_OCCURRENCE, 's1')
+    const everyThree = occurrenceSlots(
+      { ...DEFAULT_OCCURRENCE, interval: 3 },
+      's1'
+    )
+
+    expect(everyThree.slotKeys).toEqual(everyWeek.slotKeys)
+    expect(everyWeek.labels).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
+  })
+
+  it('gives a daily rule a single slot', () => {
+    const slots = occurrenceSlots(
+      { ...DEFAULT_OCCURRENCE, frequency: 'daily', interval: 3 },
+      's1'
+    )
+
+    expect(slots.slotKeys).toEqual([0])
+    expect(slots.labels).toEqual(['Every 3 days'])
+  })
+
+  it('keys a monthly date rule by day of month, deduplicated and sorted', () => {
     const monthly: Occurrence = {
       ...DEFAULT_OCCURRENCE,
       frequency: 'monthly',
       interval: 2,
       monthly_mode: 'date_specific',
-      date_specific_1: 1,
-      date_specific_2: 15,
+      date_specific_1: 15,
+      date_specific_2: 1,
     }
-    // Starts 2026-08-31, so card 1 is Sep 1 and card 15 is Sep 15.
-    const pattern = occurrencePattern(monthly, '2026-08-31', 's1')
 
-    expect(pattern).toHaveLength(60)
-    expect(
-      pattern.flatMap((card, i) => (card.is_off ? [] : [i]))
-    ).toEqual([1, 15])
-  })
-
-  it('reads a day-position rule as that weekday in that week of the month', () => {
-    const secondMonday: Occurrence = {
-      ...DEFAULT_OCCURRENCE,
-      frequency: 'monthly',
-      interval: 1,
-      monthly_mode: 'day_position',
-      day_position_rules: [{ position: 2, weekday: 'mon' }],
-    }
-    // 2026-09-14 is September's second Monday: card 14 from Aug 31.
-    const pattern = occurrencePattern(secondMonday, '2026-08-31', 's1')
+    const slots = occurrenceSlots(monthly, 's1')
+    expect(slots.labels).toEqual(['Day 1', 'Day 15'])
+    expect(slots.slotKeys).toEqual([2000, 2014])
 
     expect(
-      pattern.flatMap((card, i) => (card.is_off ? [] : [i]))
-    ).toEqual([14])
+      occurrenceSlots({ ...monthly, date_specific_2: 15 }, 's1').slotKeys
+    ).toEqual([2014])
   })
 
-  it('has nothing to staff without a shift', () => {
-    expect(occurrencePattern(DEFAULT_OCCURRENCE, '2026-08-31', undefined))
-      .toEqual([])
+  it('keys a day-position rule by position and weekday', () => {
+    const slots = occurrenceSlots(
+      {
+        ...DEFAULT_OCCURRENCE,
+        frequency: 'monthly',
+        interval: 1,
+        monthly_mode: 'day_position',
+        day_position_rules: [{ position: 2, weekday: 'mon' }],
+      },
+      's1'
+    )
+
+    expect(slots.labels).toEqual(['2nd Mon'])
+    expect(slots.slotKeys).toEqual([3007])
+  })
+
+  it('keeps weekly, monthly and daily keys in separate ranges', () => {
+    const weekly = occurrenceSlots(DEFAULT_OCCURRENCE, 's1').slotKeys
+    const monthly = occurrenceSlots(
+      {
+        ...DEFAULT_OCCURRENCE,
+        frequency: 'monthly',
+        monthly_mode: 'day_month',
+        day_of_month: 1,
+      },
+      's1'
+    ).slotKeys
+
+    expect(weekly.some((key) => monthly.includes(key))).toBe(false)
+  })
+
+  it('has slots but nothing to staff without a shift', () => {
+    const slots = occurrenceSlots(DEFAULT_OCCURRENCE, undefined)
+
+    expect(slots.pattern).toEqual([])
+    expect(slots.slotKeys).toHaveLength(5)
   })
 })

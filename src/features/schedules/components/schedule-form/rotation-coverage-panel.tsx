@@ -14,6 +14,8 @@ type RotationCoveragePanelProps = {
   orderedShiftIds: string[]
   cycleLength: number
   shifts: Shift[]
+  // Column headers ("Mon", "Day 15") instead of cycle-day numbers.
+  dayLabels?: string[]
 }
 
 function shiftLetter(name: string): string {
@@ -54,6 +56,7 @@ export function RotationCoveragePanel({
   orderedShiftIds,
   cycleLength,
   shifts,
+  dayLabels,
 }: RotationCoveragePanelProps) {
   const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
   const days = Array.from({ length: cycleLength }, (_, day) => day)
@@ -89,7 +92,7 @@ export function RotationCoveragePanel({
                   key={day}
                   className='w-8 px-1 py-2 text-center text-xs font-medium text-muted-foreground tabular-nums'
                 >
-                  {day + 1}
+                  {dayLabels?.[day] ?? day + 1}
                 </th>
               ))}
             </tr>
@@ -162,7 +165,7 @@ export function RotationCoveragePanel({
                     key={day}
                     className='w-8 px-1 py-2 text-center text-xs font-medium text-muted-foreground tabular-nums'
                   >
-                    {day + 1}
+                    {dayLabels?.[day] ?? day + 1}
                   </th>
                 ))}
               </tr>

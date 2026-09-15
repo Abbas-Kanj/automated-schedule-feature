@@ -1,97 +1,125 @@
-import { addDays, getDay, parse } from 'date-fns'
 import {
   type Occurrence,
   type RotatePatternEntry,
-  type ShiftRepeatWeekday,
+  SHIFT_REPEAT_WEEKDAYS,
 } from './data/schema'
 
-// date-fns' `getDay` order: 0 is Sunday.
-const WEEKDAY_BY_INDEX: ShiftRepeatWeekday[] = [
-  'sun',
-  'mon',
-  'tue',
-  'wed',
-  'thu',
-  'fri',
-  'sat',
-]
-
-// A fixed schedule's occurrence rule read as a rotate-style pattern, so the
-// "Assign to" step can staff both types with the same component. Card 0 is the
-// schedule's start date, which is what that step's weekday warnings assume.
+// What "Work fixed" staffs for a fixed schedule: one card per *working* day the
+// occurrence rule describes, and the stable key each card's assignments are
+// stored under in `day_coverage.day`.
 //
-// Every working card names the same shift: the suggestion transposes each
-// crew's journey through the shift list, so a crew that starts on a shift
-// stays on it — which is what makes the schedule fixed rather than rotating.
+// The keys are deliberately independent of `start_date` — "Team A works
+// Tuesdays" must stay Tuesday when the start date is picked (or changed) on
+// the later "Start & End" step. They are spaced into separate ranges so an
+// assignment can never silently re-attach to a different kind of day when the
+// frequency is switched; leaving the Occurrence step prunes keys that no longer
+// exist instead.
 //
-// - daily, every N days: an N-day cycle, working on its first day.
-// - weekly, every N weeks: a 7N-day cycle, working the chosen weekdays of its
-//   first week. The cycle length is a multiple of both 7 and N, so it repeats
-//   exactly.
-// - monthly, every N months: a 30N-day cycle — a month is a flat 30 days here,
-//   as everywhere else in schedules — working the days of its first 30 that
-//   match the rule. Days 1–28 each fall exactly once in any 30-day window, so a
-//   day-of-month rule always lands.
-export function occurrencePattern(
-  occurrence: Occurrence | undefined,
-  startDate: string | undefined,
-  shiftId: string | undefined
-): RotatePatternEntry[] {
-  if (!occurrence || !shiftId) return []
+// - daily (every N days): a single slot, key 0.
+// - weekly: the chosen weekdays, Monday first, key 1000 + weekday (Mon = 0).
+// - monthly, day of month / date specific: key 2000 + (day − 1).
+// - monthly, day position ("2nd Monday"): key 3000 + (position − 1) × 7 +
+//   weekday.
+//
+// The interval ("every 2 weeks") changes how often the slots come round, not
+// which slots exist, so it plays no part in the keys.
+export type OccurrenceSlots = {
+  // Every card works `shiftId`; empty until a shift is selected.
+  pattern: RotatePatternEntry[]
+  slotKeys: number[]
+  labels: string[]
+}
 
-  const interval =
-    Number.isFinite(occurrence.interval) && occurrence.interval >= 1
-      ? Math.floor(occurrence.interval)
-      : 1
-  const card = (index: number, works: boolean): RotatePatternEntry => ({
-    position: index + 1,
-    is_off: !works,
-    shift_id: works ? shiftId : undefined,
-  })
+const WEEKLY_BASE = 1000
+const DAY_OF_MONTH_BASE = 2000
+const DAY_POSITION_BASE = 3000
 
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function ordinal(n: number): string {
+  const suffix =
+    n % 100 >= 11 && n % 100 <= 13
+      ? 'th'
+      : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ??
+        'th'
+  return `${n}${suffix}`
+}
+
+function slotList(
+  occurrence: Occurrence
+): { key: number; label: string }[] {
   if (occurrence.frequency === 'daily') {
-    return Array.from({ length: interval }, (_, i) => card(i, i === 0))
+    const interval =
+      Number.isFinite(occurrence.interval) && occurrence.interval > 1
+        ? Math.floor(occurrence.interval)
+        : 1
+    return [
+      {
+        key: 0,
+        label: interval === 1 ? 'Every day' : `Every ${interval} days`,
+      },
+    ]
   }
 
-  const parsed = startDate
-    ? parse(startDate, 'yyyy-MM-dd', new Date())
-    : new Date()
-  const start = Number.isNaN(parsed.getTime()) ? new Date() : parsed
-
   if (occurrence.frequency === 'weekly') {
-    const weekdays = new Set(occurrence.weekdays ?? [])
-    return Array.from({ length: 7 * interval }, (_, i) =>
-      card(i, i < 7 && weekdays.has(WEEKDAY_BY_INDEX[getDay(addDays(start, i))]))
+    const chosen = new Set(occurrence.weekdays ?? [])
+    return SHIFT_REPEAT_WEEKDAYS.flatMap((weekday, index) =>
+      chosen.has(weekday)
+        ? [{ key: WEEKLY_BASE + index, label: WEEKDAY_LABELS[index] }]
+        : []
     )
   }
 
-  return Array.from({ length: DAYS_PER_MONTH * interval }, (_, i) =>
-    card(i, i < DAYS_PER_MONTH && matchesMonthly(occurrence, addDays(start, i)))
-  )
-}
-
-const DAYS_PER_MONTH = 30
-
-function matchesMonthly(occurrence: Occurrence, date: Date): boolean {
-  const dayOfMonth = date.getDate()
   switch (occurrence.monthly_mode) {
     case 'day_month':
-      return dayOfMonth === occurrence.day_of_month
-    case 'date_specific':
-      return (
-        dayOfMonth === occurrence.date_specific_1 ||
-        dayOfMonth === occurrence.date_specific_2
-      )
+    case 'date_specific': {
+      const days =
+        occurrence.monthly_mode === 'day_month'
+          ? [occurrence.day_of_month]
+          : [occurrence.date_specific_1, occurrence.date_specific_2]
+      const valid = [
+        ...new Set(
+          days.filter(
+            (day): day is number =>
+              Number.isInteger(day) && (day as number) >= 1 && (day as number) <= 28
+          )
+        ),
+      ].sort((a, b) => a - b)
+      return valid.map((day) => ({
+        key: DAY_OF_MONTH_BASE + day - 1,
+        label: `Day ${day}`,
+      }))
+    }
     case 'day_position': {
-      // "The 2nd Monday": the right weekday, in the right seven-day band.
       const rule = occurrence.day_position_rules?.[0]
-      return (
-        !!rule &&
-        WEEKDAY_BY_INDEX[getDay(date)] === rule.weekday &&
-        Math.ceil(dayOfMonth / 7) === rule.position
-      )
+      const weekday = rule ? SHIFT_REPEAT_WEEKDAYS.indexOf(rule.weekday) : -1
+      if (!rule || weekday < 0 || !Number.isInteger(rule.position)) return []
+      return [
+        {
+          key: DAY_POSITION_BASE + (rule.position - 1) * 7 + weekday,
+          label: `${ordinal(rule.position)} ${WEEKDAY_LABELS[weekday]}`,
+        },
+      ]
     }
     default:
-      return false
+      return []
+  }
+}
+
+export function occurrenceSlots(
+  occurrence: Occurrence | undefined,
+  shiftId: string | undefined
+): OccurrenceSlots {
+  const slots = occurrence ? slotList(occurrence) : []
+  return {
+    pattern: shiftId
+      ? slots.map((_, index) => ({
+          position: index + 1,
+          is_off: false,
+          shift_id: shiftId,
+        }))
+      : [],
+    slotKeys: slots.map((slot) => slot.key),
+    labels: slots.map((slot) => slot.label),
   }
 }
