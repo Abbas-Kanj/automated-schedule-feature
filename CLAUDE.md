@@ -770,10 +770,10 @@ a genuine missing-import that `tsc -b` caught.
 
 ## Pick up here next session
 
--1. **Ask the two open wizard questions first** — keep or drop the fixed
-   Occurrence step, and whether to store the fixed roster by weekday (a start
-   date picked after assignment currently slides every assigned weekday).
-   Then browser-walk both wizards (all of it is pushed as of 2026-09-15).
+-1. **Browser-walk both wizards.** The two open wizard questions were
+   answered 2026-09-15 (keep Occurrence with Monthly; fixed rosters now
+   stored under start-date-independent slot keys — "Mon", "Day 15").
+   → `.claude/handoff/schedule-wizard-assign-steps.md`
    → `.claude/handoff/schedule-wizard-assign-steps.md`
 0. **Answer the open preset question** — offered and not yet answered: add
    `M A M A M · ·` as a 7-day two-shift preset? It is the *only* true

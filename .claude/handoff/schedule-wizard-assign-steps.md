@@ -57,12 +57,23 @@ Step ids: `assign-to` (crew pick), `work` (assignment; label depends on type),
 - **Occurrence step** (`occurrence-fields.tsx`): shared
   `RecurrenceFrequencyFields` + `RepeatMonthlyFields` under `occurrence.*`, plus
   Public holiday / Sick leave switches. **No End card** — Start & End owns it.
-- **`occurrence-pattern.ts`** reads the rule as a rotate-style pattern, card 0 =
-  `start_date`, every working card = `shift_ids[0]` (the search transposes each
-  crew onto one shift, which is what makes it "fixed"):
-  daily/N → N cards working the first; weekly/N → 7N cards, chosen weekdays of
-  the first week; monthly/N → 30N cards (flat 30-day month, repo convention),
-  matching days of the first 30.
+- **`occurrence-pattern.ts#occurrenceSlots`** turns the rule into **one card
+  per working day** plus a **stable storage key** per card, independent of
+  `start_date` (user's call, 2026-09-15 — a start date picked on the later
+  Start & End step must never move an assigned crew). Keys: daily → `0`;
+  weekly → `1000 + weekday` (Mon = 0); monthly by date → `2000 + day − 1`;
+  monthly day-position → `3000 + (pos − 1) × 7 + weekday`. Separate ranges so
+  switching frequency never re-attaches a cell to a different kind of day.
+  The interval only changes cadence, not keys. Labels: "Mon", "Day 15",
+  "2nd Mon". Off days have no card, so they no longer show as red 0s.
+- **`ScheduleAssignToFields` `slotKeys` / `dayLabels` props** translate only
+  at the stored-matrix boundary: the grid, analysis and coverage panel count
+  card positions 0…k; `ManualDayCard` reads/writes `storageDay`. Weekday
+  alignment notes are suppressed when `slotKeys` is set (card 0 is not a
+  date). **Leaving Occurrence prunes** cells whose key the rule no longer has.
+- **Stored fixed rosters from before 2026-09-15** used start-anchored day
+  indices (`0…n`). None exist outside dev localStorage; they are dropped the
+  first time Occurrence is left.
 - **Summary:** Occurrence line (fixed), Assign-to card listing picked crews +
   "Not yet assigned." / "N crews assigned." (`assign-to-status-note.tsx`, no
   longer points at Schedule Rotation). **View page** renders Occurrence, Assign
@@ -84,23 +95,22 @@ Step ids: `assign-to` (crew pick), `work` (assignment; label depends on type),
 
 ## Open questions — ask before building more
 
-1. **Should the Occurrence step exist at all?** The user said "not the
+1. ~~**Should the Occurrence step exist at all?**~~ **Answered 2026-09-15:
+   keep it, Monthly enabled.** History, for context: The user said "not the
    occurrence step in fixed type, its wrong", asked for a history of fixed
    steps (answered: Policy → Shift definition/Recurrence → Occurrence →
    Shifts/Start & End since 08-16; never a Pattern-like step), then asked to
    enable Monthly in it — but never confirmed keeping or removing it. It is
    still in the fixed flow.
-2. **Start-date anchoring bug (offered, not answered).** The fixed pattern's
-   day indices are anchored on `start_date`, and Start & End now comes *after*
-   Work fixed. Assign Mon–Fri, then pick a Thursday start → the stored cells
-   land on different weekdays. Proposed fix: store the fixed roster by weekday
-   rather than by day index.
-3. The manual grid for fixed renders **one card per cycle day**, including off
-   days — 30/60 cards for monthly. Offered to hide off-day cards; not answered.
+2. ~~**Start-date anchoring bug.**~~ **Fixed 2026-09-15** (user approved) —
+   fixed rosters are stored under start-date-independent slot keys; see
+   `occurrenceSlots` above.
+3. ~~The manual grid for fixed renders one card per cycle day, including off
+   days.~~ **Resolved by the same change** — only working days get a card.
 
 ## What's left, in order
 
-1. Resolve open questions 1–2 with the user.
+1. ~~Resolve open questions 1–2 with the user.~~ Done 2026-09-15.
 2. Browser-walk both wizards: rotate (Assign to → Work rotation → Suggest →
    Start & End → Summary → save → edit reopens on the same crews) and fixed
    (Occurrence weekly + monthly → Assign to → Work fixed manual grid → Summary).
