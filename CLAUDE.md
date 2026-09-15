@@ -705,12 +705,8 @@ a genuine missing-import that `tsc -b` caught.
   **Watch out: every rotate seed is staffed**, so with seed data the dialog
   always opens on the fallback — a test asserted otherwise and correctly failed
   until it built its own unstaffed schedule.
-- **The timeline starts where the schedule and each crew do.** Days before
-  `start_date` are dropped, Previous is disabled at that boundary, and each
-  crew row is blank until its own first working day — an **empty spacer, not
-  the off-day ring**, since "not on this rotation yet" and "rostered and
-  resting" are different statements. `daysOn` no longer credits a late crew for
-  time before it existed. Each crew's start date reads under its name.
+- **The timeline start-date clamps added here were REVERTED 2026-09-13** (see
+  that session). Only the per-crew "Starts <date>" line survived. Each crew's start date reads under its name.
   Crew start dates are found by **walking forward through `getPeriodIndex`**
   rather than re-deriving the date arithmetic — duplicating it is how the two
   would drift.
@@ -744,8 +740,41 @@ a genuine missing-import that `tsc -b` caught.
 - `npm run build` clean; `npm run test` **362 passed / 0 failed** (from 349);
   eslint clean on every touched file.
 
+## Session state (2026-09-13)
+
+- **Timeline Monthly view was showing one dot per crew — reverted the 09-12
+  start-date clamps.** Every seed starts 2026-08-31 (last day of August) and
+  the screen opens there, so dropping pre-start days left a 1-column month.
+  Invisible to tests (they used mid-month schedules). The user wants whole
+  periods drawn. → `.claude/handoff/schedule-rotation-screen.md`
+- **Crew assignment is back in the wizard, for rotate *and* fixed**, as
+  "Assign to" (teams/employees pick) + "Work rotation"/"Work fixed" (the same
+  `ScheduleAssignToFields`, fixed manual-only). Start & End is the last step
+  before Summary for both. Fixed also gained an **Occurrence** step (Monthly
+  enabled) — **whether it should stay is unconfirmed**. The dialog on
+  Schedule Rotation stays. → `.claude/handoff/schedule-wizard-assign-steps.md`
+- **Git history check:** no fixed-type flow ever had a Pattern-like step, in
+  this repo or `../schedule-feature` — don't re-search.
+- `npm run build` clean; **full suite 366 passed / 0 failed** (run 09-15).
+  **Committed and pushed 2026-09-15**, together with the 11 unpushed 09-12
+  commits. **Not browser-verified.**
+- **The vitest `EACCES ::1:63315` port error came back (2026-09-15)** — and
+  its cause is now known: Windows had **reserved TCP 63242–63341**
+  (`netsh interface ipv6 show excludedportrange protocol=tcp`), and 63315 is
+  vitest's default browser API port. CLI flags (`--api.port`,
+  `--browser.api.port`) did **not** move it; a throwaway config did:
+  `mergeConfig(baseConfig, { test: { api: { port: 51777 }, browser: { api:
+  { port: 51778 } } } })` saved in the project root, run with
+  `npx vitest run --config <that file> --browser.headless`, then deleted.
+  The reservation shifts between reboots, which is why it comes and goes.
+
 ## Pick up here next session
 
+-1. **Ask the two open wizard questions first** — keep or drop the fixed
+   Occurrence step, and whether to store the fixed roster by weekday (a start
+   date picked after assignment currently slides every assigned weekday).
+   Then browser-walk both wizards (all of it is pushed as of 2026-09-15).
+   → `.claude/handoff/schedule-wizard-assign-steps.md`
 0. **Answer the open preset question** — offered and not yet answered: add
    `M A M A M · ·` as a 7-day two-shift preset? It is the *only* true
    5-on/2-off three crews can cover, so without it that roster has to be
@@ -761,10 +790,10 @@ a genuine missing-import that `tsc -b` caught.
    write-up (the 09-08 notes transcribed it as 8 cards for a 28-day cycle).
    → `.claude/handoff/rotation-crew-offsets-and-guardrails.md`
 2. **Browser-verify the rotation coverage rework** — newest work, and the
-   only item here with a written click-list. **As of 2026-09-11 this is
-   reached from `/schedule-rotation` → "Assign crews", not a wizard step**
-   — see the click-path in `.claude/handoff/rotation-suggestion.md`'s Open
-   calls (updated for the new location). Start with the case that
+   only item here with a written click-list. **As of 2026-09-13 it is
+   reachable both from the wizard's "Assign to" → "Work rotation" steps and
+   from `/schedule-rotation` → "Assign crews"** — see the click-path in
+   `.claude/handoff/rotation-suggestion.md`'s Open calls. Start with the case that
    motivated it: create a rotate schedule selecting **Morning + Night**,
    preset **5-2** on the Pattern step, save it, then from
    `/schedule-rotation` → **Assign crews** → pick it → pool of **4** →

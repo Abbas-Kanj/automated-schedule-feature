@@ -16,13 +16,14 @@ supplied.
 
 - **Schedule dropdown** — lists **rotate schedules only** (`parent_type ==
   'regular' && type == 'rotate'`), the only kind carrying a shift `pattern`.
-- **"Assign crews" button** — opens the assignment **dialog** (2026-09-12; it
-  was a separate page for one day, and a wizard step before that). See "Where
-  assignment lives" below.
+- **"Assign crews" button** — opens the assignment **dialog** (2026-09-12). As
+  of 2026-09-13 the same component is *also* back in the schedule wizard, as
+  the "Work rotation" step — the dialog is for editing a roster after saving.
+  See "Where assignment lives" below.
 - **Date navigator** — prev / range label / next / **Reset**. Reset returns to
-  the schedule's `start_date` period (rotation period 0). **Prev is disabled
-  once the visible range reaches the schedule's start** (2026-09-12) — the grid
-  draws nothing before then, so stepping back could only land somewhere empty.
+  the schedule's `start_date` period (rotation period 0). Prev is always
+  enabled (the 2026-09-12 start-date disable was reverted 2026-09-13 — see
+  "The grid draws whole periods").
 - **Two views, each with its own Weekly / Monthly tabs** (2026-09-12; one
   shared control before that, and a Daily/Weekly/Monthly one before *that*).
   Both are seeded from `getDefaultSpan(schedule)` — `cycle_length.unit`,
@@ -44,21 +45,22 @@ supplied.
 - **Cycle legend** — decodes the sequence letters (`M = Morning`, …, `O = Off`),
   now sitting in the Employees section header.
 
-### Where the grid starts (2026-09-12)
+### The grid draws whole periods (2026-09-13)
 
-Two clamps, both previously absent — the grid drew a whole week or month
-regardless of when the rotation began.
+**Decision locked by the user: keep a dot for every day of the week/month.**
+On 2026-09-12 two clamps were added (days before `start_date` dropped; each
+crew blank until its first working day) plus Prev disabled at the start. They
+were **reverted 2026-09-13** because every seed starts **2026-08-31 — the last
+day of August** and the screen opens on that date, so Monthly showed **one dot
+per crew** and Prev could not reach a full month. Tests and build never saw
+it: the clamp tests used mid-month schedules, and nobody had opened Monthly
+on a seed. Days before the start now wrap back through the cycle
+(`getAssignedIndex` handles negative period indices).
 
-- **Schedule-wide**: calendar days before `start_date` are dropped outright.
-- **Per crew**: a crew's row is blank until its own first working day, rendered
-  as an **empty spacer, not the off-day ring** — "not on this rotation yet" and
-  "rostered and resting" are different statements, and the ring already means
-  the second. `daysOn` counts only real days, so a late crew is no longer
-  credited for time before it existed.
-
-A crew's start date is found by **walking forward from `start_date` through
-`getPeriodIndex`**, not by re-deriving the date arithmetic locally —
-duplicating it is how the two would drift apart.
+Kept from 09-12: the **"Starts <date>" line under each crew** (`crewStartDate`
+in `timeline.ts`, walked through `getPeriodIndex`). Regression test:
+`timeline.test.ts` "draws the whole month even when the schedule starts on its
+last day". The Employees table's period filter lost its matching clamp too.
 
 ## Model
 
@@ -187,15 +189,13 @@ own schedule, independent of creation.
 - **Both pickers inside it carry an A-Z first-letter filter** (2026-09-12) —
   `components/multi-select/filterable-multi-select.tsx`. See
   `.claude/handoff/rotation-suggestion.md` for how it behaves.
-- **Wizard Summary + View page**: both used to show the full coverage
-  panel for a rotate schedule; both now show a one-line status note
-  ("Not yet assigned…" / "N crews assigned…") via a new shared
-  `assign-to-status-note.tsx`, pointing at Schedule Rotation for the real
-  UI. The View page needed its own small carve-out for this — it renders
-  every wizard section at once via a `disabled ||` pattern, and
-  `ScheduleSummary` (which carries the note) doesn't render in disabled
-  mode at all, so the note is rendered directly in `schedule-form.tsx`
-  too, gated on `disabled` alone.
+- **Wizard Summary + View page** (2026-09-13): the wizard edits the roster
+  again, so the View page renders the "Assign to" and "Work rotation" steps
+  read-only, and the Summary lists the picked crews plus
+  `assign-to-status-note.tsx`'s neutral "Not yet assigned." / "N crews
+  assigned." (no longer pointing at Schedule Rotation). Saving the dialog now
+  also writes the wizard's `crew_kind`/`crew_ids` pick. Full detail:
+  `.claude/handoff/schedule-wizard-assign-steps.md`.
 - **Tests**: `schedule-form.test.tsx` (nothing but the wizard-seam
   rotate-assignment suite) was deleted outright. Its 3 seam tests now live in
   `components/assign-crews-dialog.test.tsx`, driving "Save" instead of "Next"
@@ -208,9 +208,7 @@ own schedule, independent of creation.
   re-added. Two more tests added for the new Start & End fields
   (round-trips unedited; saves an edited end frequency).
 - **No schema or data migration.** `day_coverage`/`crew_placements` already
-  defaulted to `[]`; a schedule created via the now-5-step wizard just
-  starts unassigned until visited via the new page. `SEED_VERSION` not
-  bumped — nothing about stored shape changed.
+  defaulted to `[]`. `SEED_VERSION` not bumped.
 - **New `optimizeDeps.include` entries**: `react-day-picker` (2026-09-11,
   from `ScheduleStartEndFields`'s date picker) and `@radix-ui/react-dialog`
   (2026-09-12, for the dialog test) — same class of issue as the
@@ -243,10 +241,11 @@ starts where".
   `schedule-form/schedule-assign-to-fields.tsx`. One row per cycle position,
   each with Employees + Teams multi-selects, built from the same picker the
   shift form's own Assign-to tab used.
-  **Superseded 2026-09-11/12**: that step no longer exists in the wizard at
-  all — the same component now mounts in this feature's **"Assign crews"
-  dialog**. See "Where assignment lives" above. (The shift form's Assign-to
-  tab is itself no longer rendered, as of 2026-09-12.)
+  Its shape has changed since (see 2026-09-06 below). It left the wizard on
+  2026-09-11 for the **"Assign crews" dialog**, and **came back on
+  2026-09-13** as two wizard steps — "Assign to" (crew pick) then "Work
+  rotation" (the same component) — while the dialog stays. (The shift form's
+  Assign-to tab is itself no longer rendered, as of 2026-09-12.)
 - `getRotationRoster` now reads the schedule, not the shifts. **No schema
   restriction was added** — an unassigned position stays valid and the step
   never blocks "Next", a call that still holds today.
@@ -478,7 +477,8 @@ npx vitest run --browser.enabled=false --environment=node <files>
 7. **Saving the assign dialog does not re-point the screen** at the schedule
    just staffed. Minor, but the dialog can now leave you looking at a different
    rotation than the one you edited.
-8. **No seeded rotation demonstrates the start-date clamp.** All eight seeds
-   start `2026-08-31`, so both the schedule-wide and per-crew clamps are
-   invisible on seed data — the timeline tests build their own mid-month
-   schedules to exercise them. Consider a seed that starts mid-week.
+8. ~~**No seeded rotation demonstrates the start-date clamp.**~~ **Moot
+   2026-09-13** — the clamps were reverted (see "The grid draws whole periods").
+9. **The Monthly timeline revert is not browser-verified.** Build clean and
+   62/62 schedule-rotation tests pass; open `/schedule-rotation`, Monthly, on
+   any seed and confirm ~31 dots per crew row.

@@ -13,26 +13,21 @@ either way.
 > matrix** records who covers it. Details throughout — this file was rewritten,
 > not appended to.
 
-> **Relocated 2026-09-11, then made a dialog 2026-09-12:** the "Assign to"
-> step no longer lives in the schedule wizard. It is the **"Assign crews"
-> dialog** on `/schedule-rotation`
-> (`schedule-rotation/components/assign-crews-dialog.tsx`) — pick an existing
-> rotate schedule from a dropdown, then assign its crew there, instead of it
-> being wizard step 4 between Pattern and Start & End. The standalone page and
-> its route existed for one day and are **deleted**. The rotate wizard is now
-> 5 steps, not 6.
-> **`schedule-assign-to-fields.tsx` itself is unchanged** — same component,
-> same props (`disabled`, `commitRef`), same suggestion/manual-grid/coverage-
-> panel behaviour described below; only *where it's mounted* changed, so
-> everything in this file about the step's mechanics still applies verbatim.
-> What changed around it: "Save" in the dialog now plays the role
-> "Next" used to (calling `commitRef` before reading final values), the
-> wizard's Summary step shows a one-line status note instead of a full
-> recap, and the dialog also carries the "Start & End" fields
-> (start date + end frequency) alongside assignment. **One real change to the
-> component itself, 2026-09-12**: both its pickers are now
-> `FilterableMultiSelect`, not `MultiSelect`. Full detail in
-> `.claude/handoff/schedule-rotation-screen.md`.
+> **Where `schedule-assign-to-fields.tsx` is mounted (current, 2026-09-13,
+> uncommitted):** in **two** places.
+> 1. The **"Assign crews" dialog** on `/schedule-rotation` (since 2026-09-12)
+>    — its own Teams/Employees toggle and pool picker; "Save" plays the role
+>    "Next" does in the wizard (calls `commitRef` first).
+> 2. The **schedule wizard again**, as the **"Work rotation"** step (and
+>    **"Work fixed"** for fixed schedules), after a new **"Assign to"** step
+>    that stores the crew pick in the form (`crew_kind`/`crew_ids`).
+>
+> New props, all opt-in so the dialog is unchanged: `poolFromForm` (read the
+> crew pick from the form, hide the toggle/pool picker, restrict day-card
+> options to the pick), `manualOnly` (no Suggest — fixed), `pattern` (use this
+> instead of the form's `pattern` — fixed passes its occurrence read as one).
+> The suggestion/manual-grid/coverage mechanics below are unchanged. Wizard
+> detail: `.claude/handoff/schedule-wizard-assign-steps.md`.
 
 Companion to `.claude/handoff/schedule-rotation-screen.md`, which covers the
 screen those assignments drive.
@@ -419,18 +414,20 @@ recur on 2026-09-06** — the new UI reuses primitives already in the list.
   the short version is that the dialog, the A-Z strip and the coverage grid
   all render and behave, but **the suggestion click-path below was not walked
   end-to-end** — see open call #1.
-- **Committed, not pushed.** Eight commits on local `main`.
+- The 09-12 work and the 2026-09-13 wizard changes to this component (the
+  new props) are **committed and pushed** (2026-09-15) — see
+  `.claude/handoff/schedule-wizard-assign-steps.md`.
 
 ## Open calls / follow-ups
 
 1. **Browser-verify the *suggestion* path.** Partly done 2026-09-12: the
    dialog opens, the coverage grid and warning list render, the manual grid
    renders one picker per shift per day, and the A-Z strip works. **Not
-   walked**: the motivating correctness case. Do that next —
-   create a rotate schedule (Basics → Shifts, select **Morning + Night** →
-   Pattern, preset **5-2**, every card Morning → Start & End → Summary →
-   save), then `/schedule-rotation` → **Assign crews** → pick it → pool of
-   **4** → *Suggest*: the shift rows must read `1` for Morning *and* Night on
+   walked**: the motivating correctness case. Do that next — in the wizard
+   (Basics → Shifts, select **Morning + Night** → Pattern, preset **5-2**,
+   every card Morning → **Assign to**, pick **4** teams or employees → **Work
+   rotation** → *Suggest*), or the same from `/schedule-rotation` → **Assign
+   crews** on a saved schedule: the shift rows must read `1` for Morning *and* Night on
    all seven days, no red `0`. Before the 09-06 rework Night was `0` on all
    seven. Then preset **2-2-3 Panama**, 2 shifts, 4 crews → one crew on each
    shift all 14 days. Then flip **Assign manually** on and clear a cell → a
@@ -439,8 +436,8 @@ recur on 2026-09-06** — the new UI reuses primitives already in the list.
    structural ("N crews would cover every shift every day"), not as something
    done wrong. Then edit **Start & End** and Save → both the roster and the
    dates persist; re-open → "N crews assigned" and the roster loads back.
-   Then check a newly-created, unassigned schedule's wizard Summary and its
-   read-only View page both show "Not yet assigned…".
+   Then check the wizard Summary lists the picked crews and "N crews
+   assigned.", and the View page shows the roster read-only.
    Also: toggling Teams ⇄ Employees with the manual grid open must not put
    employee names in a team field.
    **Note**: creating a new rotate schedule is also the only way to see the
