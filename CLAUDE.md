@@ -768,12 +768,30 @@ a genuine missing-import that `tsc -b` caught.
   `npx vitest run --config <that file> --browser.headless`, then deleted.
   The reservation shifts between reboots, which is why it comes and goes.
 
+## Session state (2026-09-16)
+
+- **Assignment rework, uncommitted.** Fixed: per-shift occurrence
+  (`shift_occurrences`), crews assigned per shift on "Assign to"
+  (`shift_assignments`, multi-shift warned not blocked), Start & End moved
+  before Assign to, "Work fixed" removed; the 09-15 slot-key storage scheme is
+  **deleted**. Rotate: "Work rotation" removed — placement lives only in the
+  Assign crews dialog, which now requires Start & End first, shows real dates,
+  and swaps the crew table / Crew start days editor for the Employees table.
+  Wizard clears later steps on going back (create mode only). Summary calendar
+  shows crews per shift. Legacy fixed records migrate on store load.
+- `npm run build` clean; `npm run test` **435 passed / 0 failed** (no port
+  workaround needed). **Browser-walked** both types with Playwright; two bugs
+  found that build and tests could not see (Radix Select placeholder on rows
+  mounted before their field-array value; wizard pool not reaching the dialog),
+  both fixed.
+  → `.claude/handoff/schedule-wizard-assign-steps.md`
+
 ## Pick up here next session
 
--1. **Browser-walk both wizards.** The two open wizard questions were
-   answered 2026-09-15 (keep Occurrence with Monthly; fixed rosters now
-   stored under start-date-independent slot keys — "Mon", "Day 15").
-   → `.claude/handoff/schedule-wizard-assign-steps.md`
+-1. **Commit the 2026-09-16 assignment rework** (uncommitted, build + 435
+   tests green, browser-walked). Then the few still-unseen paths — monthly
+   per-shift occurrence, fixed View page, legacy fixed record migrating from
+   real localStorage.
    → `.claude/handoff/schedule-wizard-assign-steps.md`
 0. **Answer the open preset question** — offered and not yet answered: add
    `M A M A M · ·` as a 7-day two-shift preset? It is the *only* true

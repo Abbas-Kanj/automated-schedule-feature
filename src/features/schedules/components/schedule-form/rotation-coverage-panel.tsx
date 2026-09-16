@@ -1,25 +1,23 @@
+import { type ReactNode } from 'react'
 import { AlertTriangle, Info, OctagonAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import { type Shift } from '@/features/shifts/data/schema'
 import {
-  type CoverageCrew,
   type RotationAnalysis,
   type SuggestionWarning,
 } from '../../rotation-suggestion'
 
 type RotationCoveragePanelProps = {
-  crews: CoverageCrew[]
   analysis: RotationAnalysis
   orderedShiftIds: string[]
   cycleLength: number
   shifts: Shift[]
-  // Column headers ("Mon", "Day 15") instead of cycle-day numbers.
+  // Column headers (real dates) instead of cycle-day numbers.
   dayLabels?: string[]
-}
-
-function shiftLetter(name: string): string {
-  return (name.trim().charAt(0) || '?').toUpperCase()
+  // Rendered between the coverage grid and the warnings — the per-person
+  // roster, so it reads next to the numbers it explains.
+  children?: ReactNode
 }
 
 const SHOWN_INFO_CODES = new Set<SuggestionWarning['code']>([
@@ -42,16 +40,16 @@ const WARNING_STYLES: Record<
 
 // The only place a coverage hole is reported: leaving a shift unstaffed is a
 // warning, not a validation error, so "Next" always advances and this panel
-// carries the message. Two grids: shift rows show whether every selected
-// shift is covered every day; crew rows show each crew's week. Both are
-// driven by live form state, so a hand edit updates them immediately.
+// carries the message. The grid's shift rows show whether every selected
+// shift is covered every day, driven by live form state so a hand edit
+// updates it immediately.
 export function RotationCoveragePanel({
-  crews,
   analysis,
   orderedShiftIds,
   cycleLength,
   shifts,
   dayLabels,
+  children,
 }: RotationCoveragePanelProps) {
   const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
   const days = Array.from({ length: cycleLength }, (_, day) => day)
@@ -84,7 +82,7 @@ export function RotationCoveragePanel({
               {days.map((day) => (
                 <th
                   key={day}
-                  className='w-8 px-1 py-2 text-center text-xs font-medium text-muted-foreground tabular-nums'
+                  className='min-w-12 px-1 py-2 text-center text-[11px] leading-tight font-medium text-muted-foreground tabular-nums'
                 >
                   {dayLabels?.[day] ?? day + 1}
                 </th>
@@ -145,70 +143,7 @@ export function RotationCoveragePanel({
         </table>
       </div>
 
-      {crews.length > 0 && (
-        <div className='overflow-x-auto rounded-md border'>
-          <table className='w-full border-collapse text-sm'>
-            <thead>
-              <tr className='border-b'>
-                <th className='sticky start-0 bg-muted/40 px-3 py-2 text-start text-xs font-medium'>
-                  Crew
-                </th>
-                {days.map((day) => (
-                  <th
-                    key={day}
-                    className='w-8 px-1 py-2 text-center text-xs font-medium text-muted-foreground tabular-nums'
-                  >
-                    {dayLabels?.[day] ?? day + 1}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {crews.map((crew) => (
-                <tr key={crew.key} className='border-b last:border-b-0'>
-                  <td className='sticky start-0 max-w-40 truncate bg-muted/40 px-3 py-1.5 text-xs font-medium'>
-                    {crew.label}
-                  </td>
-                  {days.map((day) => {
-                    const worked = crew.byDay.get(day) ?? []
-                    if (worked.length === 0) {
-                      return (
-                        <td key={day} className='px-1 py-1.5 text-center'>
-                          <span className='font-mono text-xs text-muted-foreground/50'>
-                            ·
-                          </span>
-                        </td>
-                      )
-                    }
-                    return (
-                      <td key={day} className='px-1 py-1.5 text-center'>
-                        <span
-                          title={worked
-                            .map((id) => shiftById.get(id)?.name ?? id)
-                            .join(', ')}
-                          className={cn(
-                            'inline-flex items-center justify-center gap-1 font-mono text-xs font-semibold',
-                            // Two shifts in one day is only reachable by hand
-                            // and is a mistake.
-                            worked.length > 1 && 'text-destructive'
-                          )}
-                        >
-                          <ShiftSwatch shift={shiftById.get(worked[0])} />
-                          {worked
-                            .map((id) =>
-                              shiftLetter(shiftById.get(id)?.name ?? '?')
-                            )
-                            .join('/')}
-                        </span>
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {children}
 
       {shownWarnings.length > 0 && (
         <ul className='space-y-1.5'>

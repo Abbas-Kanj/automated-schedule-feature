@@ -44,7 +44,7 @@ export function ScheduleCreatePage() {
             Choose a schedule type and fill in the details below.
           </p>
         </div>
-        <ScheduleForm onSubmit={handleSubmit} />
+        <ScheduleForm onSubmit={handleSubmit} resetLaterStepsOnBack />
       </Main>
     </>
   )

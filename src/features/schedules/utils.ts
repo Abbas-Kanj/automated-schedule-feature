@@ -16,9 +16,11 @@ import { CYCLE_TYPE_OPTIONS } from './data/data'
 import {
   type DayOfWeek,
   type EndSettings,
+  type OccurrenceRule,
   type Schedule,
   type TimeRange,
 } from './data/schema'
+import { occursOn } from './occurrence-pattern'
 
 // "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line, since
 // the three end-settings shapes never coexist.
@@ -200,6 +202,9 @@ export function getScheduleSummary(
 export type ScheduleCalendarEntry = {
   shift: Shift
   times: { from_time: string; to_time: string; overnight?: boolean }[]
+  // Who works this shift on this date — ids, resolved to names by the caller.
+  teamIds: string[]
+  employeeIds: string[]
 }
 
 export type ScheduleCalendarDay = {
@@ -241,6 +246,35 @@ export type CalendarScheduleInput = {
     end_date?: string
     end_occurrences?: number
   }
+  // Fixed: each shift's own occurrence rule, and who works each shift.
+  shift_occurrences?: (OccurrenceRule & { shift_id: string })[]
+  shift_assignments?: CalendarCrewCell[]
+  // Rotate: the placed roster, by pattern card.
+  day_coverage?: (CalendarCrewCell & { day: number })[]
+}
+
+type CalendarCrewCell = {
+  shift_id: string
+  employee_ids?: string[]
+  team_ids?: string[]
+}
+
+const crewsOf = (cell: CalendarCrewCell | undefined) => ({
+  teamIds: cell?.team_ids ?? [],
+  employeeIds: cell?.employee_ids ?? [],
+})
+
+// A shift's hours on a real date: that weekday's own row when enabled, else
+// the shift's general range.
+function shiftTimesOn(
+  shift: Shift,
+  date: Date
+): ScheduleCalendarEntry['times'] {
+  const weekdayCode = format(date, 'EEE').toLowerCase() as ShiftDayOfWeek
+  const dayEntry = shift.days.find((d) => d.day === weekdayCode)
+  if (dayEntry?.enabled && dayEntry.times.length) return dayEntry.times
+  const range = getShiftTimeRange(shift.days)
+  return range ? [range] : []
 }
 
 // 7 days for a card whose shift has a matching `weekly` repeat entry, else 1
@@ -286,6 +320,8 @@ function getRotatePatternDayCount(
 type ExpandedRotateDay = {
   shiftId: string | undefined
   isOff: boolean
+  // The pattern card this day belongs to — what `day_coverage.day` indexes.
+  cardIndex: number
   // True for a day from a weekly card's expansion — lets the caller read the
   // shift's real per-weekday hours instead of a generic summary.
   fromWeeklyCard: boolean
@@ -300,7 +336,7 @@ function expandRotatePatternDays(
   const sortedPattern = [...pattern].sort((a, b) => a.position - b.position)
   const days: ExpandedRotateDay[] = []
 
-  for (const entry of sortedPattern) {
+  for (const [cardIndex, entry] of sortedPattern.entries()) {
     const repeat = entry.shift_id
       ? shiftRepeatByShiftId.get(entry.shift_id)
       : undefined
@@ -309,6 +345,7 @@ function expandRotatePatternDays(
       days.push({
         shiftId: entry.is_off ? undefined : entry.shift_id,
         isOff: entry.is_off || !entry.shift_id,
+        cardIndex,
         fromWeeklyCard: false,
       })
       continue
@@ -324,6 +361,7 @@ function expandRotatePatternDays(
       days.push({
         shiftId: isActive ? entry.shift_id : undefined,
         isOff: !isActive,
+        cardIndex,
         fromWeeklyCard: true,
       })
     }
@@ -427,6 +465,30 @@ export function getScheduleCalendarCycle(
         const dayInCycle =
           ((offsetDays % cycleLength) + cycleLength) % cycleLength
         const expanded = expandedDays[dayInCycle]
+
+        // Once crews are placed, every shift they cover that day is shown
+        // with its crew — not just the template's one shift.
+        if (schedule.day_coverage?.length) {
+          const cells = expanded
+            ? schedule.day_coverage.filter(
+                (cell) => cell.day === expanded.cardIndex
+              )
+            : []
+          const entries = resolvedShifts.flatMap((shift) => {
+            const cell = cells.find((c) => c.shift_id === shift.id)
+            const crews = crewsOf(cell)
+            return crews.teamIds.length || crews.employeeIds.length
+              ? [{ shift, times: shiftTimesOn(shift, date), ...crews }]
+              : []
+          })
+          return {
+            date,
+            date_str,
+            weekdayIndex,
+            isOff: entries.length === 0,
+            entries,
+          }
+        }
         const shift = expanded?.shiftId
           ? shifts.find((s) => s.id === expanded.shiftId)
           : undefined
@@ -454,18 +516,46 @@ export function getScheduleCalendarCycle(
                       : range
                         ? [range]
                         : [],
+                    teamIds: [],
+                    employeeIds: [],
                   },
                 ]
               : [],
         }
       }
 
-      // fixed / flexible — every selected shift enabled on this weekday.
+      // Fixed with per-shift occurrences: each shift on its own rule, with
+      // the crews assigned to it.
+      if (schedule.type === 'fixed' && schedule.shift_occurrences?.length) {
+        const entries = resolvedShifts.flatMap((shift) => {
+          const rule = schedule.shift_occurrences?.find(
+            (r) => r.shift_id === shift.id
+          )
+          if (!rule || !occursOn(rule, startDate, date)) return []
+          const assignment = schedule.shift_assignments?.find(
+            (a) => a.shift_id === shift.id
+          )
+          return [
+            { shift, times: shiftTimesOn(shift, date), ...crewsOf(assignment) },
+          ]
+        })
+        return {
+          date,
+          date_str,
+          weekdayIndex,
+          isOff: entries.length === 0,
+          entries,
+        }
+      }
+
+      // flexible — every selected shift enabled on this weekday.
       const shiftDayCode = format(date, 'EEE').toLowerCase() as ShiftDayOfWeek
       const entries: ScheduleCalendarEntry[] = resolvedShifts.flatMap(
         (shift) => {
           const dayEntry = shift.days.find((d) => d.day === shiftDayCode)
-          return dayEntry?.enabled ? [{ shift, times: dayEntry.times }] : []
+          return dayEntry?.enabled
+            ? [{ shift, times: dayEntry.times, teamIds: [], employeeIds: [] }]
+            : []
         }
       )
 

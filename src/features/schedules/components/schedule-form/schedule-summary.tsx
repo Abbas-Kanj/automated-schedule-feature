@@ -1,25 +1,30 @@
 import { type ReactNode } from 'react'
 import { type Control, useWatch } from 'react-hook-form'
+import { TriangleAlert } from 'lucide-react'
+import { plural } from '@/lib/plural'
 import { useTimeFormat } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useEmployeesStore } from '@/features/employees/stores/employees-store'
+import { getEmployeeFullName } from '@/features/employees/utils'
 import { ShiftDaysTable } from '@/features/shifts/components/shift-days-table'
+import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import {
   SHIFT_BADGE_COLOR_OPTIONS,
   SHIFT_ICON_COMPONENTS,
 } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
-import { useEmployeesStore } from '@/features/employees/stores/employees-store'
-import { getEmployeeFullName } from '@/features/employees/utils'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import {
   CYCLE_TYPE_OPTIONS,
   MONTHS,
   REGULAR_TYPE_OPTIONS,
   SCHEDULE_TYPES,
-  SHIFT_REPEAT_WEEKDAY_OPTIONS,
 } from '../../data/data'
+import { type CrewKind } from '../../data/schema'
+import { crewsOnMultipleShifts, shiftCrewIds } from '../../fixed-schedule'
+import { occurrenceLabels } from '../../occurrence-pattern'
 import { calculateHours, formatTimes } from '../../utils'
 import { AssignToStatusNote } from './assign-to-status-note'
 import { ScheduleCalendarPreview } from './schedule-calendar-preview'
@@ -248,26 +253,53 @@ function ShiftsSummary({ values }: { values: any }) {
   )
 }
 
-// Rotate and fixed — who was picked, plus a crew count rather than a second
-// copy of the coverage grid.
+// Rotate — who was picked, plus a crew count rather than a copy of the
+// coverage grid. Fixed — who works each shift.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AssignToSummary({ values }: { values: any }) {
   const teams = useTeamsStore((s) => s.teams)
   const employees = useEmployeesStore((s) => s.employees)
-  const ids: string[] = values.crew_ids ?? []
-  const isTeam = (values.crew_kind ?? 'team') === 'team'
-  const names = isTeam
-    ? teams.filter((team) => ids.includes(team.id)).map((team) => team.name)
-    : employees
-        .filter((employee) => employee.id && ids.includes(employee.id))
-        .map(getEmployeeFullName)
+  const shifts = useShiftsStore((s) => s.shifts)
+  const kind: CrewKind = values.crew_kind ?? 'team'
+  const isTeam = kind === 'team'
+  const nameOf = (id: string) =>
+    isTeam
+      ? teams.find((team) => team.id === id)?.name
+      : (() => {
+          const employee = employees.find((e) => e.id === id)
+          return employee ? getEmployeeFullName(employee) : undefined
+        })()
+  const names = (ids: string[]) => ids.map((id) => nameOf(id) ?? id).join(', ')
+
+  if (values.type === 'fixed') {
+    const shared = crewsOnMultipleShifts(values.shift_assignments, kind)
+    return (
+      <SummarySection title='Assign to'>
+        {(values.shift_ids ?? []).map((shiftId: string) => (
+          <SummaryRow
+            key={shiftId}
+            inline
+            label={shifts.find((s) => s.id === shiftId)?.name ?? 'Shift'}
+            value={names(shiftCrewIds(values.shift_assignments, shiftId, kind))}
+          />
+        ))}
+        {shared.size > 0 && (
+          <p className='flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400'>
+            <TriangleAlert className='size-4 shrink-0' />
+            {plural(shared.size, isTeam ? 'team' : 'employee')} on more than one
+            shift: {names([...shared.keys()])}
+          </p>
+        )}
+      </SummarySection>
+    )
+  }
 
   return (
     <SummarySection title='Assign to'>
       <SummaryRow
         inline
         label={isTeam ? 'Teams' : 'Employees'}
-        value={names.join(', ')}
+        value={names(values.crew_ids ?? [])}
       />
       <AssignToStatusNote dayCoverage={values.day_coverage} />
     </SummarySection>
@@ -275,54 +307,49 @@ function AssignToSummary({ values }: { values: any }) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OccurrenceSummary({ values }: { values: any }) {
-  const occurrence = values.occurrence
-  if (!occurrence) return null
-
-  const interval = occurrence.interval || 1
+function describeRule(rule: any): string {
+  const interval = rule.interval || 1
   const unit =
-    occurrence.frequency === 'daily'
+    rule.frequency === 'daily'
       ? 'day'
-      : occurrence.frequency === 'weekly'
+      : rule.frequency === 'weekly'
         ? 'week'
         : 'month'
   const every = interval === 1 ? `Every ${unit}` : `Every ${interval} ${unit}s`
-  const weekdayLabel = (value?: string) =>
-    SHIFT_REPEAT_WEEKDAY_OPTIONS.find((o) => o.value === value)?.label
-  const positionRule = occurrence.day_position_rules?.[0]
-  const days =
-    occurrence.frequency === 'weekly'
-      ? SHIFT_REPEAT_WEEKDAY_OPTIONS.filter((o) =>
-          (occurrence.weekdays ?? []).includes(o.value)
-        )
-          .map((o) => o.label)
-          .join(', ')
-      : occurrence.frequency !== 'monthly'
-        ? ''
-        : occurrence.monthly_mode === 'day_month' && occurrence.day_of_month
-          ? `day ${occurrence.day_of_month}`
-          : occurrence.monthly_mode === 'date_specific'
-            ? [occurrence.date_specific_1, occurrence.date_specific_2]
-                .filter(Boolean)
-                .map((d) => `day ${d}`)
-                .join(' and ')
-            : occurrence.monthly_mode === 'day_position' && positionRule
-              ? `week ${positionRule.position}'s ${weekdayLabel(positionRule.weekday)}`
-              : ''
+  if (rule.frequency === 'daily') return every
+  const days = occurrenceLabels(rule).join(', ')
+  return days ? `${every} on ${days}` : every
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function OccurrenceSummary({ values }: { values: any }) {
+  const shifts = useShiftsStore((s) => s.shifts)
+  const rules = values.shift_occurrences ?? []
   const exceptions = [
-    occurrence.exceptions?.public_holiday && 'Public holiday',
-    occurrence.exceptions?.sick_leave && 'Sick leave',
+    values.occurrence_exceptions?.public_holiday && 'Public holiday',
+    values.occurrence_exceptions?.sick_leave && 'Sick leave',
   ]
     .filter(Boolean)
     .join(', ')
 
   return (
     <SummarySection title='Occurrence'>
-      <SummaryRow
-        inline
-        label='Repeats'
-        value={days ? `${every} on ${days}` : every}
-      />
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      {rules.map((rule: any) => {
+        const shift = shifts.find((s) => s.id === rule.shift_id)
+        return (
+          <div
+            key={rule.shift_id}
+            className='flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm'
+          >
+            <ShiftSwatch shift={shift} />
+            <span className='text-muted-foreground'>
+              {shift?.name ?? 'Shift'}
+            </span>
+            <span className='font-medium'>{describeRule(rule)}</span>
+          </div>
+        )
+      })}
       <SummaryRow inline label='Exceptions' value={exceptions || 'None'} />
     </SummarySection>
   )
@@ -350,13 +377,12 @@ export function ScheduleSummary({ control }: ScheduleSummaryProps) {
             <AssignToSummary values={values} />
           )}
           <SummarySection title='Calendar preview'>
-            {values.type === 'rotate' && (
-              // Walks the *pattern* — one crew's journey — so it shows one
-              // shift a day even when several run.
+            {values.type === 'rotate' && !values.day_coverage?.length && (
+              // Without a placed roster there's only the template to walk.
               <p className='text-xs text-muted-foreground'>
-                One crew&apos;s cycle on real dates. The other selected shifts
-                run on the same days, covered by the other crews — see “Assign
-                to” above.
+                The pattern on real dates. Crews are placed on each shift from
+                Work schedule → Assign crews; once they are, this shows who
+                works what.
               </p>
             )}
             <ScheduleCalendarPreview values={values} />

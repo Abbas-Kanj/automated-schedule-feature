@@ -16,10 +16,11 @@ supplied.
 
 - **Schedule dropdown** — lists **rotate schedules only** (`parent_type ==
   'regular' && type == 'rotate'`), the only kind carrying a shift `pattern`.
-- **"Assign crews" button** — opens the assignment **dialog** (2026-09-12). As
-  of 2026-09-13 the same component is *also* back in the schedule wizard, as
-  the "Work rotation" step — the dialog is for editing a roster after saving.
-  See "Where assignment lives" below.
+- **"Assign crews" button** — opens the assignment **dialog** (2026-09-12).
+  **As of 2026-09-16 this is the only place a rotate roster is placed** — the
+  wizard's "Work rotation" step was removed; the wizard only picks the pool,
+  which pre-fills the dialog. Detail:
+  `.claude/handoff/schedule-wizard-assign-steps.md`.
 - **Date navigator** — prev / range label / next / **Reset**. Reset returns to
   the schedule's `start_date` period (rotation period 0). Prev is always
   enabled (the 2026-09-12 start-date disable was reverted 2026-09-13 — see
@@ -189,9 +190,9 @@ own schedule, independent of creation.
 - **Both pickers inside it carry an A-Z first-letter filter** (2026-09-12) —
   `components/multi-select/filterable-multi-select.tsx`. See
   `.claude/handoff/rotation-suggestion.md` for how it behaves.
-- **Wizard Summary + View page** (2026-09-13): the wizard edits the roster
-  again, so the View page renders the "Assign to" and "Work rotation" steps
-  read-only, and the Summary lists the picked crews plus
+- **Wizard Summary + View page** (2026-09-13; Work rotation step removed
+  2026-09-16, so the View page shows only "Assign to"): the View page renders
+  the wizard steps read-only, and the Summary lists the picked crews plus
   `assign-to-status-note.tsx`'s neutral "Not yet assigned." / "N crews
   assigned." (no longer pointing at Schedule Rotation). Saving the dialog now
   also writes the wizard's `crew_kind`/`crew_ids` pick. Full detail:

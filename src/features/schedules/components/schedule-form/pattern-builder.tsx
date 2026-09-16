@@ -27,8 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { RecurrenceFrequencyFields } from '@/components/recurrence-frequency-fields'
-import { RepeatMonthlyFields } from '@/components/repeat-monthly-fields'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import { SHIFT_ICON_COMPONENTS } from '@/features/shifts/data/data'
@@ -39,8 +37,6 @@ import {
   CYCLE_LENGTH_UNIT_OPTIONS,
   CYCLE_TYPE_OPTIONS,
   SHIFT_REPEAT_FREQUENCY_OPTIONS,
-  SHIFT_REPEAT_MONTHLY_MODE_OPTIONS,
-  SHIFT_REPEAT_WEEKDAY_OPTIONS,
 } from '../../data/data'
 import {
   ROTATION_PRESETS,
@@ -49,6 +45,7 @@ import {
 } from '../../data/rotation-presets'
 import { type RotatePatternEntry, type ShiftRepeat } from '../../data/schema'
 import { DirectionPreview } from './direction-preview'
+import { PerShiftRecurrenceFields } from './per-shift-recurrence-fields'
 
 type PatternBuilderProps = {
   disabled?: boolean
@@ -344,7 +341,16 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
       )}
 
       {isCustomShifts && shiftOptions.length > 0 && (
-        <ShiftRepeats shiftIds={shiftIds} disabled={disabled} />
+        <PerShiftRecurrenceFields
+          name='shift_repeat'
+          title='Shift repeats'
+          shiftIds={shiftIds}
+          frequencyOptions={SHIFT_REPEAT_FREQUENCY_OPTIONS}
+          // Weekly + Monday, so a new row isn't immediately invalid (weekly
+          // requires >=1 weekday — see `refineRecurrenceRule` in `data/schema.ts`).
+          defaultRule={{ frequency: 'weekly', interval: 1, weekdays: ['mon'] }}
+          disabled={disabled}
+        />
       )}
 
       {((isCustomShifts && totalPatternLength > 0) ||
@@ -383,82 +389,6 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
 
       <DirectionPreview />
     </div>
-  )
-}
-
-type ShiftRepeatsProps = {
-  shiftIds: string[]
-  disabled?: boolean
-}
-
-function ShiftRepeats({ shiftIds, disabled }: ShiftRepeatsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, getValues } = useFormContext<any>()
-  const shifts = useShiftsStore((s) => s.shifts)
-  const { replace } = useFieldArray({ control, name: 'shift_repeat' })
-
-  // Keep one repeat row per selected shift, preserving existing settings.
-  // Defaults to weekly + Monday pre-checked so a new row isn't immediately
-  // invalid (weekly requires >=1 weekday — see the `shift_repeat` superRefine
-  // in `data/schema.ts`).
-  const shiftIdsKey = shiftIds.join(',')
-  useEffect(() => {
-    const current =
-      (getValues('shift_repeat') as ShiftRepeat[] | undefined) ?? []
-    const next = shiftIds.map(
-      (id) =>
-        current.find((r) => r.shift_id === id) ?? {
-          shift_id: id,
-          frequency: 'weekly' as const,
-          interval: 1,
-          weekdays: ['mon'],
-        }
-    )
-    const changed =
-      next.length !== current.length ||
-      next.some((r, i) => r.shift_id !== current[i]?.shift_id)
-    if (changed) replace(next)
-  }, [shiftIdsKey])
-
-  return (
-    <Card className='gap-3 py-4'>
-      <CardHeader className='px-4'>
-        <CardTitle className='text-base font-semibold'>Shift repeats</CardTitle>
-      </CardHeader>
-      <CardContent className='space-y-4 px-4'>
-        {shiftIds.map((shiftId, index) => {
-          const shift = shifts.find((s) => s.id === shiftId)
-          const Icon = shift ? SHIFT_ICON_COMPONENTS[shift.icon] : undefined
-          return (
-            <div key={shiftId} className='space-y-3'>
-              <div className='flex items-center gap-2'>
-                <ShiftSwatch shift={shift} size='md' />
-                {Icon && (
-                  <Icon className='size-4 shrink-0 text-muted-foreground' />
-                )}
-                <p className='text-sm font-medium'>{shift?.name ?? 'Shift'}</p>
-              </div>
-              <RecurrenceFrequencyFields
-                control={control}
-                name={`shift_repeat.${index}`}
-                frequencyOptions={SHIFT_REPEAT_FREQUENCY_OPTIONS}
-                weekdayOptions={SHIFT_REPEAT_WEEKDAY_OPTIONS}
-                disabled={disabled}
-                monthlyFields={
-                  <RepeatMonthlyFields
-                    control={control}
-                    name={`shift_repeat.${index}`}
-                    monthlyModeOptions={SHIFT_REPEAT_MONTHLY_MODE_OPTIONS}
-                    weekdayOptions={SHIFT_REPEAT_WEEKDAY_OPTIONS}
-                    disabled={disabled}
-                  />
-                }
-              />
-            </div>
-          )
-        })}
-      </CardContent>
-    </Card>
   )
 }
 

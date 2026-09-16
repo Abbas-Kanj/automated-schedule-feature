@@ -13,21 +13,15 @@ either way.
 > matrix** records who covers it. Details throughout — this file was rewritten,
 > not appended to.
 
-> **Where `schedule-assign-to-fields.tsx` is mounted (current, 2026-09-13,
-> uncommitted):** in **two** places.
-> 1. The **"Assign crews" dialog** on `/schedule-rotation` (since 2026-09-12)
->    — its own Teams/Employees toggle and pool picker; "Save" plays the role
->    "Next" does in the wizard (calls `commitRef` first).
-> 2. The **schedule wizard again**, as the **"Work rotation"** step (and
->    **"Work fixed"** for fixed schedules), after a new **"Assign to"** step
->    that stores the crew pick in the form (`crew_kind`/`crew_ids`).
->
-> New props, all opt-in so the dialog is unchanged: `poolFromForm` (read the
-> crew pick from the form, hide the toggle/pool picker, restrict day-card
-> options to the pick), `manualOnly` (no Suggest — fixed), `pattern` (use this
-> instead of the form's `pattern` — fixed passes its occurrence read as one).
-> The suggestion/manual-grid/coverage mechanics below are unchanged. Wizard
-> detail: `.claude/handoff/schedule-wizard-assign-steps.md`.
+> **Where `schedule-assign-to-fields.tsx` is mounted (current, 2026-09-16,
+> uncommitted):** **only** the "Assign crews" dialog on the rotating Work
+> schedule screen. The wizard's "Work rotation"/"Work fixed" steps are gone,
+> and fixed schedules no longer use this component at all. The dialog now
+> puts Start & End before Suggest and gates everything on valid dates, labels
+> columns/cards with real dates, and shows the Employees table instead of the
+> crew table; the Crew start days editor is deleted. The suggestion and
+> coverage mechanics below are unchanged. Detail:
+> `.claude/handoff/schedule-wizard-assign-steps.md`.
 
 Companion to `.claude/handoff/schedule-rotation-screen.md`, which covers the
 screen those assignments drive.

@@ -1,12 +1,16 @@
+import { addDays, format, parse } from 'date-fns'
 import { FormProvider, useForm, useWatch } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
+import { isRotateSchedule } from '@/features/schedule-rotation/utils'
 import { sampleSchedules } from '../../data/schedules.fixtures'
 import { type RotateDayCoverage } from '../../data/schema'
 import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 
-const rotation = sampleSchedules.find((s) => s.id === 'sched-rotation')!
+const seed = sampleSchedules.find((s) => s.id === 'sched-rotation')!
+if (!isRotateSchedule(seed)) throw new Error('Seed is not a rotate schedule')
+const rotation = seed
 
 // Echoes the stored matrix into the DOM so a pick can be asserted as form
 // state rather than a rendered chip.
@@ -46,12 +50,12 @@ function CoverageState() {
   )
 }
 
-function Harness() {
+function Harness({ values = rotation }: { values?: typeof rotation }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const form = useForm<any>({ defaultValues: rotation })
+  const form = useForm<any>({ defaultValues: values })
   return (
     <FormProvider {...form}>
-      <ScheduleAssignToFields />
+      <ScheduleAssignToFields schedule={values} />
       <CoverageState />
     </FormProvider>
   )
@@ -74,16 +78,69 @@ describe('ScheduleAssignToFields', () => {
     await expect.element(screen.getByTestId('assign-day-0')).toBeVisible()
   })
 
-  it('renders one day card per cycle position, off included', async () => {
+  it('renders one day card per cycle position, labelled by its real date', async () => {
     const screen = await render(<Harness />)
     await enableManual(screen)
 
+    // Card-a-day pattern, so cycle day i is simply start + i.
+    const start = parse(rotation.start_date, 'yyyy-MM-dd', new Date())
     for (let i = 0; i < 4; i++) {
-      await expect.element(screen.getByTestId(`assign-day-${i}`)).toBeVisible()
+      const card = screen.getByTestId(`assign-day-${i}`)
+      await expect.element(card).toBeVisible()
+      await expect
+        .element(card.getByText(format(addDays(start, i), 'EEE d MMM')))
+        .toBeVisible()
     }
-    for (let i = 1; i <= 4; i++) {
-      await expect.element(screen.getByText(`Day ${i}`)).toBeVisible()
-    }
+  })
+
+  it('holds back the assignment until the start and end are set', async () => {
+    const screen = await render(
+      <Harness
+        values={{
+          ...rotation,
+          end_settings: { end_type: 'on_date' },
+        }}
+      />
+    )
+
+    await expect.element(screen.getByTestId('dates-required')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'Suggest assignment' }))
+      .not.toBeInTheDocument()
+    await expect
+      .element(screen.getByRole('button', { name: 'Assign manually' }))
+      .not.toBeInTheDocument()
+  })
+
+  it('starts the pool from the wizard pick when nobody is placed yet', async () => {
+    const screen = await render(
+      <Harness
+        values={{
+          ...rotation,
+          day_coverage: [],
+          crew_placements: [],
+          crew_kind: 'team',
+          crew_ids: ['team-b'],
+        }}
+      />
+    )
+
+    await expect.element(screen.getByText('Team B')).toBeVisible()
+    await expect
+      .element(screen.getByRole('button', { name: 'Suggest assignment' }))
+      .toBeEnabled()
+  })
+
+  it('shows the employees table instead of a crew grid or start-day editor', async () => {
+    const screen = await render(<Harness />)
+
+    await expect.element(screen.getByText('Employee Name')).toBeVisible()
+    await expect
+      .element(screen.getByText('Crew start days'))
+      .not.toBeInTheDocument()
+    await expect
+      .element(screen.getByText('Crew', { exact: true }))
+      .not.toBeInTheDocument()
   })
 
   it('gives every selected shift its own picker on every day', async () => {

@@ -2,20 +2,6 @@ import { addDays, isAfter, isBefore, isSameDay, startOfDay } from 'date-fns'
 import { type Employee } from '@/features/employees/data/schema'
 import { getEmployeeFullName } from '@/features/employees/utils'
 import {
-  type RegularSchedule,
-  type Schedule,
-} from '@/features/schedules/data/schema'
-import {
-  occurrenceKeyOn,
-  occurrenceSlots,
-} from '@/features/schedules/occurrence-pattern'
-import {
-  crewsFromDayCoverage,
-  orderShiftIdsByStart,
-} from '@/features/schedules/rotation-crews'
-import { type Shift } from '@/features/shifts/data/schema'
-import { type Team } from '@/features/teams/data/schema'
-import {
   type RotationTimeline,
   type TimelineDay,
   type TimelineSpan,
@@ -29,12 +15,25 @@ import {
   getRotationRoster,
   toPosition,
 } from '@/features/schedule-rotation/utils'
+import {
+  type RegularSchedule,
+  type RotateDayCoverage,
+  type Schedule,
+} from '@/features/schedules/data/schema'
+import {
+  occurrenceLabels,
+  occursOn,
+} from '@/features/schedules/occurrence-pattern'
+import {
+  crewsFromDayCoverage,
+  orderShiftIdsByStart,
+} from '@/features/schedules/rotation-crews'
+import { type Shift } from '@/features/shifts/data/schema'
+import { type Team } from '@/features/teams/data/schema'
 
 export type FixedSchedule = Extract<RegularSchedule, { type: 'fixed' }>
 
-export function isFixedSchedule(
-  schedule: Schedule
-): schedule is FixedSchedule {
+export function isFixedSchedule(schedule: Schedule): schedule is FixedSchedule {
   return schedule.parent_type === 'regular' && schedule.type === 'fixed'
 }
 
@@ -42,24 +41,35 @@ export function isFixedSchedule(
 // (weekly, nothing ticked) would otherwise never stop.
 const MAX_WALK_DAYS = 366 * 10
 
-// Null when the schedule isn't running that day — before its start, past its
-// end, or a day the rule has off. The end is resolved once so callers can ask
-// about many days.
-export function makeWorkingKeyOn(
-  schedule: FixedSchedule
-): (date: Date) => number | null {
+// The shifts running on a date, in clock order: each by its own occurrence
+// rule, and none before the start or past the end. The end is resolved once
+// so callers can ask about many days.
+export function makeWorkingShiftsOn(
+  schedule: FixedSchedule,
+  shifts: Shift[]
+): (date: Date) => string[] {
   const start = parseScheduleStart(schedule.start_date)
-  const { end_type, end_date, end_occurrences } = schedule.end_settings
+  const rules = orderShiftIdsByStart(schedule.shift_ids, shifts).flatMap(
+    (shiftId) => {
+      const rule = schedule.shift_occurrences.find(
+        (r) => r.shift_id === shiftId
+      )
+      return rule ? [rule] : []
+    }
+  )
+  const runningOn = (date: Date) =>
+    rules.filter((rule) => occursOn(rule, start, date)).map((r) => r.shift_id)
 
+  const { end_type, end_date, end_occurrences } = schedule.end_settings
   let last: Date | null =
     end_type === 'on_date' && end_date ? parseScheduleStart(end_date) : null
 
   if (end_type === 'after_occurrences' && end_occurrences) {
-    // Counted in working days, not calendar days.
+    // Counted in days any shift works, not calendar days.
     let seen = 0
     for (let offset = 0; offset < MAX_WALK_DAYS; offset++) {
       const date = addDays(start, offset)
-      if (occurrenceKeyOn(schedule.occurrence, start, date) === null) continue
+      if (runningOn(date).length === 0) continue
       seen++
       if (seen === end_occurrences) {
         last = date
@@ -70,31 +80,40 @@ export function makeWorkingKeyOn(
 
   return (date) => {
     const day = startOfDay(date)
-    if (isBefore(day, start) || (last && isAfter(day, last))) return null
-    return occurrenceKeyOn(schedule.occurrence, start, day)
+    if (isBefore(day, start) || (last && isAfter(day, last))) return []
+    return runningOn(day)
   }
+}
+
+// `shift_assignments` read as the matrix shape the rotation helpers take, one
+// "day" per shift (its clock-order index), so crews and people resolve through
+// the same code the rotating screen uses.
+function assignmentCells(
+  schedule: FixedSchedule,
+  order: string[]
+): RotateDayCoverage[] {
+  return schedule.shift_assignments.flatMap((assignment) => {
+    const day = order.indexOf(assignment.shift_id)
+    return day < 0 ? [] : [{ ...assignment, day }]
+  })
 }
 
 function firstWorkingDate(
   schedule: FixedSchedule,
-  keyOn: (date: Date) => number | null,
-  keys: Set<number>
+  shiftsOn: (date: Date) => string[],
+  crewShiftIds: Set<string>
 ): Date {
   const start = parseScheduleStart(schedule.start_date)
   for (let offset = 0; offset < MAX_WALK_DAYS; offset++) {
     const date = addDays(start, offset)
-    const key = keyOn(date)
-    if (key !== null && keys.has(key)) return date
+    if (shiftsOn(date).some((id) => crewShiftIds.has(id))) return date
   }
   return start
 }
 
-function shiftLegend(
-  schedule: FixedSchedule,
-  shifts: Shift[]
-): RotationPosition[] {
+function shiftLegend(order: string[], shifts: Shift[]): RotationPosition[] {
   const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
-  const legend = orderShiftIdsByStart(schedule.shift_ids, shifts)
+  const legend = order
     .map((id, index) => {
       const shift = shiftById.get(id)
       return shift ? toPosition(index, shift) : undefined
@@ -104,8 +123,8 @@ function shiftLegend(
 }
 
 // Same shape the rotating screen draws, so both render through
-// `RotationTimelineGrid`. `cycleDay` holds the day's occurrence slot key, or
-// -1 when the schedule is off.
+// `RotationTimelineGrid`. `cycleDay` is 0 on a day any shift runs, -1 when the
+// schedule is off.
 export function buildFixedTimeline(
   schedule: FixedSchedule,
   shifts: Shift[],
@@ -121,25 +140,28 @@ export function buildFixedTimeline(
       .filter((e) => e.id)
       .map((e) => [e.id as string, getEmployeeFullName(e)])
   )
-  const keyOn = makeWorkingKeyOn(schedule)
+  const order = orderShiftIdsByStart(schedule.shift_ids, shifts)
+  const shiftsOn = makeWorkingShiftsOn(schedule, shifts)
 
-  const days: TimelineDay[] = spanDays(viewDate, span).map((date) => ({
+  const dates = spanDays(viewDate, span)
+  const running = dates.map((date) => shiftsOn(date))
+  const days: TimelineDay[] = dates.map((date, i) => ({
     date,
-    cycleDay: keyOn(date) ?? -1,
+    cycleDay: running[i].length ? 0 : -1,
     isToday: isSameDay(date, today),
   }))
 
   const crews = crewsFromDayCoverage(
-    schedule.day_coverage,
+    assignmentCells(schedule, order),
     teams,
     employeeLabels
   ).sort((a, b) => a.label.localeCompare(b.label))
 
   const rows = crews.map((crew) => {
-    const cells = days.map((day) => {
-      // First shift wins on a hand-made double booking.
-      const shiftId =
-        day.cycleDay >= 0 ? crew.byDay.get(day.cycleDay)?.[0] : undefined
+    const crewShiftIds = new Set([...crew.byDay.values()].flat())
+    const cells = days.map((day, i) => {
+      // Clock order, so a crew on two shifts that day shows the earlier one.
+      const shiftId = running[i].find((id) => crewShiftIds.has(id))
       return toPosition(
         day.cycleDay,
         shiftId ? shiftById.get(shiftId) : undefined
@@ -150,7 +172,7 @@ export function buildFixedTimeline(
       label: crew.label,
       headcount: crew.headcount,
       cells,
-      startDate: firstWorkingDate(schedule, keyOn, new Set(crew.byDay.keys())),
+      startDate: firstWorkingDate(schedule, shiftsOn, crewShiftIds),
       daysOn: cells.filter((cell) => !cell.isOff).length,
     }
   })
@@ -159,15 +181,14 @@ export function buildFixedTimeline(
     days,
     blocks: toBlocks(days, span),
     rows,
-    legend: shiftLegend(schedule, shifts),
+    legend: shiftLegend(order, shifts),
     rangeLabel: getRangeLabel(
       days[0].date,
       days[days.length - 1].date,
       span === 'week' ? 'weekly' : 'monthly'
     ),
     span,
-    cycleLength: occurrenceSlots(schedule.occurrence, undefined).slotKeys
-      .length,
+    cycleLength: order.length,
   }
 }
 
@@ -191,47 +212,41 @@ export function buildFixedRoster(
   date: Date
 ): FixedEmployeeRow[] {
   const shiftById = new Map(shifts.map((shift) => [shift.id, shift]))
-  const { slotKeys, labels } = occurrenceSlots(schedule.occurrence, undefined)
   const order = orderShiftIdsByStart(schedule.shift_ids, shifts)
-  const dateKey = makeWorkingKeyOn(schedule)(date)
+  const onDate = makeWorkingShiftsOn(schedule, shifts)(date)
 
-  return getRotationRoster(schedule, employees, teams).map(
-    ({ employee, employeeId, byDay, crewLabel }) => {
-      // Walked in slot order so the days read Monday first.
-      const daysByShift = new Map<string, string[]>()
-      slotKeys.forEach((key, index) => {
-        const shiftId = byDay.get(key)
-        if (!shiftId) return
-        const days = daysByShift.get(shiftId) ?? []
-        days.push(labels[index])
-        daysByShift.set(shiftId, days)
-      })
+  return getRotationRoster(
+    { day_coverage: assignmentCells(schedule, order) },
+    employees,
+    teams
+  ).map(({ employee, employeeId, byDay, crewLabel }) => {
+    const shiftIds = [...byDay.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, shiftId]) => shiftId)
+    const shiftOnDate = onDate.find((id) => shiftIds.includes(id))
 
-      const workedShifts = [...daysByShift.entries()]
-        .sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
-        .map(([shiftId, days], index) => ({
-          position: toPosition(index, shiftById.get(shiftId)),
-          days,
-        }))
-
-      const shiftOnDate = dateKey === null ? undefined : byDay.get(dateKey)
-
-      return {
-        employeeId,
-        employee,
-        fullName: getEmployeeFullName(employee),
-        crewLabel,
-        shifts: workedShifts,
-        onDate: toPosition(
-          -1,
-          shiftOnDate ? shiftById.get(shiftOnDate) : undefined
+    return {
+      employeeId,
+      employee,
+      fullName: getEmployeeFullName(employee),
+      crewLabel,
+      shifts: shiftIds.map((shiftId, index) => ({
+        position: toPosition(index, shiftById.get(shiftId)),
+        days: occurrenceLabels(
+          schedule.shift_occurrences.find((r) => r.shift_id === shiftId)
         ),
-      }
+      })),
+      onDate: toPosition(
+        -1,
+        shiftOnDate ? shiftById.get(shiftOnDate) : undefined
+      ),
     }
-  )
+  })
 }
 
 // Only a monthly rule needs the month seen whole.
 export function getFixedDefaultSpan(schedule: FixedSchedule): TimelineSpan {
-  return schedule.occurrence.frequency === 'monthly' ? 'month' : 'week'
+  return schedule.shift_occurrences.some((rule) => rule.frequency === 'monthly')
+    ? 'month'
+    : 'week'
 }

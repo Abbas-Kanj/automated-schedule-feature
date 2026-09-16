@@ -305,10 +305,11 @@ const rotateFieldsSchema = z.object({
   crew_placements: z.array(rotateCrewPlacementSchema).default([]),
 })
 
-// --- rotate / fixed: who the roster is drawn from ---
+// --- rotate: who the roster is drawn from ---
 //
 // Optional so older saved schedules still load — the form recovers the pick
-// from `day_coverage` (see `crewSelectionFromDayCoverage`).
+// from `day_coverage` (see `crewSelectionFromDayCoverage`). Fixed keeps only
+// `crew_kind`; its crews live on `shift_assignments`.
 export const CREW_KINDS = ['team', 'employee'] as const
 
 const crewSelectionSchema = z.object({
@@ -316,21 +317,95 @@ const crewSelectionSchema = z.object({
   crew_ids: z.array(z.string()).optional(),
 })
 
-// --- fixed: occurrence ---
+// --- recurrence rules: shared by rotate's repeat rows and fixed's occurrences ---
 //
-// Fixed's counterpart of rotate's pattern. Read as a pattern (see
-// `occurrencePattern` in `utils.ts`) so both types share one roster editor.
+// Only the fields each frequency needs are required, so one check serves
+// every rule-shaped row; `path` prefixes the row's own location.
+type RecurrenceRuleShape = {
+  frequency: string
+  weekdays?: string[]
+  monthly_mode?: string
+  day_of_month?: number
+  date_specific_1?: number
+  date_specific_2?: number
+  day_position_rules?: unknown[]
+}
+
+function refineRecurrenceRule(
+  rule: RecurrenceRuleShape,
+  ctx: z.RefinementCtx,
+  path: (string | number)[]
+) {
+  const at = (field: string) => [...path, field]
+
+  if (rule.frequency === 'weekly' && !rule.weekdays?.length) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Select at least one day',
+      path: at('weekdays'),
+    })
+  }
+
+  if (rule.frequency !== 'monthly') return
+  if (!rule.monthly_mode) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Select how it repeats monthly',
+      path: at('monthly_mode'),
+    })
+  } else if (rule.monthly_mode === 'day_month' && !rule.day_of_month) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Select the day of the month',
+      path: at('day_of_month'),
+    })
+  } else if (rule.monthly_mode === 'date_specific') {
+    if (!rule.date_specific_1) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Select the first date',
+        path: at('date_specific_1'),
+      })
+    }
+    if (!rule.date_specific_2) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Select the second date',
+        path: at('date_specific_2'),
+      })
+    }
+  } else if (
+    rule.monthly_mode === 'day_position' &&
+    !rule.day_position_rules?.length
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Add a day-position rule',
+      path: at('day_position_rules'),
+    })
+  }
+}
+
+// --- fixed: occurrence, one rule per selected shift ---
+//
+// Fixed's counterpart of rotate's "Custom alternate": every shift says on
+// which days it runs, independently of the others.
 export const OCCURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 
 export const DEFAULT_OCCURRENCE = {
   frequency: 'weekly' as const,
   interval: 1,
   weekdays: ['mon', 'tue', 'wed', 'thu', 'fri'] as ShiftRepeatWeekday[],
-  exceptions: { public_holiday: false, sick_leave: false },
 }
 
-const occurrenceSchema = z
+export const DEFAULT_OCCURRENCE_EXCEPTIONS = {
+  public_holiday: false,
+  sick_leave: false,
+}
+
+const shiftOccurrenceSchema = z
   .object({
+    shift_id: z.string().min(1),
     frequency: z.enum(OCCURRENCE_FREQUENCIES),
     interval: z.number().min(1),
     weekdays: z.array(shiftRepeatWeekdaySchema).optional(),
@@ -344,59 +419,24 @@ const occurrenceSchema = z
       .array(shiftRepeatDayPositionRuleSchema)
       .max(1)
       .optional(),
-    exceptions: z.object({
-      public_holiday: z.boolean().default(false),
-      sick_leave: z.boolean().default(false),
-    }),
   })
-  .superRefine((val, ctx) => {
-    if (val.frequency === 'weekly' && !val.weekdays?.length) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Select at least one day',
-        path: ['weekdays'],
-      })
-    }
+  .superRefine((val, ctx) => refineRecurrenceRule(val, ctx, []))
 
-    if (val.frequency !== 'monthly') return
-    if (!val.monthly_mode) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Select how it repeats monthly',
-        path: ['monthly_mode'],
-      })
-    } else if (val.monthly_mode === 'day_month' && !val.day_of_month) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Select the day of the month',
-        path: ['day_of_month'],
-      })
-    } else if (val.monthly_mode === 'date_specific') {
-      if (!val.date_specific_1) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Select the first date',
-          path: ['date_specific_1'],
-        })
-      }
-      if (!val.date_specific_2) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'Select the second date',
-          path: ['date_specific_2'],
-        })
-      }
-    } else if (
-      val.monthly_mode === 'day_position' &&
-      !val.day_position_rules?.length
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Add a day-position rule',
-        path: ['day_position_rules'],
-      })
-    }
-  })
+const occurrenceExceptionsSchema = z.object({
+  public_holiday: z.boolean().default(false),
+  sick_leave: z.boolean().default(false),
+})
+
+// --- fixed: who works each shift ---
+//
+// Per shift rather than per day: which days a shift runs is its occurrence's
+// business. The same crew may be on several shifts — the step warns, it
+// doesn't forbid.
+const shiftAssignmentSchema = z.object({
+  shift_id: z.string().min(1),
+  employee_ids: z.array(z.string()).default([]),
+  team_ids: z.array(z.string()).default([]),
+})
 
 // --- assemble the three `regular` arms ---
 
@@ -405,11 +445,12 @@ const regularFixedSchema = z.object({
   type: z.literal('fixed'),
   ...regularSharedSchema.shape,
   ...shiftDefinitionFieldsSchema.shape,
-  // Defaulted so fixed schedules saved before these existed still load.
-  occurrence: occurrenceSchema.default(DEFAULT_OCCURRENCE),
-  ...crewSelectionSchema.shape,
-  day_coverage: z.array(rotateDayCoverageSchema).default([]),
-  crew_placements: z.array(rotateCrewPlacementSchema).default([]),
+  shift_occurrences: z.array(shiftOccurrenceSchema).default([]),
+  occurrence_exceptions: occurrenceExceptionsSchema.default(
+    DEFAULT_OCCURRENCE_EXCEPTIONS
+  ),
+  crew_kind: z.enum(CREW_KINDS).optional(),
+  shift_assignments: z.array(shiftAssignmentSchema).default([]),
 })
 
 const regularFlexibleSchema = z.object({
@@ -453,6 +494,34 @@ const regularScheduleSchema = z
         code: 'custom',
         message: 'Select at least 2 shifts to build a rotation',
         path: ['shift_ids'],
+      })
+    }
+
+    if (val.type === 'fixed') {
+      val.shift_ids.forEach((shiftId) => {
+        const rows = val.shift_occurrences.filter(
+          (row) => row.shift_id === shiftId
+        ).length
+        if (rows !== 1) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              rows === 0
+                ? 'Set how often every selected shift occurs'
+                : 'Each shift can only have one occurrence',
+            path: ['shift_occurrences'],
+          })
+        }
+      })
+
+      val.shift_assignments.forEach((assignment, i) => {
+        if (!val.shift_ids.includes(assignment.shift_id)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Assigned shift is not one of this schedule’s shifts',
+            path: ['shift_assignments', i, 'shift_id'],
+          })
+        }
       })
     }
 
@@ -590,53 +659,7 @@ const regularScheduleSchema = z
             })
           }
 
-          if (r.frequency === 'weekly' && !r.weekdays?.length) {
-            ctx.addIssue({
-              code: 'custom',
-              message: 'Select at least one day',
-              path: ['shift_repeat', i, 'weekdays'],
-            })
-          }
-
-          if (r.frequency === 'monthly') {
-            if (!r.monthly_mode) {
-              ctx.addIssue({
-                code: 'custom',
-                message: 'Select how it repeats monthly',
-                path: ['shift_repeat', i, 'monthly_mode'],
-              })
-            } else if (r.monthly_mode === 'day_month' && !r.day_of_month) {
-              ctx.addIssue({
-                code: 'custom',
-                message: 'Select the day of the month',
-                path: ['shift_repeat', i, 'day_of_month'],
-              })
-            } else if (r.monthly_mode === 'date_specific') {
-              if (!r.date_specific_1) {
-                ctx.addIssue({
-                  code: 'custom',
-                  message: 'Select the first date',
-                  path: ['shift_repeat', i, 'date_specific_1'],
-                })
-              }
-              if (!r.date_specific_2) {
-                ctx.addIssue({
-                  code: 'custom',
-                  message: 'Select the second date',
-                  path: ['shift_repeat', i, 'date_specific_2'],
-                })
-              }
-            } else if (
-              r.monthly_mode === 'day_position' &&
-              !r.day_position_rules?.length
-            ) {
-              ctx.addIssue({
-                code: 'custom',
-                message: 'Add a day-position rule',
-                path: ['shift_repeat', i, 'day_position_rules'],
-              })
-            }
-          }
+          refineRecurrenceRule(r, ctx, ['shift_repeat', i])
         })
       }
     }
@@ -689,7 +712,11 @@ export type RotateDayCoverage = Extract<
   RegularSchedule,
   { type: 'rotate' }
 >['day_coverage'][number]
-export type Occurrence = z.infer<typeof occurrenceSchema>
+export type ShiftOccurrence = z.infer<typeof shiftOccurrenceSchema>
+// A rule without the shift it belongs to — what the date maths needs.
+export type OccurrenceRule = Omit<ShiftOccurrence, 'shift_id'>
+export type OccurrenceExceptions = z.infer<typeof occurrenceExceptionsSchema>
+export type ShiftAssignment = z.infer<typeof shiftAssignmentSchema>
 export type CrewKind = (typeof CREW_KINDS)[number]
 export type RotateCrewPlacement = Extract<
   RegularSchedule,

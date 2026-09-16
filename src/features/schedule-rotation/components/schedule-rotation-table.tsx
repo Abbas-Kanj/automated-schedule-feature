@@ -1,3 +1,4 @@
+import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import {
   Table,
@@ -30,12 +31,15 @@ function CrewNote({
   cycleLength: number
 }) {
   if (!row.crewLabel && row.startDay === undefined) return null
+  // A crew's real first day beats its cycle-day number when there is one.
   return (
     <div className='text-xs text-muted-foreground'>
       {[
         row.crewLabel,
-        row.startDay !== undefined &&
-          `starts ${describeStartDay(row.startDay, cycleLength).toLowerCase()}`,
+        row.startDate
+          ? `starts ${format(row.startDate, 'EEE, MMM d')}`
+          : row.startDay !== undefined &&
+            `starts ${describeStartDay(row.startDay, cycleLength).toLowerCase()}`,
       ]
         .filter(Boolean)
         .join(' · ')}

@@ -101,11 +101,11 @@ export function AssignToPanel({
   return (
     <FormProvider {...form}>
       <div className='space-y-6'>
-        <ScheduleAssignToFields commitRef={commitRef} />
-        <div className='space-y-3'>
-          <h3 className='text-base font-semibold'>Start &amp; End</h3>
-          <ScheduleStartEndFields />
-        </div>
+        <ScheduleAssignToFields
+          schedule={schedule}
+          commitRef={commitRef}
+          startEnd={<ScheduleStartEndFields />}
+        />
         <div className='flex justify-end'>
           <Button onClick={handleSave}>Save assignment</Button>
         </div>
@@ -166,9 +166,9 @@ export function AssignCrewsDialog({
         <DialogHeader className='text-start'>
           <DialogTitle>Assign crews</DialogTitle>
           <DialogDescription>
-            Pick a rotate schedule, then say who covers each shift on each day
-            of its cycle. Picking an already-assigned schedule opens its roster
-            for editing.
+            Pick a rotate schedule and its crews, set when it starts and ends,
+            then say who covers each shift on each day. Picking an
+            already-assigned schedule opens its roster for editing.
           </DialogDescription>
         </DialogHeader>
 

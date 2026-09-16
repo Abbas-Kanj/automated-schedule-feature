@@ -4,9 +4,12 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { useTimeFormat } from '@/lib/time-format'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useEmployeesStore } from '@/features/employees/stores/employees-store'
+import { getEmployeeFullName } from '@/features/employees/utils'
 import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import { SHIFT_ICON_COMPONENTS } from '@/features/shifts/data/data'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
+import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import {
   type CalendarScheduleInput,
   type ScheduleCalendarDay,
@@ -39,7 +42,23 @@ export function ScheduleCalendarPreview({
     pattern: values.pattern,
     shift_repeat: values.shift_repeat,
     end_settings: values.end_settings,
+    shift_occurrences: values.shift_occurrences,
+    shift_assignments: values.shift_assignments,
+    day_coverage: values.day_coverage,
   }
+
+  const teams = useTeamsStore((s) => s.teams)
+  const employees = useEmployeesStore((s) => s.employees)
+  const crewName = new Map<string, string>([
+    ...teams.map((team) => [`team:${team.id}`, team.name] as const),
+    ...employees
+      .filter((employee) => employee.id)
+      .map(
+        (employee) =>
+          [`employee:${employee.id}`, getEmployeeFullName(employee)] as const
+      ),
+  ])
+  const showCrews = values.type === 'fixed' || values.type === 'rotate'
 
   const cycle = getScheduleCalendarCycle(schedule, shifts, cycleIndex)
 
@@ -109,6 +128,7 @@ export function ScheduleCalendarPreview({
             key={day.date_str}
             day={day}
             formatTime={formatTime}
+            crewName={showCrews ? crewName : undefined}
           />
         ))}
 
@@ -123,10 +143,23 @@ export function ScheduleCalendarPreview({
 function CalendarDayCell({
   day,
   formatTime,
+  crewName,
 }: {
   day: ScheduleCalendarDay
   formatTime: (time: string) => string
+  // Set for types that carry crews; names each team/employee key.
+  crewName?: Map<string, string>
 }) {
+  // A crew on more than one shift the same day is almost always a slip.
+  const keysOf = (entry: ScheduleCalendarDay['entries'][number]) => [
+    ...entry.teamIds.map((id) => `team:${id}`),
+    ...entry.employeeIds.map((id) => `employee:${id}`),
+  ]
+  const seen = new Map<string, number>()
+  day.entries.forEach((entry) =>
+    keysOf(entry).forEach((key) => seen.set(key, (seen.get(key) ?? 0) + 1))
+  )
+
   return (
     <div
       className={cn(
@@ -157,11 +190,44 @@ function CalendarDayCell({
                 <p className='truncate text-[11px] text-muted-foreground'>
                   {formatTimes(entry.times, formatTime)}
                 </p>
+                {crewName && (
+                  <CrewLine
+                    names={keysOf(entry).map((key) => crewName.get(key) ?? '?')}
+                    doubleBooked={keysOf(entry).some(
+                      (key) => (seen.get(key) ?? 0) > 1
+                    )}
+                  />
+                )}
               </div>
             )
           })}
         </div>
       )}
     </div>
+  )
+}
+
+function CrewLine({
+  names,
+  doubleBooked,
+}: {
+  names: string[]
+  doubleBooked: boolean
+}) {
+  const text = names.length ? names.join(', ') : 'Unassigned'
+  return (
+    <p
+      title={text}
+      className={cn(
+        'truncate text-[11px]',
+        doubleBooked
+          ? 'font-medium text-amber-600 dark:text-amber-400'
+          : names.length
+            ? 'text-foreground/80'
+            : 'text-muted-foreground italic'
+      )}
+    >
+      {text}
+    </p>
   )
 }

@@ -1,4 +1,4 @@
-import { useFormContext } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   FormControl,
@@ -7,54 +7,44 @@ import {
   FormLabel,
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
-import { RecurrenceFrequencyFields } from '@/components/recurrence-frequency-fields'
-import { RepeatMonthlyFields } from '@/components/repeat-monthly-fields'
-import {
-  OCCURRENCE_FREQUENCY_OPTIONS,
-  SHIFT_REPEAT_MONTHLY_MODE_OPTIONS,
-  SHIFT_REPEAT_WEEKDAY_OPTIONS,
-} from '../../data/data'
+import { OCCURRENCE_FREQUENCY_OPTIONS } from '../../data/data'
+import { DEFAULT_OCCURRENCE } from '../../data/schema'
+import { PerShiftRecurrenceFields } from './per-shift-recurrence-fields'
 
 type OccurrenceFieldsProps = {
   disabled?: boolean
 }
 
 const EXCEPTIONS = [
-  { name: 'occurrence.exceptions.public_holiday', label: 'Public holiday' },
-  { name: 'occurrence.exceptions.sick_leave', label: 'Sick leave' },
+  { name: 'occurrence_exceptions.public_holiday', label: 'Public holiday' },
+  { name: 'occurrence_exceptions.sick_leave', label: 'Sick leave' },
 ] as const
 
-// Fixed only — the counterpart of rotate's Pattern step. End settings live in
-// "Start & End", so they aren't repeated here.
+// Fixed only — the counterpart of rotate's "Custom alternate" pattern: each
+// selected shift repeats on its own rule. End settings live in "Start & End",
+// so they aren't repeated here.
 export function OccurrenceFields({ disabled }: OccurrenceFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control } = useFormContext<any>()
+  const shiftIds =
+    (useWatch({ control, name: 'shift_ids' }) as string[] | undefined) ?? []
 
   return (
     <div className='space-y-4'>
-      <Card className='gap-3 py-4'>
-        <CardHeader className='px-4'>
-          <CardTitle className='text-sm font-medium'>Frequency</CardTitle>
-        </CardHeader>
-        <CardContent className='px-4'>
-          <RecurrenceFrequencyFields
-            control={control}
-            name='occurrence'
-            frequencyOptions={OCCURRENCE_FREQUENCY_OPTIONS}
-            weekdayOptions={SHIFT_REPEAT_WEEKDAY_OPTIONS}
-            disabled={disabled}
-            monthlyFields={
-              <RepeatMonthlyFields
-                control={control}
-                name='occurrence'
-                monthlyModeOptions={SHIFT_REPEAT_MONTHLY_MODE_OPTIONS}
-                weekdayOptions={SHIFT_REPEAT_WEEKDAY_OPTIONS}
-                disabled={disabled}
-              />
-            }
-          />
-        </CardContent>
-      </Card>
+      {shiftIds.length === 0 ? (
+        <p className='text-sm text-muted-foreground'>
+          Pick shifts in the previous step to set how often each occurs.
+        </p>
+      ) : (
+        <PerShiftRecurrenceFields
+          name='shift_occurrences'
+          title='Frequency'
+          shiftIds={shiftIds}
+          frequencyOptions={OCCURRENCE_FREQUENCY_OPTIONS}
+          defaultRule={DEFAULT_OCCURRENCE}
+          disabled={disabled}
+        />
+      )}
 
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>

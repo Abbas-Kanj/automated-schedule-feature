@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { format } from 'date-fns'
 import {
   type Control,
@@ -30,26 +30,22 @@ import {
 import { SCHEDULE_TYPES } from '../../data/data'
 import {
   type DailySchedule,
-  DEFAULT_OCCURRENCE,
-  type Occurrence,
+  DEFAULT_OCCURRENCE_EXCEPTIONS,
   type RegularType,
-  type RotateCrewPlacement,
-  type RotateDayCoverage,
   type Schedule,
   type ScheduleType,
   scheduleSchema,
 } from '../../data/schema'
-import { occurrenceSlots } from '../../occurrence-pattern'
 import {
   crewSelectionFromDayCoverage,
   pruneRosterToCrews,
 } from '../../rotation-crews'
 import { AssignToCrewFields } from './assign-to-crew-fields'
 import { EmployeeMultiSelect } from './employee-multi-select'
+import { FixedAssignToFields } from './fixed-assign-to-fields'
 import { MonthlyFields } from './monthly-fields'
 import { OccurrenceFields } from './occurrence-fields'
 import { PatternBuilder } from './pattern-builder'
-import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 import { ScheduleBasicsFields } from './schedule-basics-fields'
 import { ScheduleStartEndFields } from './schedule-start-end-fields'
 import { ScheduleSummary } from './schedule-summary'
@@ -72,28 +68,26 @@ function getSteps(
     ]
   }
 
+  // Rotate only picks who is on the rotation here; placing those crews on
+  // days happens on the rotating Work schedule's "Assign crews".
   if (regularType === 'rotate') {
     return [
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'pattern', label: 'Pattern' },
       { id: 'assign-to', label: 'Assign to' },
-      { id: 'work', label: 'Work rotation' },
       { id: 'end-settings', label: 'Start & End' },
       { id: 'summary', label: 'Summary' },
     ]
   }
-  // The occurrence pattern is anchored on the start date, so changing it
-  // re-lines the weekdays under an already-assigned roster — the coverage
-  // panel reflects that if revisited.
+  // Fixed assigns crews per shift directly, once the dates are known.
   if (regularType === 'fixed') {
     return [
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'occurrence', label: 'Occurrence' },
-      { id: 'assign-to', label: 'Assign to' },
-      { id: 'work', label: 'Work fixed' },
       { id: 'end-settings', label: 'Start & End' },
+      { id: 'assign-to', label: 'Assign to' },
       { id: 'summary', label: 'Summary' },
     ]
   }
@@ -195,11 +189,10 @@ function getRegularTypeDefaults(type: RegularType) {
   if (type === 'fixed') {
     return {
       ...shared,
-      occurrence: DEFAULT_OCCURRENCE,
+      shift_occurrences: [] as Record<string, unknown>[],
+      occurrence_exceptions: DEFAULT_OCCURRENCE_EXCEPTIONS,
       crew_kind: 'team' as const,
-      crew_ids: [] as string[],
-      day_coverage: [] as RotateDayCoverage[],
-      crew_placements: [] as RotateCrewPlacement[],
+      shift_assignments: [] as Record<string, unknown>[],
     }
   }
 
@@ -209,7 +202,7 @@ function getRegularTypeDefaults(type: RegularType) {
 // A schedule saved before the "Assign to" step stored its pick still has a
 // roster; recover the pick from it so editing opens on the right crews.
 function withCrewSelection(schedule: Schedule): Schedule {
-  if (schedule.parent_type !== 'regular' || schedule.type === 'flexible') {
+  if (schedule.parent_type !== 'regular' || schedule.type !== 'rotate') {
     return schedule
   }
   if (schedule.crew_ids?.length) return schedule
@@ -224,6 +217,9 @@ type ScheduleFormProps = {
   onSubmit: (values: Schedule) => void
   disabled?: boolean
   submitLabel?: string
+  // Creating only: going back clears every later step, so what's ahead is
+  // always rebuilt from what's behind. Editing keeps saved data.
+  resetLaterStepsOnBack?: boolean
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -245,17 +241,14 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
     return ['cycle_type', 'cycle_length', 'pattern', 'shift_repeat']
   }
   if (stepId === 'occurrence') {
-    return ['occurrence']
+    return ['shift_occurrences', 'occurrence_exceptions']
   }
   // At least one crew is required too, but checked in `handleNext` rather
   // than the schema, so schedules saved without a pick still load.
   if (stepId === 'assign-to') {
-    return ['crew_kind', 'crew_ids']
-  }
-  // Only well-formedness is checked — an unstaffed shift is a warning in the
-  // coverage panel, never a reason to block "Next".
-  if (stepId === 'work') {
-    return ['day_coverage', 'crew_placements']
+    return type === 'fixed'
+      ? ['crew_kind', 'shift_assignments']
+      : ['crew_kind', 'crew_ids']
   }
   if (stepId === 'type') {
     if (type === 'weekly') return ['type', 'year', 'month', 'week', 'days']
@@ -266,11 +259,19 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
   return []
 }
 
+// Fields a step doesn't show but whose meaning depends on it: a rotate roster
+// is placed on the pattern's cards and drawn from the "Assign to" pick.
+const STEP_DEPENDENT_FIELDS: Record<string, string[]> = {
+  pattern: ['day_coverage', 'crew_placements'],
+  'assign-to': ['day_coverage', 'crew_placements'],
+}
+
 export function ScheduleForm({
   defaultValues,
   onSubmit,
   disabled = false,
   submitLabel = 'Save schedule',
+  resetLaterStepsOnBack = false,
 }: ScheduleFormProps) {
   const form = useForm<Schedule>({
     resolver: zodResolver(scheduleSchema) as Resolver<Schedule>,
@@ -293,11 +294,6 @@ export function ScheduleForm({
   // open — locks all step navigation so the user can't jump away from
   // underneath it. See `ShiftPickerField`'s `onDialogOpenChange`.
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
-  // Set by the "Assign to" step while it is mounted, so leaving the step
-  // accepts the crew assignment it is showing — see
-  // `schedule-assign-to-fields.tsx#commitPendingSuggestion`.
-  const assignToCommitRef = useRef<(() => void) | null>(null)
-
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -307,40 +303,12 @@ export function ScheduleForm({
   const regularType = useWatch({ control: looseControl, name: 'type' }) as
     | RegularType
     | undefined
-  const occurrence = useWatch({
-    control: looseControl,
-    name: 'occurrence',
-  }) as Occurrence | undefined
-  const shiftIds = useWatch({ control: looseControl, name: 'shift_ids' }) as
-    | string[]
-    | undefined
-
-  // What "Work fixed" staffs: one card per working day of the occurrence, keyed
-  // independently of the start date. Rotate reads its own `pattern` instead.
-  const fixedSlots =
-    regularType === 'fixed'
-      ? occurrenceSlots(occurrence, shiftIds?.[0])
-      : undefined
-
-  // Leaving Occurrence drops assignments on days the rule no longer has, so a
-  // changed frequency cannot leave invisible cells behind in `day_coverage`.
-  const pruneCoverageToOccurrence = () => {
-    if (!fixedSlots) return
-    const keys = new Set(fixedSlots.slotKeys)
-    const cells = (looseForm.getValues('day_coverage') ??
-      []) as RotateDayCoverage[]
-    looseForm.setValue(
-      'day_coverage',
-      cells.filter((cell) => keys.has(cell.day))
-    )
-  }
-
   const steps = getSteps(parentType, regularType)
   const currentStepId = steps[step]?.id
   const isLastStep = step === steps.length - 1
 
-  // Leaving "Assign to" drops anybody no longer picked from the roster, so the
-  // work step never shows crews that are not on the schedule.
+  // Leaving rotate's "Assign to" drops anybody no longer picked from a saved
+  // roster, so "Assign crews" never shows crews that are not on the schedule.
   const pruneRosterToSelection = () => {
     const values = looseForm.getValues()
     const pruned = pruneRosterToCrews(
@@ -353,20 +321,58 @@ export function ScheduleForm({
     looseForm.setValue('crew_placements', pruned.crew_placements)
   }
 
+  // Puts every field of the steps after `index` back to this type's defaults
+  // and locks those steps again.
+  const resetStepsAfter = (index: number) => {
+    const defaults = (
+      parentType === 'daily'
+        ? getTypeDefaults(type as ScheduleType)
+        : getRegularTypeDefaults(regularType ?? 'fixed')
+    ) as Record<string, unknown>
+    const fields = new Set<string>()
+    steps.slice(index + 1).forEach(({ id }) => {
+      const stepFields = getStepFields(id, parentType, type) as string[]
+      stepFields.forEach((field) => fields.add(field))
+      STEP_DEPENDENT_FIELDS[id]?.forEach((field) => fields.add(field))
+    })
+    // The discriminators pick the steps themselves; they are never "later".
+    fields.delete('type')
+    fields.delete('parent_type')
+    fields.forEach((field) => {
+      if (!(field in defaults)) return
+      looseForm.setValue(field, structuredClone(defaults[field]))
+    })
+    looseForm.clearErrors([...fields])
+    setMaxStep(index)
+  }
+
   const goToStep = (index: number) => {
-    if (currentStepId === 'work') assignToCommitRef.current?.()
-    if (currentStepId === 'assign-to') pruneRosterToSelection()
-    if (currentStepId === 'occurrence') pruneCoverageToOccurrence()
-    setStep(Math.min(Math.max(index, 0), steps.length - 1))
+    const target = Math.min(Math.max(index, 0), steps.length - 1)
+    if (currentStepId === 'assign-to' && regularType === 'rotate') {
+      pruneRosterToSelection()
+    }
+    if (resetLaterStepsOnBack && target < step) resetStepsAfter(target)
+    setStep(target)
   }
 
   const handleNext = async () => {
-    // Before validating, not after: the commit writes `day_coverage`, and
-    // `trigger` has to see the values the user is actually advancing with.
-    if (currentStepId === 'work') assignToCommitRef.current?.()
-    if (currentStepId === 'occurrence') pruneCoverageToOccurrence()
+    if (currentStepId === 'assign-to' && regularType === 'fixed') {
+      const assignments = (looseForm.getValues('shift_assignments') ?? []) as {
+        employee_ids: string[]
+        team_ids: string[]
+      }[]
+      if (
+        !assignments.some((a) => a.employee_ids.length || a.team_ids.length)
+      ) {
+        looseForm.setError('shift_assignments', {
+          type: 'manual',
+          message: 'Assign at least one team or employee to a shift',
+        })
+        return
+      }
+    }
 
-    if (currentStepId === 'assign-to') {
+    if (currentStepId === 'assign-to' && regularType === 'rotate') {
       const crewIds = looseForm.getValues('crew_ids') as string[] | undefined
       if (!crewIds?.length) {
         looseForm.setError('crew_ids', {
@@ -388,7 +394,7 @@ export function ScheduleForm({
     }
   }
 
-  const handleBack = () => setStep((s) => Math.max(s - 1, 0))
+  const handleBack = () => goToStep(step - 1)
 
   const handleTypeChange = (value: string) => {
     if (value === type) return
@@ -558,29 +564,14 @@ export function ScheduleForm({
 
             {(disabled || currentStepId === 'assign-to') &&
               parentType === 'regular' &&
-              (regularType === 'rotate' || regularType === 'fixed') && (
+              regularType === 'rotate' && (
                 <AssignToCrewFields disabled={disabled} />
               )}
 
-            {(disabled || currentStepId === 'work') &&
+            {(disabled || currentStepId === 'assign-to') &&
               parentType === 'regular' &&
-              (regularType === 'rotate' || regularType === 'fixed') && (
-                <div className='space-y-1.5'>
-                  {disabled && (
-                    <FormLabel>
-                      {regularType === 'rotate' ? 'Work rotation' : 'Work fixed'}
-                    </FormLabel>
-                  )}
-                  <ScheduleAssignToFields
-                    disabled={disabled}
-                    commitRef={assignToCommitRef}
-                    pattern={fixedSlots?.pattern}
-                    slotKeys={fixedSlots?.slotKeys}
-                    dayLabels={fixedSlots?.labels}
-                    manualOnly={regularType === 'fixed'}
-                    poolFromForm
-                  />
-                </div>
+              regularType === 'fixed' && (
+                <FixedAssignToFields disabled={disabled} />
               )}
 
             {(disabled || currentStepId === 'end-settings') &&

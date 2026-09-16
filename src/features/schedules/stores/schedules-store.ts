@@ -4,6 +4,7 @@ import { generateId } from '@/lib/id'
 import { readSeeded, writeSeeded } from '@/lib/seed-store'
 import { defaultSchedules } from '../data/schedules'
 import { type Schedule, scheduleSchema } from '../data/schema'
+import { migrateLegacyFixedSchedule } from '../fixed-schedule'
 
 const STORAGE_KEY = 'schedules'
 
@@ -21,7 +22,8 @@ interface SchedulesState {
 
 const initialSchedules = readSeeded(
   STORAGE_KEY,
-  z.array(scheduleSchema),
+  // Older fixed schedules are rewritten before validating, not re-seeded away.
+  z.array(z.preprocess(migrateLegacyFixedSchedule, scheduleSchema)),
   defaultSchedules
 )
 

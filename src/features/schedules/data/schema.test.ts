@@ -46,6 +46,15 @@ function fixed(overrides: Record<string, unknown> = {}) {
     temporary_schedule: false,
     start_date: '2026-01-05',
     end_settings: endSettings,
+    shift_occurrences: [
+      {
+        shift_id: 'shift-morning',
+        frequency: 'weekly' as const,
+        interval: 1,
+        weekdays: ['mon', 'tue'],
+      },
+    ],
+    shift_assignments: [],
     ...overrides,
   }
 }
@@ -89,6 +98,83 @@ describe('regular schedules', () => {
       errorsAt(rotate({ shift_ids: ['shift-morning'] }), 'shift_ids')
     ).toContain('Select at least 2 shifts to build a rotation')
     expect(parses(fixed({ shift_ids: ['shift-morning'] }))).toBe(true)
+  })
+})
+
+describe('fixed occurrence and assignment', () => {
+  const nightRule = {
+    shift_id: 'shift-night',
+    frequency: 'daily' as const,
+    interval: 2,
+  }
+
+  it('gives every selected shift its own rule', () => {
+    const both = ['shift-morning', 'shift-night']
+    expect(errorsAt(fixed({ shift_ids: both }), 'shift_occurrences')).toContain(
+      'Set how often every selected shift occurs'
+    )
+    const withNight = fixed({
+      shift_ids: both,
+      shift_occurrences: [...fixed().shift_occurrences, nightRule],
+    })
+    expect(parses(withNight)).toBe(true)
+  })
+
+  it('rejects two rules for one shift', () => {
+    const doubled = fixed()
+    doubled.shift_occurrences = [
+      ...doubled.shift_occurrences,
+      { ...doubled.shift_occurrences[0], weekdays: ['fri'] },
+    ]
+    expect(errorsAt(doubled, 'shift_occurrences')).toContain(
+      'Each shift can only have one occurrence'
+    )
+  })
+
+  it('checks each rule on its own row', () => {
+    expect(
+      errorsAt(
+        fixed({
+          shift_occurrences: [
+            { shift_id: 'shift-morning', frequency: 'weekly', interval: 1 },
+          ],
+        }),
+        'shift_occurrences.0.weekdays'
+      )
+    ).toContain('Select at least one day')
+    expect(
+      errorsAt(
+        fixed({
+          shift_occurrences: [
+            { shift_id: 'shift-morning', frequency: 'monthly', interval: 1 },
+          ],
+        }),
+        'shift_occurrences.0.monthly_mode'
+      )
+    ).toContain('Select how it repeats monthly')
+  })
+
+  it('allows the same crew on several shifts, but only this schedule’s shifts', () => {
+    const shared = fixed({
+      shift_ids: ['shift-morning', 'shift-night'],
+      shift_assignments: [
+        { shift_id: 'shift-morning', employee_ids: [], team_ids: ['team-a'] },
+        { shift_id: 'shift-night', employee_ids: [], team_ids: ['team-a'] },
+      ],
+      shift_occurrences: [...fixed().shift_occurrences, nightRule],
+    })
+    expect(parses(shared)).toBe(true)
+
+    expect(
+      errorsAt(
+        fixed({
+          shift_assignments: [
+            { shift_id: 'shift-other', employee_ids: ['e1'], team_ids: [] },
+          ],
+        }),
+        'shift_assignments.0.shift_id'
+      )
+    ).toContain('Assigned shift is not one of this schedule’s shifts')
   })
 })
 

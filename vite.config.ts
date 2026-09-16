@@ -37,6 +37,9 @@ export default defineConfig({
       '@radix-ui/react-popover',
       '@radix-ui/react-dialog',
       'react-day-picker',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-tabs',
+      'radix-ui',
     ],
   },
   test: {

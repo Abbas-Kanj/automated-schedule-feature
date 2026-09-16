@@ -52,19 +52,16 @@ In `rotation-crews.ts`: `cellsFromCrewPlacements` (stored shape in, cells out �
 `cellsFromPlacements` delegates to it), `crewPlacementsToStored`,
 `dayCoverageMatchesPlacements`, `shiftHoursById`.
 
-Surfaces in three places:
+**The editable Crew start days editor (`CrewStartEditor`) and the Summary
+read-back (`CrewStartSummary`) were deleted 2026-09-16** at the user's request
+(`rotation-crew-starts.tsx` is gone). Placements are still written by Suggest
+and still read in one place:
 
-- **Assign to** — `CrewStartEditor` in `components/schedule-form/rotation-crew-starts.tsx`.
-  A "Day N · week M" select and a shift-track select per crew. Shift-track
-  options are labelled by **the shift the crew actually opens on**, never the
-  stored step number. Changing either regenerates the whole matrix via
-  `applyPlacements` — regenerated, not patched.
-- **Summary** — `CrewStartSummary`, read-only, reads the opening shift off the
-  *stored matrix* so it stays honest after a hand edit.
-- **`/schedule-rotation`** — `RotationRow.crewKey`/`crewLabel`/`startDay`;
-  "Team B · starts day 8 · week 2" under the employee name. `startDay` is only
-  filled when the placements still describe the matrix, checked once per table
-  in `buildRotation`.
+- **Employees table** (rotating Work schedule screen *and* the Assign crews
+  dialog) — `RotationRow.crewKey`/`crewLabel`/`startDay`/`startDate`;
+  "Team B · starts Sat, Sep 19" under the employee name (real date via
+  `cycleDayDates`). `startDay` is only filled when the placements still
+  describe the matrix, checked once per table in `buildRotation`.
 
 Both Radix `Select`s carry the `if (!value) return` guard from the
 `radix-select-bubble-select-wipes-programmatic-value` skill — every value here
@@ -182,12 +179,10 @@ thing.
 
 ## What's left, in priority order
 
-1. **Browser-verify.** Nothing here has been seen. Use the click-list in
-   `.claude/handoff/rotation-suggestion.md` §"Open calls" #1, plus: press
-   *Suggest*, move a crew in **Crew start days**, confirm the grid rebuilds;
-   flip to **Assign manually**, clear a cell, confirm the "edited by hand" note
-   appears in the editor *and* on Summary; then `/schedule-rotation` for the
-   per-employee crew line.
+1. ~~**Browser-verify.**~~ Suggest → Save → per-employee "starts <date>" line
+   seen in a browser 2026-09-16. The start-day editor and its "edited by hand"
+   note no longer exist. Still unseen: a hand edit in the dialog's manual grid
+   dropping the start dates from the Employees table.
 2. **Add a 7-day two-shift preset** — `M A M A M · ·`, the only true 5-on/2-off
    that 3 crews can cover. **Offered to the user, not yet answered.** Without
    it, the one-pick answer for "two shifts, a real weekend, three teams" does

@@ -197,7 +197,7 @@ export function FixedWorkSchedule() {
               <EmptyState
                 icon={<Users className='size-8' />}
                 title='Nobody is assigned to this schedule'
-                description='Edit the schedule and pick teams or employees on its “Assign to” and “Work fixed” steps.'
+                description='Edit the schedule and pick teams or employees for each shift on its “Assign to” step.'
               />
             ) : (
               <>

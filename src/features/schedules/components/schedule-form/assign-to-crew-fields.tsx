@@ -19,8 +19,8 @@ type AssignToCrewFieldsProps = {
   disabled?: boolean
 }
 
-// Who this schedule's roster is drawn from. The next step ("Work rotation" /
-// "Work fixed") places exactly these crews on days and shifts.
+// Rotate only: who this rotation's roster is drawn from. The rotating Work
+// schedule's "Assign crews" places exactly these crews on days and shifts.
 export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, setValue, clearErrors } = useFormContext<any>()
@@ -91,7 +91,9 @@ export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
           name='crew_ids'
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{crewKind === 'team' ? 'Teams' : 'Employees'}</FormLabel>
+              <FormLabel>
+                {crewKind === 'team' ? 'Teams' : 'Employees'}
+              </FormLabel>
               <FilterableMultiSelect
                 options={options}
                 value={options.filter((option) =>

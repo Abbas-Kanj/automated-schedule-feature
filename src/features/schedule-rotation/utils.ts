@@ -71,6 +71,8 @@ export type RotationRow = {
   crewKey?: string
   crewLabel?: string
   startDay?: number
+  // The first real date `startDay` falls on.
+  startDate?: Date
   assignedIndex: number
   assigned: RotationPosition
   // Rotated so the day they're on now comes first (Alice "M A N O", Bob
@@ -273,6 +275,43 @@ export function getPeriodIndex(
     : differenceInCalendarMonths(current, anchor)
 }
 
+// How many calendar days one cycle position covers, at most.
+const DAYS_PER_ADVANCE: Record<RotationPeriodType, number> = {
+  daily: 1,
+  weekly: 7,
+  monthly: 31,
+}
+
+// The first real date on or after `start_date` that each cycle day falls on,
+// index-aligned with the cycle. Walked through `getPeriodIndex` rather than
+// computed, so it can never disagree with how the screens map dates to days.
+// A slot stays undefined only if the start date is unusable.
+export function cycleDayDates(
+  schedule: RotateSchedule,
+  periodType: RotationPeriodType,
+  cycleLength: number = schedule.pattern.length
+): (Date | undefined)[] {
+  const dates: (Date | undefined)[] = Array.from({ length: cycleLength })
+  const start = parse(schedule.start_date, 'yyyy-MM-dd', new Date())
+  if (!cycleLength || Number.isNaN(start.getTime())) return dates
+
+  let found = 0
+  // One extra period, since the start can sit part-way through its first.
+  const limit = (cycleLength + 1) * DAYS_PER_ADVANCE[periodType]
+  for (let offset = 0; offset < limit && found < cycleLength; offset++) {
+    const date = addDays(start, offset)
+    const day = getAssignedIndex(
+      0,
+      getPeriodIndex(schedule, date, periodType),
+      cycleLength
+    )
+    if (dates[day]) continue
+    dates[day] = date
+    found++
+  }
+  return dates
+}
+
 // Wrapped into [0, cycleLength). `offset` stays a parameter because the
 // pattern preview walks the cards from an arbitrary starting card.
 export function getAssignedIndex(
@@ -332,6 +371,9 @@ export function buildRotation(
   const placementByCrew = new Map(
     schedule.crew_placements.map((placement) => [placement.crew, placement])
   )
+  const startDates = placementsDescribeCoverage
+    ? cycleDayDates(schedule, periodType, cycleLength)
+    : []
 
   const rows: RotationRow[] = roster.map(
     ({ employee, employeeId, byDay, offset, crewKey, crewLabel }) => {
@@ -344,6 +386,11 @@ export function buildRotation(
         dayFor((assignedIndex + i) % cycleLength)
       )
 
+      const startDay =
+        placementsDescribeCoverage && crewKey
+          ? placementByCrew.get(crewKey)?.day_offset
+          : undefined
+
       return {
         employee,
         employeeId,
@@ -351,10 +398,8 @@ export function buildRotation(
         offset,
         crewKey,
         crewLabel,
-        startDay:
-          placementsDescribeCoverage && crewKey
-            ? placementByCrew.get(crewKey)?.day_offset
-            : undefined,
+        startDay,
+        startDate: startDay === undefined ? undefined : startDates[startDay],
         assignedIndex,
         assigned: dayFor(assignedIndex),
         sequence,

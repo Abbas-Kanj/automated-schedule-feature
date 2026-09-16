@@ -1,7 +1,13 @@
-import { type RefObject, useEffect, useMemo, useState } from 'react'
-import { parse } from 'date-fns'
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
+import { format, parse } from 'date-fns'
 import { useFormContext, useWatch } from 'react-hook-form'
-import { CheckCircle2, TriangleAlert, Wand2 } from 'lucide-react'
+import { CalendarClock, CheckCircle2, TriangleAlert, Wand2 } from 'lucide-react'
 import { plural } from '@/lib/plural'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -10,20 +16,29 @@ import { MultiSelect } from '@/components/multi-select'
 import { ToggleButton } from '@/components/toggle-button'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { getEmployeeFullName } from '@/features/employees/utils'
+import { ScheduleRotationTable } from '@/features/schedule-rotation/components/schedule-rotation-table'
+import {
+  type RotateSchedule,
+  buildRotation,
+  cycleDayDates,
+  getAdvanceType,
+} from '@/features/schedule-rotation/utils'
 import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
 import {
+  type EndSettings,
   type RotateCrewPlacement,
   type RotateDayCoverage,
   type RotatePatternEntry,
+  dateStringSchema,
+  endSettingsSchema,
 } from '../../data/schema'
 import {
   cellsFromCrewPlacements,
   crewKeysFromDayCoverage,
   crewPlacementsToStored,
   crewsFromDayCoverage,
-  dayCoverageMatchesPlacements,
   orderShiftIdsByStart,
   patternToSlots,
   shiftHoursById,
@@ -36,30 +51,21 @@ import {
   suggestRotationCoverage,
 } from '../../rotation-suggestion'
 import { RotationCoveragePanel } from './rotation-coverage-panel'
-import { CrewStartEditor } from './rotation-crew-starts'
 
 type Option = { value: string; label: string }
 
 type CrewKind = 'team' | 'employee'
 
 type ScheduleAssignToFieldsProps = {
+  // The stored record; the form's live values are laid over it so the
+  // rotation maths runs on what's on screen.
+  schedule: RotateSchedule
   disabled?: boolean
-  // Called by the wizard's "Next" button — see `commitPendingSuggestion`.
+  // Called before saving — see `commitPendingSuggestion`.
   commitRef?: RefObject<(() => void) | null>
-  // Fixed schedules have no `pattern` field; they pass their occurrence rule
-  // read as one.
-  pattern?: RotatePatternEntry[]
-  // Fixed schedules have no rotation for the search to stagger.
-  manualOnly?: boolean
-  // Crews come from the form's `crew_kind`/`crew_ids` (wizard's own "Assign
-  // to" step) instead of this component's toggle/pool picker.
-  poolFromForm?: boolean
-  // Fixed only: the key each card's assignments are stored under in
-  // `day_coverage.day`, index-aligned with `pattern`, so a start date picked
-  // later can never move anyone.
-  slotKeys?: number[]
-  // Card and column labels ("Mon", "Day 15"), index-aligned with `pattern`.
-  dayLabels?: string[]
+  // The start date + end settings fields, placed between the crew pick and
+  // the suggestion: the dates have to be set before anything can be placed.
+  startEnd?: ReactNode
 }
 
 // Who covers each selected shift on each day of the cycle. The pattern is a
@@ -69,13 +75,10 @@ type ScheduleAssignToFieldsProps = {
 // edits single cells freely; hand-assignment is the escape hatch for rosters
 // the search can't express.
 export function ScheduleAssignToFields({
+  schedule,
   disabled,
   commitRef,
-  pattern: patternProp,
-  manualOnly = false,
-  poolFromForm = false,
-  slotKeys,
-  dayLabels,
+  startEnd,
 }: ScheduleAssignToFieldsProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { control, getValues, setValue } = useFormContext<any>()
@@ -83,29 +86,11 @@ export function ScheduleAssignToFields({
     | RotatePatternEntry[]
     | undefined
   // Memoised so a fresh `[]` doesn't re-run the coverage analysis every render.
-  const pattern = useMemo(
-    () => patternProp ?? patternRaw ?? [],
-    [patternProp, patternRaw]
-  )
-  const readPattern = (): RotatePatternEntry[] =>
-    patternProp ??
-    (getValues('pattern') as RotatePatternEntry[] | undefined) ??
-    []
+  const pattern = useMemo(() => patternRaw ?? [], [patternRaw])
   const coverageRaw = useWatch({ control, name: 'day_coverage' }) as
     | RotateDayCoverage[]
     | undefined
-  // With `slotKeys`, translate stored cells from their stable key to the card
-  // position the grid/analysis count in; cells on keys the current occurrence
-  // no longer has are dropped.
-  const dayCoverage = useMemo(() => {
-    const cells = coverageRaw ?? []
-    if (!slotKeys) return cells
-    const positionOf = new Map(slotKeys.map((key, index) => [key, index]))
-    return cells.flatMap((cell) => {
-      const position = positionOf.get(cell.day)
-      return position === undefined ? [] : [{ ...cell, day: position }]
-    })
-  }, [coverageRaw, slotKeys])
+  const dayCoverage = useMemo(() => coverageRaw ?? [], [coverageRaw])
   const placementsRaw = useWatch({ control, name: 'crew_placements' }) as
     | RotateCrewPlacement[]
     | undefined
@@ -116,6 +101,9 @@ export function ScheduleAssignToFields({
   const shiftIds = useMemo(() => shiftIdsRaw ?? [], [shiftIdsRaw])
   const startDateValue = useWatch({ control, name: 'start_date' }) as
     | string
+    | undefined
+  const endSettings = useWatch({ control, name: 'end_settings' }) as
+    | EndSettings
     | undefined
 
   const shifts = useShiftsStore((s) => s.shifts)
@@ -160,28 +148,20 @@ export function ScheduleAssignToFields({
   // Feeds the search as a tie-break, and the rest-guardrail warning.
   const shiftHours = useMemo(() => shiftHoursById(shifts), [shifts])
 
-  // Both kinds at once — a saved schedule can hold team placements while the
-  // step shows the employee pool.
-  const crewLabels = useMemo(() => {
-    const labels = new Map<string, string>()
-    teams.forEach((team) => labels.set(`team:${team.id}`, team.name))
-    employeeOptions.forEach((option) =>
-      labels.set(`employee:${option.value}`, option.label)
-    )
-    return labels
-  }, [teams, employeeOptions])
-
   // Not a form field: the union of what's already assigned *is* the pool, so
   // it round-trips through a saved schedule without adding to the schema.
-  const [localCrewKind, setCrewKind] = useState<CrewKind>(() => {
+  // Before anyone is placed, the wizard's "Assign to" pick seeds it.
+  const [crewKind, setCrewKind] = useState<CrewKind>(() => {
     const keys = crewKeysFromDayCoverage(dayCoverage)
     if (keys.some((key) => key.startsWith('team:'))) return 'team'
     if (keys.some((key) => key.startsWith('employee:'))) return 'employee'
+    if (schedule.crew_ids?.length) return schedule.crew_kind ?? 'team'
     return teamOptions.length > 0 ? 'team' : 'employee'
   })
 
-  const [localPoolIds, setPoolIds] = useState<string[]>(() => {
+  const [poolIds, setPoolIds] = useState<string[]>(() => {
     const keys = crewKeysFromDayCoverage(dayCoverage)
+    if (keys.length === 0) return schedule.crew_ids ?? []
     const teamIds = keys
       .filter((key) => key.startsWith('team:'))
       .map((key) => key.slice('team:'.length))
@@ -191,31 +171,41 @@ export function ScheduleAssignToFields({
       .map((key) => key.slice('employee:'.length))
   })
 
-  const formCrewKind = useWatch({ control, name: 'crew_kind' }) as
-    | CrewKind
-    | undefined
-  const formCrewIds = useWatch({ control, name: 'crew_ids' }) as
-    | string[]
-    | undefined
-  const crewKind: CrewKind = poolFromForm
-    ? (formCrewKind ?? 'team')
-    : localCrewKind
-  const poolIds: string[] = poolFromForm ? (formCrewIds ?? []) : localPoolIds
-
-  // Starting in manual mode keeps `commitPendingSuggestion` from ever running
-  // a search when `manualOnly` is set.
-  const [manualMode, setManualMode] = useState(manualOnly)
+  const [manualMode, setManualMode] = useState(false)
 
   const crews = useMemo(
     () => crewsFromDayCoverage(dayCoverage, teams, employeeLabels),
     [dayCoverage, teams, employeeLabels]
   )
 
+  // Nothing is placed until the dates are settled: every table below is read
+  // in real dates, and a suggestion made against the wrong start would put
+  // crews on the wrong weekdays.
+  const datesReady =
+    dateStringSchema.safeParse(startDateValue).success &&
+    endSettingsSchema.safeParse(endSettings).success
+
   const startDate = useMemo(() => {
     if (!startDateValue) return undefined
     const parsed = parse(startDateValue, 'yyyy-MM-dd', new Date())
     return Number.isNaN(parsed.getTime()) ? undefined : parsed
   }, [startDateValue])
+
+  const liveSchedule: RotateSchedule = {
+    ...schedule,
+    pattern,
+    shift_ids: shiftIds,
+    start_date: startDateValue ?? schedule.start_date,
+    end_settings: endSettings ?? schedule.end_settings,
+    day_coverage: dayCoverage,
+    crew_placements: crewPlacements,
+  }
+  const advanceType = getAdvanceType(liveSchedule)
+  const dayDates =
+    datesReady && startDate ? cycleDayDates(liveSchedule, advanceType) : []
+  const dayLabels = pattern.map((_, day) =>
+    dayDates[day] ? format(dayDates[day], 'EEE d MMM') : `Day ${day + 1}`
+  )
 
   // Not keyed on the pool itself, which wouldn't change the answer.
   const requirement = useMemo(
@@ -226,9 +216,7 @@ export function ScheduleAssignToFields({
   const analysis = useMemo(
     () =>
       analyzeDayCoverage(crews, orderedShiftIds, pattern.length, {
-        // Card 0 isn't a calendar date when cards are keyed slots, so
-        // weekday-alignment notes would describe the wrong days.
-        startDate: slotKeys ? undefined : startDate,
+        startDate,
         shiftLabels,
         shiftHours,
         // Only when exact — else the panel could tell someone who just
@@ -240,34 +228,18 @@ export function ScheduleAssignToFields({
       orderedShiftIds,
       pattern.length,
       startDate,
-      slotKeys,
       shiftLabels,
       shiftHours,
       requirement,
     ]
   )
 
-  // Do the stored start days still describe the stored matrix? Re-derived
-  // rather than flagged, so a manual grid edit can't leave a stale flag behind.
-  const placementsDescribeCoverage = useMemo(
-    () =>
-      dayCoverageMatchesPlacements(
-        patternToSlots(pattern),
-        crewPlacements,
-        orderedShiftIds,
-        dayCoverage
-      ),
-    [pattern, crewPlacements, orderedShiftIds, dayCoverage]
-  )
-
   const poolOptions = crewKind === 'team' ? teamOptions : employeeOptions
-  const manualCrewOptions = poolFromForm
-    ? poolOptions.filter((option) => poolIds.includes(option.value))
-    : poolOptions
 
   function applySuggestion() {
-    const currentPattern = readPattern()
-    if (currentPattern.length === 0) return
+    const currentPattern =
+      (getValues('pattern') as RotatePatternEntry[] | undefined) ?? []
+    if (currentPattern.length === 0 || !datesReady) return
 
     const suggestionCrews = poolIds.flatMap<SuggestionCrew>((id) => {
       if (crewKind === 'team') {
@@ -305,23 +277,15 @@ export function ScheduleAssignToFields({
       { startDate, shiftLabels, shiftHours }
     )
 
-    applyPlacements(crewPlacementsToStored(placements))
-  }
-
-  // The one place both halves of the roster are written, so they can't drift
-  // apart. The matrix is regenerated from the start days rather than
-  // patched — that's what makes moving one crew safe, since nothing survives
-  // from the previous arrangement to double-book a cell.
-  function applyPlacements(next: RotateCrewPlacement[]) {
-    const currentPattern = readPattern()
-    if (currentPattern.length === 0) return
-
-    setValue('crew_placements', next, { shouldDirty: true })
+    const stored = crewPlacementsToStored(placements)
+    // Both halves of the roster are written together so they can't drift
+    // apart; the matrix is regenerated, never patched.
+    setValue('crew_placements', stored, { shouldDirty: true })
     setValue(
       'day_coverage',
       cellsFromCrewPlacements(
         patternToSlots(currentPattern),
-        next,
+        stored,
         orderedShiftIds
       ),
       { shouldDirty: true }
@@ -335,13 +299,19 @@ export function ScheduleAssignToFields({
     poolCrewKeys.length === placedCrewKeys.size &&
     poolCrewKeys.every((key) => placedCrewKeys.has(key))
 
-  // Makes "Next" accept what's showing: a no-op on the ordinary path, but
+  // Makes "Save" accept what's showing: a no-op on the ordinary path, but
   // catches leaving with the suggestion half-taken (pool picked but never
   // applied, or changed after). Manual mode is left alone — re-running the
   // search over hand-placed crew would throw away exactly what the toggle
   // exists to allow.
   function commitPendingSuggestion() {
-    if (manualMode || poolIds.length === 0 || coverageMatchesPool) return
+    if (
+      manualMode ||
+      !datesReady ||
+      poolIds.length === 0 ||
+      coverageMatchesPool
+    )
+      return
     applySuggestion()
   }
 
@@ -358,23 +328,33 @@ export function ScheduleAssignToFields({
   if (pattern.length === 0) {
     return (
       <p className='text-sm text-muted-foreground'>
-        {patternProp
-          ? 'Select a shift and set the occurrence to assign crew to it.'
-          : 'Build the pattern in the previous step to assign crew to it.'}
+        This schedule has no pattern yet — build it from the schedule wizard
+        first.
       </p>
     )
   }
+
+  const rotation =
+    datesReady && startDate
+      ? buildRotation(
+          liveSchedule,
+          shifts,
+          employees,
+          teams,
+          startDate,
+          advanceType
+        )
+      : null
 
   return (
     <div className='space-y-4'>
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>
           <CardTitle className='text-base font-semibold'>
-            {manualOnly ? 'Who is on this schedule' : 'Who is on this rotation'}
+            Who is on this rotation
           </CardTitle>
         </CardHeader>
         <CardContent className='space-y-4 px-4'>
-          {!poolFromForm && (
           <div className='flex flex-wrap items-center gap-2'>
             <ToggleButton
               size='sm'
@@ -404,127 +384,136 @@ export function ScheduleAssignToFields({
                 : 'Each employee is their own crew.'}
             </span>
           </div>
-          )}
 
-          {!manualOnly && (
-            <div className='flex flex-wrap items-center gap-2'>
-              <ToggleButton
-                size='sm'
-                selected={!manualMode}
-                disabled={disabled}
-                onClick={() => setManualMode(false)}
-              >
-                Suggest
-              </ToggleButton>
-              <ToggleButton
-                size='sm'
-                selected={manualMode}
-                disabled={disabled}
-                onClick={() => setManualMode(true)}
-              >
-                Assign manually
-              </ToggleButton>
+          <MultiSelect
+            options={poolOptions}
+            value={poolOptions.filter((option) =>
+              poolIds.includes(option.value)
+            )}
+            onChange={(selected: Option[]) =>
+              setPoolIds((selected ?? []).map((option) => option.value))
+            }
+            isMulti
+            placeholder={
+              crewKind === 'team'
+                ? teamOptions.length
+                  ? 'Select teams'
+                  : 'No teams yet — create one first'
+                : 'Select employees'
+            }
+            isDisabled={disabled || poolOptions.length === 0}
+          />
+
+          {startEnd && (
+            <div className='space-y-3 rounded-md border p-3'>
+              <h3 className='text-sm font-semibold'>Start &amp; End</h3>
+              {startEnd}
             </div>
           )}
 
-          {!manualMode ? (
-            <div className='space-y-3'>
-              <p className='text-sm text-muted-foreground'>
-                {poolFromForm
-                  ? 'Let the suggestion stagger the crews picked on the previous step across the cycle'
-                  : 'Pick the crews, then let the suggestion stagger them across the cycle'} — it reuses the pattern&apos;s rhythm and moves each crew
-                along the shift list so every selected shift is covered every
-                day.
-              </p>
-              <CrewRequirementNote
-                requirement={requirement}
-                cycleLength={pattern.length}
-                shiftCount={orderedShiftIds.length}
-                selectedCount={poolIds.length}
-                crewKind={crewKind}
-              />
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-end'>
-                {!poolFromForm && (
-                <div className='flex-1'>
-                  <MultiSelect
-                    options={poolOptions}
-                    value={poolOptions.filter((option) =>
-                      poolIds.includes(option.value)
-                    )}
-                    onChange={(selected: Option[]) =>
-                      setPoolIds((selected ?? []).map((option) => option.value))
-                    }
-                    isMulti
-                    placeholder={
-                      crewKind === 'team'
-                        ? teamOptions.length
-                          ? 'Select teams'
-                          : 'No teams yet — create one first'
-                        : 'Select employees'
-                    }
-                    isDisabled={disabled || poolOptions.length === 0}
-                  />
-                </div>
-                )}
-                <Button
-                  type='button'
-                  onClick={applySuggestion}
-                  disabled={disabled || poolIds.length === 0}
-                  className='shrink-0'
+          {!datesReady ? (
+            <p
+              className='flex items-center gap-1.5 text-sm text-muted-foreground'
+              data-testid='dates-required'
+            >
+              <CalendarClock className='size-4 shrink-0' />
+              Set the start date and end settings first — the assignment is laid
+              out on real dates.
+            </p>
+          ) : (
+            <>
+              <div className='flex flex-wrap items-center gap-2'>
+                <ToggleButton
+                  size='sm'
+                  selected={!manualMode}
+                  disabled={disabled}
+                  onClick={() => setManualMode(false)}
                 >
-                  <Wand2 className='me-1 size-4' />
-                  Suggest assignment
-                </Button>
+                  Suggest
+                </ToggleButton>
+                <ToggleButton
+                  size='sm'
+                  selected={manualMode}
+                  disabled={disabled}
+                  onClick={() => setManualMode(true)}
+                >
+                  Assign manually
+                </ToggleButton>
               </div>
 
-              <CrewStartEditor
-                placements={crewPlacements}
-                crewLabels={crewLabels}
-                slots={patternToSlots(pattern)}
+              {!manualMode ? (
+                <div className='space-y-3'>
+                  <p className='text-sm text-muted-foreground'>
+                    Let the suggestion stagger the picked crews across the cycle
+                    — it reuses the pattern&apos;s rhythm and moves each crew
+                    along the shift list so every selected shift is covered
+                    every day.
+                  </p>
+                  <CrewRequirementNote
+                    requirement={requirement}
+                    cycleLength={pattern.length}
+                    shiftCount={orderedShiftIds.length}
+                    selectedCount={poolIds.length}
+                    crewKind={crewKind}
+                  />
+                  <Button
+                    type='button'
+                    onClick={applySuggestion}
+                    disabled={disabled || poolIds.length === 0}
+                  >
+                    <Wand2 className='me-1 size-4' />
+                    Suggest assignment
+                  </Button>
+                </div>
+              ) : (
+                <div className='space-y-3'>
+                  <p className='text-sm text-muted-foreground'>
+                    Staff each shift on each cycle day yourself — for the
+                    rosters the suggestion cannot express. One card per cycle
+                    day, one row per selected shift; an empty row is a shift
+                    nobody is covering that day. The grid below keeps grading
+                    whatever you set.
+                  </p>
+                  <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-3'>
+                    {pattern.map((entry, index) => (
+                      <ManualDayCard
+                        key={entry.position ?? index}
+                        day={index}
+                        label={dayLabels[index]}
+                        orderedShiftIds={orderedShiftIds}
+                        crewKind={crewKind}
+                        crewOptions={poolOptions}
+                        dayCoverage={dayCoverage}
+                        disabled={disabled}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <RotationCoveragePanel
+                analysis={analysis}
                 orderedShiftIds={orderedShiftIds}
                 cycleLength={pattern.length}
                 shifts={shifts}
-                describesCoverage={placementsDescribeCoverage}
-                disabled={disabled}
-                onChange={applyPlacements}
-              />
-            </div>
-          ) : (
-            <div className='space-y-3'>
-              <p className='text-sm text-muted-foreground'>
-                {manualOnly
-                  ? 'Staff each shift on each working day yourself.'
-                  : 'Staff each shift on each cycle day yourself — for the rosters the suggestion cannot express.'}{' '}
-                One card per cycle day, one row per selected shift; an empty row
-                is a shift nobody is covering that day. The grid below keeps
-                grading whatever you set.
-              </p>
-              <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-3'>
-                {pattern.map((entry, index) => (
-                  <ManualDayCard
-                    key={entry.position ?? index}
-                    day={index}
-                    storageDay={slotKeys?.[index] ?? index}
-                    label={dayLabels?.[index] ?? `Day ${index + 1}`}
-                    orderedShiftIds={orderedShiftIds}
-                    crewKind={crewKind}
-                    crewOptions={manualCrewOptions}
-                    dayCoverage={coverageRaw ?? []}
-                    disabled={disabled}
-                  />
-                ))}
-              </div>
-            </div>
+                dayLabels={dayLabels}
+              >
+                {rotation && rotation.rows.length > 0 && (
+                  <div className='space-y-2'>
+                    <h3 className='text-sm font-semibold'>Employees</h3>
+                    <ScheduleRotationTable
+                      rows={rotation.rows}
+                      assignedHeading={`Assigned Shift · ${format(
+                        startDate as Date,
+                        'EEE, MMM d'
+                      )}`}
+                      cycleLength={rotation.cycleLength}
+                    />
+                  </div>
+                )}
+              </RotationCoveragePanel>
+            </>
           )}
-
-          <RotationCoveragePanel
-            crews={crews}
-            analysis={analysis}
-            orderedShiftIds={orderedShiftIds}
-            cycleLength={pattern.length}
-            shifts={shifts}
-            dayLabels={dayLabels}
-          />
         </CardContent>
       </Card>
     </div>
@@ -617,11 +606,8 @@ function CrewRequirementNote({
 }
 
 type ManualDayCardProps = {
-  // Card position, for the test id.
+  // Cycle day this card reads and writes (`day_coverage.day`).
   day: number
-  // The `day_coverage.day` this card reads and writes — equal to `day` unless
-  // the cards are keyed slots (fixed schedules).
-  storageDay: number
   label: string
   orderedShiftIds: string[]
   crewKind: CrewKind
@@ -635,7 +621,6 @@ type ManualDayCardProps = {
 // else, which is the point of storing the matrix rather than crew offsets.
 function ManualDayCard({
   day,
-  storageDay,
   label,
   orderedShiftIds,
   crewKind,
@@ -655,7 +640,7 @@ function ManualDayCard({
       (getValues('day_coverage') as RotateDayCoverage[] | undefined) ?? []
     const key = crewKind === 'team' ? 'team_ids' : 'employee_ids'
     const existing = current.find(
-      (cell) => cell.day === storageDay && cell.shift_id === shiftId
+      (cell) => cell.day === day && cell.shift_id === shiftId
     )
 
     const next = existing
@@ -665,7 +650,7 @@ function ManualDayCard({
       : [
           ...current,
           {
-            day: storageDay,
+            day,
             shift_id: shiftId,
             employee_ids: [],
             team_ids: [],
@@ -692,7 +677,7 @@ function ManualDayCard({
         {orderedShiftIds.map((shiftId) => {
           const shift = shifts.find((s) => s.id === shiftId)
           const cell = dayCoverage.find(
-            (entry) => entry.day === storageDay && entry.shift_id === shiftId
+            (entry) => entry.day === day && entry.shift_id === shiftId
           )
           const ids =
             (crewKind === 'team' ? cell?.team_ids : cell?.employee_ids) ?? []

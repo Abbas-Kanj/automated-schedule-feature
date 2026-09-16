@@ -7,6 +7,7 @@ import { type Team } from '@/features/teams/data/schema'
 import {
   type RotateSchedule,
   buildRotation,
+  cycleDayDates,
   getAssignedIndex,
   getPeriodEnd,
   getPeriodIndex,
@@ -456,5 +457,44 @@ describe('getRangeLabel', () => {
     expect(
       getRangeLabel(new Date(2026, 0, 26), new Date(2026, 1, 1), 'weekly')
     ).toBe('Jan 26 – Feb 1, 2026')
+  })
+})
+
+describe('cycleDayDates', () => {
+  it('gives a card-a-day cycle consecutive dates from the start', () => {
+    const dates = cycleDayDates(
+      { ...schedule, start_date: '2026-09-02' },
+      'daily'
+    )
+    expect(dates).toEqual([
+      new Date(2026, 8, 2),
+      new Date(2026, 8, 3),
+      new Date(2026, 8, 4),
+      new Date(2026, 8, 5),
+    ])
+  })
+
+  // A weekly-advancing cycle starting mid-week: period 0 is the start's own
+  // week, so card 0 falls on the start date and card 1 on the next Monday.
+  it('steps a week-a-card cycle by Monday-first weeks', () => {
+    const dates = cycleDayDates(
+      { ...schedule, start_date: '2026-09-02' },
+      'weekly'
+    )
+    expect(dates).toEqual([
+      new Date(2026, 8, 2),
+      new Date(2026, 8, 7),
+      new Date(2026, 8, 14),
+      new Date(2026, 8, 21),
+    ])
+  })
+
+  it('leaves every day undated without a usable start', () => {
+    expect(cycleDayDates({ ...schedule, start_date: '' }, 'daily')).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ])
   })
 })

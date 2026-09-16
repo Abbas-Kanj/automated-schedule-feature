@@ -1920,13 +1920,15 @@ export const sampleSchedules: Schedule[] = [
     temporary_schedule: false,
     start_date: '2026-08-31',
     end_settings: { end_type: 'never' },
-    occurrence: {
-      frequency: 'weekly',
-      interval: 1,
-      weekdays: ['mon', 'tue', 'wed', 'thu', 'fri'],
-      exceptions: { public_holiday: false, sick_leave: false },
-    },
-    day_coverage: [],
-    crew_placements: [],
+    shift_occurrences: [
+      {
+        shift_id: 'shift-office',
+        frequency: 'weekly',
+        interval: 1,
+        weekdays: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      },
+    ],
+    occurrence_exceptions: { public_holiday: false, sick_leave: false },
+    shift_assignments: [],
   },
 ]
