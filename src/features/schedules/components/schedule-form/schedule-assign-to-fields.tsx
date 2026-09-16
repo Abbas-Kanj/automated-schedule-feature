@@ -370,7 +370,7 @@ export function ScheduleAssignToFields({
       <Card className='gap-3 py-4'>
         <CardHeader className='px-4'>
           <CardTitle className='text-base font-semibold'>
-            Who is on this rotation
+            {manualOnly ? 'Who is on this schedule' : 'Who is on this rotation'}
           </CardTitle>
         </CardHeader>
         <CardContent className='space-y-4 px-4'>
