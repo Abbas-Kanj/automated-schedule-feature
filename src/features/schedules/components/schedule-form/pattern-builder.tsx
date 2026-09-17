@@ -305,7 +305,10 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                 name='cycle_length.days'
                 render={({ field }) => {
                   const isMonthly = cycleLength?.unit === 'monthly'
-                  const multiplier = isMonthly ? 30 : 6
+                  const multiplier =
+                    CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS[
+                      (cycleLength?.unit ?? 'weekly') as keyof typeof CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS
+                    ] ?? 7
                   const count = field.value
                     ? Math.round(field.value / multiplier)
                     : ''

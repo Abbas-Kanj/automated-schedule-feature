@@ -152,7 +152,7 @@ function getRegularTypeDefaults(type: RegularType) {
       cycle_type: 'pattern_shifts' as const,
       crew_kind: 'team' as const,
       crew_ids: [] as string[],
-      cycle_length: { unit: 'weekly' as const, days: 6 },
+      cycle_length: { unit: 'weekly' as const, days: 7 },
       pattern: Array.from({ length: 7 }, (_, i) => ({
         position: i + 1,
         is_off: true,
