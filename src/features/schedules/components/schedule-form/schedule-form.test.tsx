@@ -65,12 +65,16 @@ describe('ScheduleForm — going back', () => {
     ])
   })
 
-  it('clears and relocks every later step when creating', async () => {
+  // Stepping back to re-read an earlier answer is not an edit. Resetting on
+  // the navigation itself discarded every later answer, and because the step
+  // landed on still showed its own data the loss only surfaced on the way
+  // forward again.
+  it('keeps later steps when creating and nothing is edited', async () => {
     const screen = await render(
       <ScheduleForm
         defaultValues={fixed}
         onSubmit={vi.fn()}
-        resetLaterStepsOnBack
+        resetLaterStepsOnChange
       />
     )
 
@@ -79,10 +83,46 @@ describe('ScheduleForm — going back', () => {
     await expect.element(card.getByText('Team A')).toBeVisible()
 
     await userEvent.click(tab(screen, 'Occurrence'))
-    await expect.element(tab(screen, 'Start & End')).toBeDisabled()
-    await expect.element(tab(screen, 'Assign to')).toBeDisabled()
+    await expect.element(tab(screen, 'Start & End')).toBeEnabled()
+    await expect.element(tab(screen, 'Assign to')).toBeEnabled()
 
     await next(screen, 2)
+    await expect
+      .element(
+        screen.getByTestId('assign-shift-shift-morning').getByText('Team A')
+      )
+      .toBeVisible()
+  }, 45_000)
+
+  it('clears and relocks every later step once an earlier one is edited', async () => {
+    const screen = await render(
+      <ScheduleForm
+        defaultValues={fixed}
+        onSubmit={vi.fn()}
+        resetLaterStepsOnChange
+      />
+    )
+
+    await next(screen, 4)
+    await expect
+      .element(
+        screen.getByTestId('assign-shift-shift-morning').getByText('Team A')
+      )
+      .toBeVisible()
+
+    // Back to Occurrence and actually change it — Wed joins Mon/Tue.
+    await userEvent.click(tab(screen, 'Occurrence'))
+    await userEvent.click(screen.getByRole('button', { name: 'Wed' }))
+    await expect
+      .element(screen.getByRole('button', { name: 'Wed' }))
+      .toHaveAttribute('aria-pressed', 'true')
+
+    // The edit only takes effect on the way out, so the later steps are still
+    // reachable until Next is pressed.
+    await next(screen, 1)
+    await expect.element(tab(screen, 'Assign to')).toBeDisabled()
+
+    await next(screen, 1)
     await expect
       .element(
         screen

@@ -71,7 +71,7 @@ export type RotationRow = {
   crewKey?: string
   crewLabel?: string
   startDay?: number
-  // The first real date `startDay` falls on.
+  // The first real date this crew is on duty.
   startDate?: Date
   assignedIndex: number
   assigned: RotationPosition
@@ -286,6 +286,22 @@ const DAYS_PER_ADVANCE: Record<RotationPeriodType, number> = {
 // index-aligned with the cycle. Walked through `getPeriodIndex` rather than
 // computed, so it can never disagree with how the screens map dates to days.
 // A slot stays undefined only if the start date is unusable.
+// `cycleDayDates` gives the first calendar date each cycle *day* falls on, so
+// the earliest of the days a crew actually works is the date it first comes on
+// duty. Mirrors the timeline's own forward walk without duplicating the date
+// arithmetic a second time.
+function firstWorkedDate(
+  byDay: Map<number, string>,
+  cycleDates: (Date | undefined)[]
+): Date | undefined {
+  let earliest: Date | undefined
+  byDay.forEach((_shiftId, day) => {
+    const date = cycleDates[day]
+    if (date && (!earliest || date < earliest)) earliest = date
+  })
+  return earliest
+}
+
 export function cycleDayDates(
   schedule: RotateSchedule,
   periodType: RotationPeriodType,
@@ -399,7 +415,15 @@ export function buildRotation(
         crewKey,
         crewLabel,
         startDay,
-        startDate: startDay === undefined ? undefined : startDates[startDay],
+        // The crew's first day *on duty*, not the date its cycle position
+        // falls on. `day_offset` says which card the crew stands on at day 0,
+        // so `startDates[day_offset]` answers a different question entirely —
+        // it read "starts Sep 7" for a crew already working on Aug 31, and
+        // disagreed with the timeline's own label on the same screen.
+        startDate:
+          startDay === undefined
+            ? undefined
+            : firstWorkedDate(byDay, startDates),
         assignedIndex,
         assigned: dayFor(assignedIndex),
         sequence,

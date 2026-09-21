@@ -12,6 +12,23 @@ export const DAYS_OF_WEEK = [
 
 const daySchema = z.enum(DAYS_OF_WEEK)
 
+// Shape *and* reality: the regex alone accepts `2026-02-31`, which then
+// silently becomes March 3rd wherever the string is turned into a Date, and
+// `2026-13-45`, which becomes an Invalid Date. Round-tripped through UTC
+// because local parsing shifts the day in negative offsets.
+export const dateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number)
+    const parsed = new Date(Date.UTC(year, month - 1, day))
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    )
+  }, 'Enter a real calendar date')
+
 const timeRangeSchema = z
   .object({
     from_time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required'),
@@ -42,8 +59,8 @@ const weeklyScheduleSchema = z.object({
   year: z.number(),
   month: z.number().min(1).max(12),
   week: z.object({
-    start_date: z.string(),
-    end_date: z.string(),
+    start_date: dateStringSchema,
+    end_date: dateStringSchema,
   }),
   days: z
     .array(dayScheduleSchema)
@@ -142,10 +159,6 @@ export const SCHEDULE_ICONS = [
   'home',
   'truck',
 ] as const
-export const dateStringSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
-
 // --- fixed / flexible: shift selection ---
 //
 // `shift_ids` references the `shifts` feature's own store; a schedule has no
@@ -479,6 +492,21 @@ const regularScheduleSchema = z
     regularRotateSchema,
   ])
   .superRefine((val, ctx) => {
+    // `endSettingsSchema` can only see its own object, so the one rule that
+    // needs both dates lives here. ISO strings compare chronologically, so
+    // no parsing is needed.
+    if (
+      val.end_settings.end_type === 'on_date' &&
+      val.end_settings.end_date &&
+      val.end_settings.end_date < val.start_date
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'End date must be on or after the start date',
+        path: ['end_settings', 'end_date'],
+      })
+    }
+
     if (new Set(val.shift_ids).size !== val.shift_ids.length) {
       ctx.addIssue({
         code: 'custom',

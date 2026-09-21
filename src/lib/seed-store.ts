@@ -3,7 +3,7 @@ import { type ZodType } from 'zod'
 // Bump whenever bundled seed data changes and should win over a browser's
 // cached copy — each store stamps the version it was seeded from and
 // re-seeds when it's stale, so a stale cache doesn't silently shadow new defaults.
-export const SEED_VERSION = '2026-09-15-no-schedule-seeds'
+export const SEED_VERSION = '2026-09-19-standard-schedule-seeds'
 
 function seedStampKey(key: string): string {
   return `${key}:seed`

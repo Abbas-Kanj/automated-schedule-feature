@@ -1,6 +1,10 @@
 import { addDays } from 'date-fns'
 import { describe, expect, it } from 'vitest'
 import { type Employee } from '@/features/employees/data/schema'
+import {
+  cellsFromCrewPlacements,
+  patternToSlots,
+} from '@/features/schedules/rotation-crews'
 import { type Shift } from '@/features/shifts/data/schema'
 import { buildDefaultDays } from '@/features/shifts/utils'
 import { type Team } from '@/features/teams/data/schema'
@@ -496,5 +500,68 @@ describe('cycleDayDates', () => {
       undefined,
       undefined,
     ])
+  })
+})
+
+// A crew's `day_offset` is the cycle card it stands on at day 0 — not a delay
+// before it starts. Indexing the cycle-day dates by it produced "starts Sep 7"
+// for a crew already on duty on day 0, contradicting the timeline's own label.
+describe('buildRotation crew start dates', () => {
+  const staggered: RotateSchedule = {
+    ...schedule,
+    start_date: '2026-08-31',
+    crew_placements: [
+      { crew: 'employee:e-alice', day_offset: 0, shift_step: 0 },
+      { crew: 'employee:e-bob', day_offset: 1, shift_step: 0 },
+      { crew: 'employee:e-dana', day_offset: 2, shift_step: 0 },
+      { crew: 'team:team-night', day_offset: 3, shift_step: 0 },
+    ],
+    day_coverage: cellsFromCrewPlacements(
+      patternToSlots(schedule.pattern),
+      [
+        { crew: 'employee:e-alice', day_offset: 0, shift_step: 0 },
+        { crew: 'employee:e-bob', day_offset: 1, shift_step: 0 },
+        { crew: 'employee:e-dana', day_offset: 2, shift_step: 0 },
+        { crew: 'team:team-night', day_offset: 3, shift_step: 0 },
+      ],
+      ['shift-morning', 'shift-afternoon', 'shift-night']
+    ),
+  }
+
+  function rowsByName() {
+    const rotation = buildRotation(
+      staggered,
+      shifts,
+      employees,
+      teams,
+      new Date(2026, 7, 31),
+      'daily'
+    )
+    return Object.fromEntries(rotation.rows.map((r) => [r.fullName, r]))
+  }
+
+  it('dates every working crew from the schedule start, whatever its offset', () => {
+    const byName = rowsByName()
+    // Alice, Bob and Dana all work on day 0 of a 4-card cycle that rests only
+    // one crew, so all three come on duty on the schedule's own start date.
+    for (const name of ['Alice M Test', 'Bob M Test', 'Dana M Test']) {
+      expect(byName[name].startDate).toEqual(new Date(2026, 7, 31))
+    }
+  })
+
+  it('keeps the cycle-day number it was placed on', () => {
+    const byName = rowsByName()
+    expect(byName['Alice M Test'].startDay).toBe(0)
+    expect(byName['Bob M Test'].startDay).toBe(1)
+    expect(byName['Dana M Test'].startDay).toBe(2)
+  })
+
+  it('agrees with the shift the same row reports for that date', () => {
+    const byName = rowsByName()
+    // If a row says it starts on the 31st it must also be working on the 31st.
+    for (const name of ['Alice M Test', 'Bob M Test', 'Dana M Test']) {
+      expect(byName[name].startDate).toEqual(new Date(2026, 7, 31))
+      expect(byName[name].assigned.label).not.toBe('Off')
+    }
   })
 })

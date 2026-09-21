@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { format } from 'date-fns'
 import {
   type Control,
@@ -217,9 +217,10 @@ type ScheduleFormProps = {
   onSubmit: (values: Schedule) => void
   disabled?: boolean
   submitLabel?: string
-  // Creating only: going back clears every later step, so what's ahead is
-  // always rebuilt from what's behind. Editing keeps saved data.
-  resetLaterStepsOnBack?: boolean
+  // Creating only: editing a step clears every later step, so what's ahead is
+  // always rebuilt from what's behind. Navigating alone never discards
+  // anything. Editing an existing schedule keeps saved data either way.
+  resetLaterStepsOnChange?: boolean
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -271,7 +272,7 @@ export function ScheduleForm({
   onSubmit,
   disabled = false,
   submitLabel = 'Save schedule',
-  resetLaterStepsOnBack = false,
+  resetLaterStepsOnChange = false,
 }: ScheduleFormProps) {
   const form = useForm<Schedule>({
     resolver: zodResolver(scheduleSchema) as Resolver<Schedule>,
@@ -321,6 +322,35 @@ export function ScheduleForm({
     looseForm.setValue('crew_placements', pruned.crew_placements)
   }
 
+  // What the step currently on screen held when the user arrived on it, so
+  // leaving can tell an actual edit from plain navigation. `null` means no
+  // baseline has been taken yet, which counts as "nothing was edited" —
+  // never as "everything changed".
+  const stepSnapshot = useRef<string | null>(null)
+
+  // Only the step's *own* fields. `STEP_DEPENDENT_FIELDS` are consequences of
+  // a step rather than things edited on it — `pruneRosterToSelection` rewrites
+  // `day_coverage` on the way out of "Assign to", which would otherwise read
+  // as the user having changed something every single time.
+  const snapshotOf = (index: number): string => {
+    const id = steps[index]?.id
+    if (!id) return ''
+    const fields = getStepFields(id, parentType, type) as string[]
+    return JSON.stringify(fields.map((field) => looseForm.getValues(field)))
+  }
+
+  const leavingStepChanged = (): boolean =>
+    stepSnapshot.current !== null && snapshotOf(step) !== stepSnapshot.current
+
+  // Later steps are rebuilt from what is behind them, so they have to go when
+  // what is behind them moves — but *only* then. Resetting on the navigation
+  // itself meant stepping back to re-read an earlier step silently discarded
+  // every answer after it, with the loss invisible until the user walked
+  // forward again.
+  const resetLaterStepsIfEdited = () => {
+    if (resetLaterStepsOnChange && leavingStepChanged()) resetStepsAfter(step)
+  }
+
   // Puts every field of the steps after `index` back to this type's defaults
   // and locks those steps again.
   const resetStepsAfter = (index: number) => {
@@ -348,11 +378,13 @@ export function ScheduleForm({
 
   const goToStep = (index: number) => {
     const target = Math.min(Math.max(index, 0), steps.length - 1)
+    if (target === step) return
     if (currentStepId === 'assign-to' && regularType === 'rotate') {
       pruneRosterToSelection()
     }
-    if (resetLaterStepsOnBack && target < step) resetStepsAfter(target)
+    resetLaterStepsIfEdited()
     setStep(target)
+    stepSnapshot.current = snapshotOf(target)
   }
 
   const handleNext = async () => {
@@ -388,9 +420,13 @@ export function ScheduleForm({
       getStepFields(currentStepId, parentType, type)
     )
     if (valid) {
+      // Before advancing, so a changed step wipes the ones ahead of it and
+      // `setMaxStep` below can then re-open the step being stepped onto.
+      resetLaterStepsIfEdited()
       const next = Math.min(step + 1, steps.length - 1)
       setStep(next)
       setMaxStep((m) => Math.max(m, next))
+      stepSnapshot.current = snapshotOf(next)
     }
   }
 
@@ -420,6 +456,9 @@ export function ScheduleForm({
     setStep(0)
     setMaxStep(0)
     setIsShiftDialogOpen(false)
+    // The form underneath the baseline is gone, so a stale one would read as
+    // an edit on the next navigation.
+    stepSnapshot.current = null
   }
 
   const handleFormSubmit = (values: Schedule) => {

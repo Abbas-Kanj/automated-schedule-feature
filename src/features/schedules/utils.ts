@@ -22,6 +22,42 @@ import {
 } from './data/schema'
 import { occursOn } from './occurrence-pattern'
 
+// Who a schedule actually names, whichever arm holds them: `daily` keeps its
+// own `employees` list, `fixed` puts crews on `shift_assignments`, and
+// `rotate` spreads them across the `day_coverage` matrix. Returned in first-
+// seen order and de-duplicated, since a crew normally appears in many cells.
+export function getScheduleCrewNames(
+  schedule: Schedule,
+  teamNames: Map<string, string>,
+  employeeNames: Map<string, string>
+): string[] {
+  const names: string[] = []
+  const add = (name: string | undefined) => {
+    if (name && !names.includes(name)) names.push(name)
+  }
+  const addCrews = (teamIds: string[], employeeIds: string[]) => {
+    teamIds.forEach((id) => add(teamNames.get(id)))
+    employeeIds.forEach((id) => add(employeeNames.get(id)))
+  }
+
+  if (schedule.parent_type === 'daily') {
+    schedule.employees.forEach((employee) => add(employee.label))
+    return names
+  }
+
+  if (schedule.type === 'fixed') {
+    schedule.shift_assignments.forEach((assignment) =>
+      addCrews(assignment.team_ids, assignment.employee_ids)
+    )
+  } else if (schedule.type === 'rotate') {
+    schedule.day_coverage.forEach((cell) =>
+      addCrews(cell.team_ids, cell.employee_ids)
+    )
+  }
+
+  return names
+}
+
 // "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line, since
 // the three end-settings shapes never coexist.
 export function formatEndSettings(

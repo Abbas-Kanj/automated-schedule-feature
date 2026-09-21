@@ -482,6 +482,74 @@ describe('end settings', () => {
   it('needs nothing else when it never ends', () => {
     expect(parses(fixed({ end_settings: { end_type: 'never' } }))).toBe(true)
   })
+
+  it('rejects an end date that falls before the start date', () => {
+    expect(
+      errorsAt(
+        fixed({
+          start_date: '2026-01-05',
+          end_settings: { end_type: 'on_date', end_date: '2025-12-31' },
+        }),
+        'end_settings.end_date'
+      )
+    ).toContain('End date must be on or after the start date')
+  })
+
+  it('accepts an end date on the start date itself', () => {
+    expect(
+      parses(
+        fixed({
+          start_date: '2026-01-05',
+          end_settings: { end_type: 'on_date', end_date: '2026-01-05' },
+        })
+      )
+    ).toBe(true)
+  })
+
+  // The same rule has to hold on the rotate arm, which declares `start_date`
+  // and `end_settings` itself rather than sharing `regularSharedSchema`.
+  it('rejects a backwards end date on a rotation too', () => {
+    expect(
+      errorsAt(
+        rotate({
+          start_date: '2026-01-05',
+          end_settings: { end_type: 'on_date', end_date: '2025-06-01' },
+        }),
+        'end_settings.end_date'
+      )
+    ).toContain('End date must be on or after the start date')
+  })
+})
+
+// A date that matches the regex but does not exist used to pass, and then
+// became a different day the moment anything turned it into a Date.
+describe('calendar dates', () => {
+  it.each(['2026-02-31', '2026-13-01', '2026-00-10', '2026-04-31'])(
+    'rejects %s',
+    (start_date) => {
+      expect(errorsAt(fixed({ start_date }), 'start_date')).toContain(
+        'Enter a real calendar date'
+      )
+    }
+  )
+
+  it.each(['2026-02-28', '2028-02-29', '2026-12-31'])(
+    'accepts %s',
+    (start_date) => {
+      expect(parses(fixed({ start_date }))).toBe(true)
+    }
+  )
+
+  it('rejects an impossible end date as well', () => {
+    expect(
+      errorsAt(
+        fixed({
+          end_settings: { end_type: 'on_date', end_date: '2026-06-31' },
+        }),
+        'end_settings.end_date'
+      )
+    ).toContain('Enter a real calendar date')
+  })
 })
 
 describe('daily schedules', () => {
