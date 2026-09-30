@@ -23,11 +23,11 @@ import {
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { MultiSelect } from '@/components/multi-select'
 import {
   type VerticalTabsStep,
   VerticalTabs,
 } from '@/components/ui/vertical-tabs'
+import { MultiSelect } from '@/components/multi-select'
 import { PARENT_TYPE_OPTIONS, SCHEDULE_TYPES } from '../../data/data'
 import {
   type DailySchedule,
@@ -477,13 +477,7 @@ export function ScheduleForm({
   }
 
   const handleFormSubmit = (values: Schedule) => {
-    // No backend wired up yet — log what would be sent (console + toast) so
-    // the payload shape is easy to inspect during development.
-    // eslint-disable-next-line no-console
-    console.log(
-      'Schedule form submitted — JSON payload:',
-      JSON.stringify(values, null, 2)
-    )
+    // No backend wired up yet — the toast shows what would be sent.
     showSubmittedData(values, 'Schedule submitted — JSON payload:')
     onSubmit(values)
   }

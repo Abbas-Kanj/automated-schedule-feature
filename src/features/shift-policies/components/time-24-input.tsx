@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 
 type Time24InputProps = {
@@ -40,9 +40,13 @@ export function Time24Input({
 }: Time24InputProps) {
   // Own buffer so a half-typed "9:" isn't reformatted mid-edit.
   const [buffer, setBuffer] = useState(value ?? '')
-  useEffect(() => {
+  // Re-sync when the value changes from outside (reset, rule retype) —
+  // during render rather than in an effect, so there's no stale frame.
+  const [syncedValue, setSyncedValue] = useState(value)
+  if (value !== syncedValue) {
+    setSyncedValue(value)
     setBuffer(value ?? '')
-  }, [value])
+  }
 
   return (
     <Input

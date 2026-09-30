@@ -57,15 +57,15 @@ export function PolicyRulesField() {
     name: 'rules',
   })
 
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
-
   // Open with something to fill in rather than an empty panel plus an
   // "Add at least one rule" error. Guarded on length so clearing every rule
   // by hand stays cleared.
+  const [editingIndex, setEditingIndex] = useState<number | null>(() =>
+    form.getValues('rules').length === 0 ? 0 : null
+  )
   useEffect(() => {
     if (form.getValues('rules').length === 0) {
       append(buildDefaultRule(generateId()))
-      setEditingIndex(0)
     }
   }, [append, form])
 

@@ -4,11 +4,9 @@ import employeeData from '../data/data.json'
 import { type Employee, EmployeeSchema } from '../data/schema'
 
 // Read-only, seeded from bundled sample records. No localStorage
-// persistence — that would just shadow an updated seed.
-const parsed = z.array(EmployeeSchema).safeParse(employeeData)
-const seededEmployees: Employee[] = parsed.success
-  ? parsed.data
-  : (employeeData as unknown as Employee[])
+// persistence — that would just shadow an updated seed. `parse`, not
+// `safeParse`: a bad bundled seed is a bug to surface, not to paper over.
+const seededEmployees: Employee[] = z.array(EmployeeSchema).parse(employeeData)
 
 interface EmployeesState {
   employees: Employee[]
