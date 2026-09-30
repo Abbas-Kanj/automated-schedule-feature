@@ -1,5 +1,7 @@
 import {
   getAttendanceTypeLabel,
+  getBreakPayTypeLabel,
+  getBreakTypeLabel,
   getComparisonOperatorLabel,
   getDefaultHolidayAttendance,
   getHolidayAttendanceTypeLabel,
@@ -8,7 +10,10 @@ import {
   getMissedPunchPeriodUnitLabel,
 } from './data/data'
 import {
+  type BreakTimeRule,
+  type BreakType,
   getRuleResultMinutes,
+  getRuleSpanMinutes,
   type HolidayWorkPolicyType,
   type HolidayWorkRule,
   isHolidayWorkRule,
@@ -77,11 +82,50 @@ export function buildDefaultMissedPunchRule(id: string): MissedPunchRule {
   }
 }
 
+// Starts as a 30-minute unpaid fixed break — the common case.
+export function buildDefaultBreakTimeRule(id: string): BreakTimeRule {
+  return {
+    id,
+    policy_type: 'break_time',
+    name: '',
+    pay_type: 'unpaid',
+    ...buildBreakTypeFields('fixed'),
+  }
+}
+
+// The fields one break type uses, defaulted, with every other type's fields
+// cleared — so switching type can't leave a stale value behind to fail
+// validation or get saved.
+export function buildBreakTypeFields(
+  break_type: BreakType
+): Pick<
+  BreakTimeRule,
+  | 'break_type'
+  | 'duration_unit'
+  | 'duration_minutes'
+  | 'threshold_hours'
+  | 'from_time'
+  | 'to_time'
+> {
+  return {
+    break_type,
+    duration_unit: break_type === 'fixed' ? 'minutes' : undefined,
+    duration_minutes: break_type === 'fixed' ? 30 : undefined,
+    threshold_hours: break_type === 'dynamic' ? 4 : undefined,
+    from_time: break_type === 'range' ? '12:00' : undefined,
+    to_time: break_type === 'range' ? '13:00' : undefined,
+  }
+}
+
 // Keeps what the shapes share (id, name) and defaults the rest. A move
 // between two holiday-work types also keeps hours/mode, resetting only the
 // case fields whose options differ.
 export function retypeRule(rule: PolicyRule, next: PolicyType): PolicyRule {
   if (rule.policy_type === next) return rule
+
+  if (next === 'break_time') {
+    return { ...buildDefaultBreakTimeRule(rule.id), name: rule.name }
+  }
 
   if (next === 'missed_punch_error') {
     return { ...buildDefaultMissedPunchRule(rule.id), name: rule.name }
@@ -114,7 +158,7 @@ export function retypeRule(rule: PolicyRule, next: PolicyType): PolicyRule {
     // window → window keeps everything but the type.
     return { ...rule, policy_type: next }
   }
-  // Coming from missed-punch or holiday work — nothing window-shaped to
+  // Coming from missed-punch, holiday work or a break — nothing window-shaped to
   // carry over, so start from a blank window rule.
   return { ...buildDefaultRule(rule.id, next), name: rule.name }
 }
@@ -125,6 +169,23 @@ export function describeRule(
   rule: PolicyRule,
   formatTime: (time: string) => string
 ): string {
+  if (rule.policy_type === 'break_time') {
+    const pay = getBreakPayTypeLabel(rule.pay_type)
+    if (rule.break_type === 'range') {
+      const span = getRuleSpanMinutes(rule.from_time ?? '', rule.to_time ?? '')
+      const duration = span > 0 ? ` · ${formatMinutes(span)}` : ''
+      return `${pay} · ${formatTime(rule.from_time ?? '')}–${formatTime(rule.to_time ?? '')}${duration}`
+    }
+    const type = getBreakTypeLabel(rule.break_type)
+    if (rule.break_type === 'fixed') {
+      return `${pay} · ${type} · ${formatMinutes(rule.duration_minutes ?? 0)}`
+    }
+    if (rule.break_type === 'dynamic') {
+      return `${pay} · ${type} · after ${rule.threshold_hours ?? 0}h`
+    }
+    return `${pay} · ${type} · logged by punch`
+  }
+
   if (rule.policy_type === 'missed_punch_error') {
     const period = getMissedPunchPeriodUnitLabel(rule.period_unit).toLowerCase()
     const deducted =

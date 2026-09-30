@@ -43,6 +43,7 @@ import {
   formatMinutes,
   retypeRule,
 } from '../utils'
+import { BreakTimeRuleFields } from './break-time-fields'
 import { HolidayWorkRuleFields } from './holiday-work-fields'
 import { MissedPunchRuleFields } from './missed-punch-fields'
 import { Time24Input } from './time-24-input'
@@ -290,7 +291,9 @@ function PolicyRuleRow({
         )}
       />
 
-      {rule?.policy_type === 'missed_punch_error' ? (
+      {rule?.policy_type === 'break_time' ? (
+        <BreakTimeRuleFields index={index} />
+      ) : rule?.policy_type === 'missed_punch_error' ? (
         <MissedPunchRuleFields index={index} />
       ) : rule?.policy_type === 'working_on_day_off' ||
         rule?.policy_type === 'working_on_public_holiday' ? (

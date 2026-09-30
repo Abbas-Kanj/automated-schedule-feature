@@ -211,3 +211,74 @@ describe('shiftPolicyFormSchema', () => {
     expect(result.success).toBe(false)
   })
 })
+
+describe('break time rules', () => {
+  const breakRule = {
+    id: 'rule-5',
+    policy_type: 'break_time' as const,
+    name: 'Lunch',
+    pay_type: 'unpaid' as const,
+  }
+
+  it('accepts each break type with its own fields', () => {
+    const result = shiftPolicyFormSchema.safeParse(
+      policy([
+        {
+          ...breakRule,
+          break_type: 'fixed',
+          duration_unit: 'hours_minutes',
+          duration_minutes: 90,
+        },
+        { ...breakRule, break_type: 'manual' },
+        { ...breakRule, break_type: 'dynamic', threshold_hours: 4.5 },
+        {
+          ...breakRule,
+          break_type: 'range',
+          from_time: '12:00',
+          to_time: '13:00',
+        },
+      ])
+    )
+    expect(result.success).toBe(true)
+  })
+
+  it('requires a duration only for a fixed break', () => {
+    const result = shiftPolicyFormSchema.safeParse(
+      policy([{ ...breakRule, break_type: 'fixed' }])
+    )
+    expect(result.error?.issues[0].path).toEqual([
+      'rules',
+      0,
+      'duration_minutes',
+    ])
+  })
+
+  it('requires a half-step threshold for a dynamic break', () => {
+    const missing = shiftPolicyFormSchema.safeParse(
+      policy([{ ...breakRule, break_type: 'dynamic' }])
+    )
+    expect(missing.error?.issues[0].path).toEqual([
+      'rules',
+      0,
+      'threshold_hours',
+    ])
+    const offStep = shiftPolicyFormSchema.safeParse(
+      policy([{ ...breakRule, break_type: 'dynamic', threshold_hours: 4.2 }])
+    )
+    expect(offStep.success).toBe(false)
+  })
+
+  it('rejects a range that ends before it starts', () => {
+    const result = shiftPolicyFormSchema.safeParse(
+      policy([
+        {
+          ...breakRule,
+          break_type: 'range',
+          from_time: '13:00',
+          to_time: '12:00',
+        },
+      ])
+    )
+    expect(result.error?.issues[0].path).toEqual(['rules', 0, 'to_time'])
+  })
+})

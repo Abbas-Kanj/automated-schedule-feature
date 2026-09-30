@@ -9,6 +9,7 @@ export const POLICY_TYPES = [
   'working_on_day_off',
   'working_on_public_holiday',
   'overtime',
+  'break_time',
 ] as const
 
 // A rule takes one of three shapes, discriminated on `policy_type`: window
@@ -24,6 +25,18 @@ export const HOLIDAY_WORK_POLICY_TYPES = [
   'working_on_public_holiday',
 ] as const
 const holidayWorkPolicyTypeSchema = z.enum(HOLIDAY_WORK_POLICY_TYPES)
+
+// How a break is taken: a set length, punched by the employee, generated
+// by the system past a worked-hours threshold, or a from–to clock window.
+export const BREAK_TYPES = ['fixed', 'manual', 'dynamic', 'range'] as const
+const breakTypeSchema = z.enum(BREAK_TYPES)
+
+export const BREAK_PAY_TYPES = ['paid', 'unpaid'] as const
+const breakPayTypeSchema = z.enum(BREAK_PAY_TYPES)
+
+// How a fixed break's length is typed in — stored as total minutes either way.
+export const BREAK_DURATION_UNITS = ['minutes', 'hours_minutes'] as const
+const breakDurationUnitSchema = z.enum(BREAK_DURATION_UNITS)
 
 export function isMissedPunchRuleType(type: PolicyType | undefined): boolean {
   return type === 'missed_punch_error'
@@ -90,7 +103,7 @@ const ruleNameSchema = z.string().min(1, 'Rule name is required').max(60)
 // A rule's own from–to span in minutes. 0 for a non-increasing range
 // rather than a negative number — rules don't cross midnight (unlike a
 // shift's time ranges), the range is a window within one day.
-function getRuleSpanMinutes(from_time: string, to_time: string): number {
+export function getRuleSpanMinutes(from_time: string, to_time: string): number {
   if (!from_time || !to_time || !(to_time > from_time)) return 0
   return toMinutes(to_time) - toMinutes(from_time)
 }
@@ -170,10 +183,37 @@ const missedPunchRuleSchema = z.object({
   deduction_hours: z.number().min(0).max(24).optional(),
 })
 
+// Each break type uses its own subset of the optional fields — pinned
+// per-case in the policy `superRefine`. A range is a window within one day,
+// like a window rule, and its duration is derived rather than stored.
+const breakTimeRuleSchema = z.object({
+  id: z.string(),
+  policy_type: z.literal('break_time'),
+  name: ruleNameSchema,
+  pay_type: breakPayTypeSchema,
+  break_type: breakTypeSchema,
+  duration_unit: breakDurationUnitSchema.optional(),
+  duration_minutes: z
+    .number({ message: 'Required' })
+    .int('Whole minutes only')
+    .min(1, 'At least 1 minute')
+    .max(1440, 'Must be 24 hours or less')
+    .optional(),
+  threshold_hours: z
+    .number({ message: 'Required' })
+    .min(0.5, 'At least 0.5 hours')
+    .max(24, 'Hours must be 24 or less')
+    .multipleOf(0.5, 'Hours go up in steps of 0.5')
+    .optional(),
+  from_time: timeStringSchema.optional(),
+  to_time: timeStringSchema.optional(),
+})
+
 const policyRuleSchema = z.discriminatedUnion('policy_type', [
   windowRuleSchema,
   holidayWorkRuleSchema,
   missedPunchRuleSchema,
+  breakTimeRuleSchema,
 ])
 
 // Cross-field checks live here rather than on the members so both rule
@@ -193,6 +233,46 @@ const policyFieldsSchema = z
       })
     }
     val.rules.forEach((rule, index) => {
+      if (rule.policy_type === 'break_time') {
+        // Manual breaks are punched, so they carry nothing to check.
+        if (rule.break_type === 'fixed' && rule.duration_minutes == null) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Enter the break duration',
+            path: ['rules', index, 'duration_minutes'],
+          })
+        }
+        if (rule.break_type === 'dynamic' && rule.threshold_hours == null) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Enter the threshold hours',
+            path: ['rules', index, 'threshold_hours'],
+          })
+        }
+        if (rule.break_type === 'range') {
+          if (!rule.from_time) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'Required',
+              path: ['rules', index, 'from_time'],
+            })
+          }
+          if (!rule.to_time) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'Required',
+              path: ['rules', index, 'to_time'],
+            })
+          } else if (rule.from_time && !(rule.to_time > rule.from_time)) {
+            ctx.addIssue({
+              code: 'custom',
+              message: 'End time must be after start time',
+              path: ['rules', index, 'to_time'],
+            })
+          }
+        }
+        return
+      }
       if (rule.policy_type === 'missed_punch_error') {
         if (rule.to_period < rule.from_period) {
           ctx.addIssue({
@@ -268,6 +348,10 @@ export type ComparisonOperator = (typeof COMPARISON_OPERATORS)[number]
 export type MissedPunchPeriodUnit = (typeof MISSED_PUNCH_PERIOD_UNITS)[number]
 export type MissedPunchDeductionUnit =
   (typeof MISSED_PUNCH_DEDUCTION_UNITS)[number]
+export type BreakType = (typeof BREAK_TYPES)[number]
+export type BreakPayType = (typeof BREAK_PAY_TYPES)[number]
+export type BreakDurationUnit = (typeof BREAK_DURATION_UNITS)[number]
+export type BreakTimeRule = z.infer<typeof breakTimeRuleSchema>
 export type WindowRule = z.infer<typeof windowRuleSchema>
 export type HolidayWorkRule = z.infer<typeof holidayWorkRuleSchema>
 export type MissedPunchRule = z.infer<typeof missedPunchRuleSchema>
@@ -275,7 +359,7 @@ export type PolicyRule = z.infer<typeof policyRuleSchema>
 export type ShiftPolicy = z.infer<typeof shiftPolicySchema>
 export type ShiftPolicyFormValues = z.infer<typeof shiftPolicyFormSchema>
 
-// Needed because the discriminant is spread across a literal and two enum
+// Needed because the discriminant is spread across literals and enum
 // members, which a single `policy_type` comparison doesn't narrow cleanly.
 export function isHolidayWorkRule(rule: PolicyRule): rule is HolidayWorkRule {
   return isHolidayWorkRuleType(rule.policy_type)
@@ -283,8 +367,9 @@ export function isHolidayWorkRule(rule: PolicyRule): rule is HolidayWorkRule {
 
 export function isWindowRule(rule: PolicyRule): rule is WindowRule {
   return (
-    rule.policy_type !== 'missed_punch_error' &&
-    !isHolidayWorkRuleType(rule.policy_type)
+    rule.policy_type === 'tardy' ||
+    rule.policy_type === 'departure' ||
+    rule.policy_type === 'overtime'
   )
 }
 

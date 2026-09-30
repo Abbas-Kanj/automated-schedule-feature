@@ -1,6 +1,12 @@
 import {
   type AttendanceType,
   ATTENDANCE_TYPES,
+  BREAK_DURATION_UNITS,
+  BREAK_PAY_TYPES,
+  BREAK_TYPES,
+  type BreakDurationUnit,
+  type BreakPayType,
+  type BreakType,
   COMPARISON_OPERATORS,
   type ComparisonOperator,
   type HolidayAttendanceType,
@@ -22,6 +28,7 @@ const POLICY_TYPE_LABELS: Record<PolicyType, string> = {
   working_on_day_off: 'Working on Day Off',
   working_on_public_holiday: 'Working on Public Holiday',
   overtime: 'Overtime',
+  break_time: 'Break Time',
 }
 
 export const POLICY_TYPE_OPTIONS = POLICY_TYPES.map((value) => ({
@@ -169,3 +176,42 @@ export function getMissedPunchDeductionUnitLabel(
 ): string {
   return MISSED_PUNCH_DEDUCTION_UNIT_LABELS[unit]
 }
+
+const BREAK_TYPE_LABELS: Record<BreakType, string> = {
+  fixed: 'Fixed',
+  manual: 'Manual',
+  dynamic: 'Dynamic',
+  range: 'Range',
+}
+
+export const BREAK_TYPE_OPTIONS = BREAK_TYPES.map((value) => ({
+  value,
+  label: BREAK_TYPE_LABELS[value],
+}))
+
+export function getBreakTypeLabel(type: BreakType): string {
+  return BREAK_TYPE_LABELS[type]
+}
+
+const BREAK_PAY_TYPE_LABELS: Record<BreakPayType, string> = {
+  paid: 'Paid',
+  unpaid: 'Unpaid',
+}
+
+export const BREAK_PAY_TYPE_OPTIONS = BREAK_PAY_TYPES.map((value) => ({
+  value,
+  label: BREAK_PAY_TYPE_LABELS[value],
+}))
+
+export function getBreakPayTypeLabel(type: BreakPayType): string {
+  return BREAK_PAY_TYPE_LABELS[type]
+}
+
+const BREAK_DURATION_UNIT_LABELS: Record<BreakDurationUnit, string> = {
+  minutes: 'Minutes',
+  hours_minutes: 'Hours & minutes',
+}
+
+export const BREAK_DURATION_UNIT_OPTIONS = BREAK_DURATION_UNITS.map(
+  (value) => ({ value, label: BREAK_DURATION_UNIT_LABELS[value] })
+)

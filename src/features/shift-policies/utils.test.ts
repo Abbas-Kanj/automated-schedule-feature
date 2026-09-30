@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { type HolidayWorkRule, type WindowRule } from './data/schema'
 import {
+  type BreakTimeRule,
+  type HolidayWorkRule,
+  type WindowRule,
+} from './data/schema'
+import {
+  buildBreakTypeFields,
+  buildDefaultBreakTimeRule,
   buildDefaultHolidayWorkRule,
   buildDefaultMissedPunchRule,
   buildDefaultRule,
@@ -150,5 +156,45 @@ describe('describeRule', () => {
         identity
       )
     ).toBe('8h · Substitute day off · Leave')
+  })
+})
+
+describe('break time rules', () => {
+  it('keeps only id and name when moving to a break', () => {
+    const window = { ...buildDefaultRule('r1'), name: 'Late' }
+    expect(retypeRule(window, 'break_time')).toEqual({
+      ...buildDefaultBreakTimeRule('r1'),
+      name: 'Late',
+    })
+  })
+
+  it("clears the other break types' fields when switching type", () => {
+    expect(buildBreakTypeFields('dynamic')).toEqual({
+      break_type: 'dynamic',
+      duration_unit: undefined,
+      duration_minutes: undefined,
+      threshold_hours: 4,
+      from_time: undefined,
+      to_time: undefined,
+    })
+  })
+
+  it('describes each break type', () => {
+    const base: BreakTimeRule = buildDefaultBreakTimeRule('r1')
+    expect(describeRule({ ...base, duration_minutes: 90 }, identity)).toBe(
+      'Unpaid · Fixed · 1h 30m'
+    )
+    expect(
+      describeRule(
+        { ...base, pay_type: 'paid', ...buildBreakTypeFields('manual') },
+        identity
+      )
+    ).toBe('Paid · Manual · logged by punch')
+    expect(
+      describeRule({ ...base, ...buildBreakTypeFields('dynamic') }, identity)
+    ).toBe('Unpaid · Dynamic · after 4h')
+    expect(
+      describeRule({ ...base, ...buildBreakTypeFields('range') }, identity)
+    ).toBe('Unpaid · 12:00–13:00 · 1h')
   })
 })

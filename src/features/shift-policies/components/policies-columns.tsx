@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/data-table'
 import {
   getAttendanceTypeLabel,
+  getBreakPayTypeLabel,
   getHolidayAttendanceTypeLabel,
   getPolicyTypeLabel,
 } from '../data/data'
@@ -113,14 +114,17 @@ export const policiesColumns: ColumnDef<ShiftPolicy>[] = [
     ),
     enableSorting: false,
     cell: ({ row }) => {
-      // Holiday-work rules book a different attendance vocabulary; resolve
-      // each rule's label by its shape. Blanks ('—') drop out.
+      // Holiday-work rules book a different attendance vocabulary, and a
+      // break is booked as paid/unpaid; resolve each rule's label by its
+      // shape. Blanks ('—') drop out.
       const labels = [
         ...new Set(
           row.original.rules.map((r) =>
-            isHolidayWorkRule(r)
-              ? getHolidayAttendanceTypeLabel(r.holiday_attendance_type)
-              : getAttendanceTypeLabel(r.attendance_type)
+            r.policy_type === 'break_time'
+              ? `${getBreakPayTypeLabel(r.pay_type)} break`
+              : isHolidayWorkRule(r)
+                ? getHolidayAttendanceTypeLabel(r.holiday_attendance_type)
+                : getAttendanceTypeLabel(r.attendance_type)
           )
         ),
       ].filter((label) => label !== '—')
