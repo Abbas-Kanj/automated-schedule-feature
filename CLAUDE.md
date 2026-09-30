@@ -877,13 +877,15 @@ a genuine missing-import that `tsc -b` caught.
 11. **Decide on the duplicate sidebar entry** for `/schedule-rotation`
     (top-level button *and* the Time Track → Schedules leaf) — kept both
     rather than deleting from a hierarchy that was deliberate and recent.
-12. **`pattern-builder.tsx` week-count readout divides by a hardcoded `6`**
-    while `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS.weekly` is `7` — a 7-day
-    weekly cycle renders as "1 week" correct by luck. Found, not fixed.
-13. **`eslint` reports 11 errors / 3 warnings repo-wide** — re-verified
-    2026-09-11 after the refactor, unchanged. All `react-hooks/
-    set-state-in-effect` / exhaustive-deps, across five files:
-    `components/multi-select/index.tsx`,
-    `schedules/components/schedule-form/{pattern-builder,schedule-form}.tsx`,
-    `shift-policies/components/{policy-rules-field,time-24-input}.tsx`.
-    Reconcile before treating lint as a gate.
+12. **Audit cleanup (2026-09-30) on branch `chore/audit-cleanup`, not yet
+    merged to `main`.** `eslint` is now **0 errors / 3 warnings** (the
+    warnings are deliberate `exhaustive-deps` / `incompatible-library`), so
+    lint can be treated as a gate. The schedule form is typed against
+    `Schedule` — **don't reintroduce `useFormContext<any>()`**; the shared
+    `components/{end,recurrence}-frequency-fields` / `repeat-monthly-fields`
+    are generic in the caller's form type instead. `.gitattributes` now
+    forces LF. Build clean, 500/500 tests. **Not browser-verified.**
+    The old "week-count divides by a hardcoded `6`" item was already fixed.
+13. **Two lockfiles** — both `package-lock.json` and `pnpm-lock.yaml` are
+    checked in. Pick one. (`@radix-ui/react-accordion` is now unused but
+    was left in `package.json` rather than touching both lockfiles.)
