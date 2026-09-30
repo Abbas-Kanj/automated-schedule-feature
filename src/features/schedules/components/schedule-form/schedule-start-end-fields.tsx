@@ -6,8 +6,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { DateField } from '@/components/date-field'
 import { EndFrequencyFields } from '@/components/end-frequency-fields'
-import { DateField } from './date-field'
 
 type ScheduleStartEndFieldsProps = {
   disabled?: boolean

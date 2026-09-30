@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { toMinutes } from '@/lib/time'
+import { timeStringSchema, toMinutes } from '@/lib/time'
 
 export const SHIFT_BADGE_COLORS = [
   'red',
@@ -97,10 +97,6 @@ export const DAYS_OF_WEEK = [
   'sun',
 ] as const
 const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
-
-const timeStringSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required')
 
 // One time range; may cross midnight (22:00 -> 06:00) instead of failing
 // the "end after start" check below.

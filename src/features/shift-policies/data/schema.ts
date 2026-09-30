@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { toMinutes } from '@/lib/time'
+import { timeStringSchema, toMinutes } from '@/lib/time'
 
 // A policy is a named bag of rules, so one policy can mix several of these.
 export const POLICY_TYPES = [
@@ -93,10 +93,6 @@ export const MISSED_PUNCH_DEDUCTION_UNITS = [
   'full_day',
 ] as const
 const missedPunchDeductionUnitSchema = z.enum(MISSED_PUNCH_DEDUCTION_UNITS)
-
-const timeStringSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required')
 
 const ruleNameSchema = z.string().min(1, 'Rule name is required').max(60)
 

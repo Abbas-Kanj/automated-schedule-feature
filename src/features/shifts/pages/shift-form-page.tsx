@@ -1,10 +1,6 @@
 import { useState } from 'react'
-import { type Resolver, useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
-import { toast } from 'sonner'
-import { generateId } from '@/lib/id'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { ConfigDrawer } from '@/components/config-drawer'
@@ -15,15 +11,9 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog'
 import { ShiftFormTabs } from '../components/shift-form/shift-form-tabs'
-import { emptyShiftFormValues } from '../data/defaults'
-import {
-  type Shift,
-  type ShiftFormValues,
-  shiftFormSchema,
-} from '../data/schema'
-import { useDeriveShortCode } from '../hooks/use-derive-short-code'
+import { type Shift } from '../data/schema'
+import { useShiftForm } from '../hooks/use-shift-form'
 import { useShiftsStore } from '../stores/shifts-store'
-import { normalizeShiftFormValues } from '../utils'
 
 export function ShiftCreatePage() {
   return <ShiftFormPage />
@@ -46,20 +36,10 @@ type ShiftFormPageProps = {
 }
 
 function ShiftFormPage({ currentShift, missing }: ShiftFormPageProps) {
-  const isEdit = !!currentShift
   const navigate = useNavigate()
-  const addShift = useShiftsStore((s) => s.addShift)
-  const updateShift = useShiftsStore((s) => s.updateShift)
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false)
-
-  const form = useForm<ShiftFormValues>({
-    resolver: zodResolver(shiftFormSchema) as Resolver<ShiftFormValues>,
-    defaultValues: currentShift ?? emptyShiftFormValues,
-  })
-  const { isDirty } = form.formState
-  useDeriveShortCode(form)
-
   const goBack = () => navigate({ to: '/shifts' })
+  const { form, isDirty, isEdit, onSubmit } = useShiftForm(currentShift, goBack)
 
   // A plain button instead of a `Link`, so a dirty form can intercept it.
   const handleBack = () => {
@@ -68,18 +48,6 @@ function ShiftFormPage({ currentShift, missing }: ShiftFormPageProps) {
     } else {
       goBack()
     }
-  }
-
-  const onSubmit = (values: ShiftFormValues) => {
-    const submitValues = normalizeShiftFormValues(values)
-    if (currentShift) {
-      updateShift(currentShift.id, { id: currentShift.id, ...submitValues })
-      toast.success(`Shift "${values.name}" has been updated.`)
-    } else {
-      addShift({ id: generateId(), ...submitValues })
-      toast.success(`Shift "${values.name}" has been created.`)
-    }
-    goBack()
   }
 
   return (
@@ -118,7 +86,7 @@ function ShiftFormPage({ currentShift, missing }: ShiftFormPageProps) {
             <Form {...form}>
               <form
                 id='shift-form-page'
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={onSubmit}
                 className='space-y-4'
               >
                 <ShiftFormTabs contentClassName='w-full py-1' />

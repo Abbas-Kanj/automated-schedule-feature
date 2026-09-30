@@ -1,4 +1,5 @@
 import { useFormContext } from 'react-hook-form'
+import { DateField } from '@/components/date-field'
 import { EndFrequencyFields } from '@/components/end-frequency-fields'
 import {
   RecurrenceFrequencyFields,
@@ -11,7 +12,6 @@ import {
   REPEAT_MONTHLY_MODE_OPTIONS,
 } from '../../data/data'
 import { DAYS_OF_WEEK } from '../../data/schema'
-import { DateField } from './date-field'
 
 type RepeatFieldsProps = {
   disabled?: boolean

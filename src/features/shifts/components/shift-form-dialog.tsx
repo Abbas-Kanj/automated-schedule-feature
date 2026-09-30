@@ -1,8 +1,4 @@
 import { useState } from 'react'
-import { type Resolver, useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { toast } from 'sonner'
-import { generateId } from '@/lib/id'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -15,14 +11,8 @@ import {
 import { Form } from '@/components/ui/form'
 import { UnsavedChangesDialog } from '@/components/unsaved-changes-dialog'
 import { emptyShiftFormValues } from '../data/defaults'
-import {
-  type Shift,
-  type ShiftFormValues,
-  shiftFormSchema,
-} from '../data/schema'
-import { useDeriveShortCode } from '../hooks/use-derive-short-code'
-import { useShiftsStore } from '../stores/shifts-store'
-import { normalizeShiftFormValues } from '../utils'
+import { type Shift } from '../data/schema'
+import { useShiftForm } from '../hooks/use-shift-form'
 import { ShiftFormTabs } from './shift-form/shift-form-tabs'
 
 type ShiftFormDialogProps = {
@@ -39,23 +29,13 @@ export function ShiftFormDialog({
   open,
   onOpenChange,
 }: ShiftFormDialogProps) {
-  const isEdit = !!currentRow
-  const addShift = useShiftsStore((s) => s.addShift)
-  const updateShift = useShiftsStore((s) => s.updateShift)
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false)
-
-  const form = useForm<ShiftFormValues>({
-    resolver: zodResolver(shiftFormSchema) as Resolver<ShiftFormValues>,
-    defaultValues: isEdit ? currentRow : emptyShiftFormValues,
-  })
-  // react-hook-form's `isDirty` is gated behind a Proxy subscription that
-  // only arms if read during render — reading it only in an event handler
-  // leaves it stuck at `false`.
-  const { isDirty } = form.formState
-  useDeriveShortCode(form)
+  const { form, isDirty, isEdit, onSubmit } = useShiftForm(currentRow, () =>
+    onOpenChange(false)
+  )
 
   const resetAndClose = () => {
-    form.reset(isEdit ? currentRow : emptyShiftFormValues)
+    form.reset(currentRow ?? emptyShiftFormValues)
     onOpenChange(false)
   }
 
@@ -67,19 +47,6 @@ export function ShiftFormDialog({
     } else {
       resetAndClose()
     }
-  }
-
-  const onSubmit = (values: ShiftFormValues) => {
-    const submitValues = normalizeShiftFormValues(values)
-
-    if (isEdit) {
-      updateShift(currentRow.id, { id: currentRow.id, ...submitValues })
-      toast.success(`Shift "${values.name}" has been updated.`)
-    } else {
-      addShift({ id: generateId(), ...submitValues })
-      toast.success(`Shift "${values.name}" has been created.`)
-    }
-    onOpenChange(false)
   }
 
   return (
@@ -104,11 +71,7 @@ export function ShiftFormDialog({
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form
-              id='shift-form'
-              onSubmit={form.handleSubmit(onSubmit)}
-              className='space-y-4'
-            >
+            <form id='shift-form' onSubmit={onSubmit} className='space-y-4'>
               <ShiftFormTabs />
             </form>
           </Form>

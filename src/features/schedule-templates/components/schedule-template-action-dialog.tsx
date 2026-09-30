@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { generateId } from '@/lib/id'
+import { timeStringSchema } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -41,10 +42,6 @@ import {
 import { useScheduleTemplatesStore } from '../stores/schedule-templates-store'
 import { formatDuration } from '../utils'
 import { useScheduleTemplates } from './schedule-templates-provider'
-
-const timeStringSchema = z
-  .string()
-  .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Required')
 
 const formSchema = z
   .object({
