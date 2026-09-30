@@ -7,7 +7,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { ToggleButton } from '@/components/toggle-button'
-import { type DayOfWeek } from '../../data/schema'
+import { type DayOfWeek, type Schedule } from '../../data/schema'
 import { TimeRangeFields } from './time-range-fields'
 
 const WEEKDAYS_MON_TO_SUN: DayOfWeek[] = [
@@ -25,14 +25,11 @@ type WeeklyOneFieldsProps = {
 }
 
 export function WeeklyOneFields({ disabled }: WeeklyOneFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control } = useFormContext<any>()
+  const { control } = useFormContext<Schedule>()
   const { fields, append, remove } = useFieldArray({ control, name: 'days' })
 
   const toggleDay = (day: DayOfWeek, checked: boolean) => {
-    const index = fields.findIndex(
-      (f) => (f as unknown as { day: string }).day === day
-    )
+    const index = fields.findIndex((f) => f.day === day)
     if (checked && index === -1) {
       append({ day, times: [{ from_time: '09:00', to_time: '17:00' }] })
     } else if (!checked && index > -1) {
@@ -50,9 +47,7 @@ export function WeeklyOneFields({ disabled }: WeeklyOneFieldsProps) {
             <FormLabel>Days</FormLabel>
             <div className='grid grid-cols-7 gap-1 text-center'>
               {WEEKDAYS_MON_TO_SUN.map((day) => {
-                const checked = fields.some(
-                  (f) => (f as unknown as { day: string }).day === day
-                )
+                const checked = fields.some((f) => f.day === day)
                 return (
                   <ToggleButton
                     key={day}
@@ -74,7 +69,7 @@ export function WeeklyOneFields({ disabled }: WeeklyOneFieldsProps) {
       {fields.length > 0 && (
         <div className='grid gap-3 sm:grid-cols-2'>
           {fields.map((field, index) => {
-            const day = (field as unknown as { day: DayOfWeek }).day
+            const day = field.day
             return (
               <Card key={field.id} className='gap-3 py-3'>
                 <CardHeader className='px-3'>

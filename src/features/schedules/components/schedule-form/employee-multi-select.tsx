@@ -7,10 +7,10 @@ import {
 } from '@/components/ui/form'
 import { MultiSelect } from '@/components/multi-select'
 import { employees } from '../../data/employees'
+import { type Schedule } from '../../data/schema'
 
 type EmployeeMultiSelectProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  control: Control<any>
+  control: Control<Schedule>
   disabled?: boolean
 }
 

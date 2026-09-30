@@ -1,5 +1,4 @@
 import { useFormContext } from 'react-hook-form'
-import { DateField } from '@/components/date-field'
 import { EndFrequencyFields } from '@/components/end-frequency-fields'
 import {
   RecurrenceFrequencyFields,
@@ -11,7 +10,7 @@ import {
   REPEAT_FREQUENCY_OPTIONS,
   REPEAT_MONTHLY_MODE_OPTIONS,
 } from '../../data/data'
-import { DAYS_OF_WEEK } from '../../data/schema'
+import { DAYS_OF_WEEK, type ShiftFormValues } from '../../data/schema'
 
 type RepeatFieldsProps = {
   disabled?: boolean
@@ -26,8 +25,7 @@ const WEEKDAY_OPTIONS: RecurrenceOption[] = DAYS_OF_WEEK.map((day) => ({
 }))
 
 export function RepeatFields({ disabled }: RepeatFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control } = useFormContext<any>()
+  const { control } = useFormContext<ShiftFormValues>()
 
   return (
     <div className='space-y-4'>
@@ -48,12 +46,7 @@ export function RepeatFields({ disabled }: RepeatFieldsProps) {
         }
       />
 
-      <EndFrequencyFields
-        control={control}
-        name='repeat'
-        disabled={disabled}
-        DateField={DateField}
-      />
+      <EndFrequencyFields control={control} name='repeat' disabled={disabled} />
     </div>
   )
 }

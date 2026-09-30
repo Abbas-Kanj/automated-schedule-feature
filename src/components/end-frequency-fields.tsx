@@ -1,4 +1,4 @@
-import { type Control, useWatch } from 'react-hook-form'
+import { type Control, type FieldValues, useWatch } from 'react-hook-form'
 import {
   FormControl,
   FormField,
@@ -8,30 +8,23 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { DateField } from '@/components/date-field'
 
-export type EndFrequencyDateFieldProps = {
-  value: string | undefined
-  onChange: (value: string | undefined) => void
-  disabled?: boolean
-}
-
-type EndFrequencyFieldsProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  control: Control<any>
+type EndFrequencyFieldsProps<T extends FieldValues> = {
+  control: Control<T>
   // Field path prefix, so `shifts` and `schedules` can share this despite different field names.
   name: string
   disabled?: boolean
-  // Passed in rather than imported, since shifts and schedules are separate
-  // features each keeping their own DateField implementation.
-  DateField: React.ComponentType<EndFrequencyDateFieldProps>
 }
 
-export function EndFrequencyFields({
-  control,
+export function EndFrequencyFields<T extends FieldValues>({
+  control: typedControl,
   name,
   disabled,
-  DateField,
-}: EndFrequencyFieldsProps) {
+}: EndFrequencyFieldsProps<T>) {
+  // Paths are built from `name` at runtime, so they can't be checked
+  // against `T` — callers stay typed, the inside works on plain paths.
+  const control = typedControl as unknown as Control<FieldValues>
   const endType = useWatch({ control, name: `${name}.end_type` }) as
     | string
     | undefined

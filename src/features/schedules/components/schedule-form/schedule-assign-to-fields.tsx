@@ -33,6 +33,7 @@ import {
   type RotatePatternEntry,
   dateStringSchema,
   endSettingsSchema,
+  type Schedule,
 } from '../../data/schema'
 import {
   cellsFromCrewPlacements,
@@ -80,8 +81,7 @@ export function ScheduleAssignToFields({
   commitRef,
   startEnd,
 }: ScheduleAssignToFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, getValues, setValue } = useFormContext<any>()
+  const { control, getValues, setValue } = useFormContext<Schedule>()
   const patternRaw = useWatch({ control, name: 'pattern' }) as
     | RotatePatternEntry[]
     | undefined
@@ -628,8 +628,7 @@ function ManualDayCard({
   dayCoverage,
   disabled,
 }: ManualDayCardProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { getValues, setValue } = useFormContext<any>()
+  const { getValues, setValue } = useFormContext<Schedule>()
   const shifts = useShiftsStore((s) => s.shifts)
 
   // Written through `setValue` rather than a `FormField` per cell: the stored

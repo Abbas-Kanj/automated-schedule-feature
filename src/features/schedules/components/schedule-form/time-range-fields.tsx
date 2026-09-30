@@ -9,13 +9,17 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { type TimeRange } from '../../data/schema'
+import { type Schedule } from '../../data/schema'
 import { calculateHours } from '../../utils'
 
+// Every place a daily schedule keeps a list of time ranges.
+type TimeRangesPath =
+  | `days.${number}.times`
+  | `months.${number}.days.${number}.times`
+
 type TimeRangeFieldsProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  control: Control<any>
-  name: string
+  control: Control<Schedule>
+  name: TimeRangesPath
   disabled?: boolean
   // When set, the range count is externally controlled, so add/remove
   // controls are hidden.
@@ -29,7 +33,7 @@ export function TimeRangeFields({
   fixedCount,
 }: TimeRangeFieldsProps) {
   const { fields, append, remove } = useFieldArray({ control, name })
-  const times = (useWatch({ control, name }) as TimeRange[] | undefined) ?? []
+  const times = useWatch({ control, name }) ?? []
   const hours = calculateHours(times)
 
   return (

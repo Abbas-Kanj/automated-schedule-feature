@@ -22,7 +22,14 @@ import {
   REGULAR_TYPE_OPTIONS,
   SCHEDULE_TYPES,
 } from '../../data/data'
-import { type CrewKind } from '../../data/schema'
+import {
+  type CrewKind,
+  type DailySchedule,
+  type EndSettings,
+  type OccurrenceRule,
+  type RegularSchedule,
+  type Schedule,
+} from '../../data/schema'
 import { crewsOnMultipleShifts, shiftCrewIds } from '../../fixed-schedule'
 import { occurrenceLabels } from '../../occurrence-pattern'
 import { calculateHours, formatTimes } from '../../utils'
@@ -73,8 +80,9 @@ function SummaryRow({
 }
 
 // The three end-settings shapes never coexist, so one line covers all of them.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function formatEndSettings(endSettings: any): string | undefined {
+function formatEndSettings(
+  endSettings: EndSettings | undefined
+): string | undefined {
   if (!endSettings?.end_type) return undefined
   if (endSettings.end_type === 'after_occurrences') {
     return endSettings.end_occurrences
@@ -87,17 +95,19 @@ function formatEndSettings(endSettings: any): string | undefined {
   return 'Never ends'
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function BasicsSummary({ values }: { values: any }) {
-  const isRegular = values.parent_type === 'regular'
+function BasicsSummary({ values }: { values: Schedule }) {
+  const regular = values.parent_type === 'regular' ? values : undefined
+  const isRegular = !!regular
   const typeLabel = isRegular
     ? REGULAR_TYPE_OPTIONS.find((o) => o.value === values.type)?.label
     : (SCHEDULE_TYPES.find((t) => t.value === values.type)?.label ??
       values.type)
-  const rotateTypeLabel = CYCLE_TYPE_OPTIONS.find(
-    (o) => o.value === values.cycle_type
-  )?.label
-  const employees = values.employees ?? []
+  const rotateTypeLabel =
+    values.type === 'rotate'
+      ? CYCLE_TYPE_OPTIONS.find((o) => o.value === values.cycle_type)?.label
+      : undefined
+  const employees =
+    values.parent_type === 'daily' ? (values.employees ?? []) : []
 
   return (
     <SummarySection title='Basics'>
@@ -110,19 +120,18 @@ function BasicsSummary({ values }: { values: any }) {
       )}
       {isRegular && (
         <>
-          <SummaryRow inline label='Start date' value={values.start_date} />
+          <SummaryRow inline label='Start date' value={regular?.start_date} />
           <SummaryRow
             inline
             label='Ends'
-            value={formatEndSettings(values.end_settings)}
+            value={formatEndSettings(regular?.end_settings)}
           />
         </>
       )}
       {!isRegular && (
         <SummaryRow
           inline
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          value={employees.map((e: any) => e.label).join(', ')}
+          value={employees.map((e) => e.label).join(', ')}
           label='Employees'
         />
       )}
@@ -132,15 +141,13 @@ function BasicsSummary({ values }: { values: any }) {
 
 // Legacy `parent_type: 'daily'` schedules only — view/edit of pre-existing
 // data, the wizard can't create these anymore.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function DailyDaysSummary({ values }: { values: any }) {
+function DailyDaysSummary({ values }: { values: DailySchedule }) {
   const formatTime = useTimeFormat()
 
   if (values.type === 'weekly' || values.type === 'weekly_one') {
     return (
       <SummarySection title='Days'>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        {(values.days ?? []).map((d: any) => (
+        {(values.days ?? []).map((d) => (
           <SummaryRow
             key={d.day}
             label={d.day.charAt(0).toUpperCase() + d.day.slice(1)}
@@ -155,8 +162,7 @@ function DailyDaysSummary({ values }: { values: any }) {
 
   return (
     <SummarySection title='Months'>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      {(values.months ?? []).map((m: any) => {
+      {(values.months ?? []).map((m) => {
         const monthLabel = MONTHS.find(
           (mo) => Number(mo.value) === m.month
         )?.label
@@ -166,8 +172,7 @@ function DailyDaysSummary({ values }: { values: any }) {
             className='space-y-1 border-t pt-1.5 first:border-t-0 first:pt-0'
           >
             <p className='text-sm font-medium'>{monthLabel}</p>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {(m.days ?? []).map((d: any) => (
+            {(m.days ?? []).map((d) => (
               <SummaryRow
                 key={d.day}
                 label={`Day ${d.day}`}
@@ -183,14 +188,12 @@ function DailyDaysSummary({ values }: { values: any }) {
 
 // Mirrors the "Shifts" step's own display — `ShiftDaysTable` collapses
 // identical consecutive days into "Mon → Fri".
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ShiftsSummary({ values }: { values: any }) {
+function ShiftsSummary({ values }: { values: RegularSchedule }) {
   const shifts = useShiftsStore((s) => s.shifts)
   const formatTime = useTimeFormat()
-  const resolvedShifts: Shift[] =
-    (values.shift_ids as string[] | undefined)
-      ?.map((id) => shifts.find((s) => s.id === id))
-      .filter((s): s is Shift => s !== undefined) ?? []
+  const resolvedShifts: Shift[] = (values.shift_ids ?? [])
+    .map((id) => shifts.find((s) => s.id === id))
+    .filter((s): s is Shift => s !== undefined)
 
   return (
     <SummarySection title={`Shifts (${resolvedShifts.length})`}>
@@ -255,8 +258,11 @@ function ShiftsSummary({ values }: { values: any }) {
 
 // Rotate — who was picked, plus a crew count rather than a copy of the
 // coverage grid. Fixed — who works each shift.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function AssignToSummary({ values }: { values: any }) {
+function AssignToSummary({
+  values,
+}: {
+  values: Extract<RegularSchedule, { type: 'fixed' | 'rotate' }>
+}) {
   const teams = useTeamsStore((s) => s.teams)
   const employees = useEmployeesStore((s) => s.employees)
   const shifts = useShiftsStore((s) => s.shifts)
@@ -275,7 +281,7 @@ function AssignToSummary({ values }: { values: any }) {
     const shared = crewsOnMultipleShifts(values.shift_assignments, kind)
     return (
       <SummarySection title='Assign to'>
-        {(values.shift_ids ?? []).map((shiftId: string) => (
+        {(values.shift_ids ?? []).map((shiftId) => (
           <SummaryRow
             key={shiftId}
             inline
@@ -306,8 +312,7 @@ function AssignToSummary({ values }: { values: any }) {
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function describeRule(rule: any): string {
+function describeRule(rule: OccurrenceRule): string {
   const interval = rule.interval || 1
   const unit =
     rule.frequency === 'daily'
@@ -321,8 +326,11 @@ function describeRule(rule: any): string {
   return days ? `${every} on ${days}` : every
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function OccurrenceSummary({ values }: { values: any }) {
+function OccurrenceSummary({
+  values,
+}: {
+  values: Extract<RegularSchedule, { type: 'fixed' }>
+}) {
   const shifts = useShiftsStore((s) => s.shifts)
   const rules = values.shift_occurrences ?? []
   const exceptions = [
@@ -334,8 +342,7 @@ function OccurrenceSummary({ values }: { values: any }) {
 
   return (
     <SummarySection title='Occurrence'>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      {rules.map((rule: any) => {
+      {rules.map((rule) => {
         const shift = shifts.find((s) => s.id === rule.shift_id)
         return (
           <div
@@ -356,12 +363,13 @@ function OccurrenceSummary({ values }: { values: any }) {
 }
 
 type ScheduleSummaryProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  control: Control<any>
+  control: Control<Schedule>
 }
 
 export function ScheduleSummary({ control }: ScheduleSummaryProps) {
-  const values = useWatch({ control })
+  // Watched values are typed deep-partial, but every field is seeded from
+  // the type's defaults, so the record the summary reads is always whole.
+  const values = useWatch({ control }) as Schedule
 
   return (
     <div className='space-y-3'>

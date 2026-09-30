@@ -4,7 +4,8 @@ import { REGULAR_TYPE_OPTIONS } from '../../data/data'
 import { type RegularType } from '../../data/schema'
 
 type ScheduleTypeSelectorProps = {
-  value: RegularType | undefined
+  // The form field holds every schedule type; only regular ones match.
+  value: string | undefined
   onChange: (value: RegularType) => void
   disabled?: boolean
 }

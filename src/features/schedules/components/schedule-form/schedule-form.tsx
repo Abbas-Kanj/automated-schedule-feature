@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
 import { format } from 'date-fns'
 import {
-  type Control,
+  type FieldPath,
+  type PathValue,
   type Resolver,
-  type UseFormReturn,
   useForm,
   useWatch,
 } from 'react-hook-form'
@@ -222,8 +222,13 @@ type ScheduleFormProps = {
   resetLaterStepsOnChange?: boolean
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getStepFields(stepId: string, parentType: string, type?: string): any {
+type ScheduleField = FieldPath<Schedule>
+
+function getStepFields(
+  stepId: string,
+  parentType: string,
+  type?: string
+): ScheduleField[] {
   if (stepId === 'basics') {
     if (parentType !== 'regular') return ['name', 'description', 'employees']
     // Same basics fields for fixed/flexible/rotate alike — just type + template.
@@ -261,7 +266,7 @@ function getStepFields(stepId: string, parentType: string, type?: string): any {
 
 // Fields a step doesn't show but whose meaning depends on it: a rotate roster
 // is placed on the pattern's cards and drawn from the "Assign to" pick.
-const STEP_DEPENDENT_FIELDS: Record<string, string[]> = {
+const STEP_DEPENDENT_FIELDS: Record<string, ScheduleField[]> = {
   pattern: ['day_coverage', 'crew_placements'],
   'assign-to': ['day_coverage', 'crew_placements'],
 }
@@ -296,11 +301,7 @@ export function ScheduleForm({
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false)
   const type = form.watch('type')
   const parentType = form.watch('parent_type')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const looseControl = form.control as unknown as Control<any>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const looseForm = form as unknown as UseFormReturn<any>
-  const regularType = useWatch({ control: looseControl, name: 'type' }) as
+  const regularType = useWatch({ control: form.control, name: 'type' }) as
     | RegularType
     | undefined
   const steps = getSteps(parentType, regularType)
@@ -310,15 +311,16 @@ export function ScheduleForm({
   // Leaving rotate's "Assign to" drops anybody no longer picked from a saved
   // roster, so "Assign crews" never shows crews that are not on the schedule.
   const pruneRosterToSelection = () => {
-    const values = looseForm.getValues()
+    const values = form.getValues()
+    if (values.type !== 'rotate') return
     const pruned = pruneRosterToCrews(
       values.day_coverage ?? [],
       values.crew_placements ?? [],
       values.crew_kind ?? 'team',
       values.crew_ids ?? []
     )
-    looseForm.setValue('day_coverage', pruned.day_coverage)
-    looseForm.setValue('crew_placements', pruned.crew_placements)
+    form.setValue('day_coverage', pruned.day_coverage)
+    form.setValue('crew_placements', pruned.crew_placements)
   }
 
   // What the step currently on screen held when the user arrived on it, so
@@ -334,8 +336,8 @@ export function ScheduleForm({
   const snapshotOf = (index: number): string => {
     const id = steps[index]?.id
     if (!id) return ''
-    const fields = getStepFields(id, parentType, type) as string[]
-    return JSON.stringify(fields.map((field) => looseForm.getValues(field)))
+    const fields = getStepFields(id, parentType, type)
+    return JSON.stringify(fields.map((field) => form.getValues(field)))
   }
 
   const leavingStepChanged = (): boolean =>
@@ -358,9 +360,9 @@ export function ScheduleForm({
         ? getTypeDefaults(type as ScheduleType)
         : getRegularTypeDefaults(regularType ?? 'fixed')
     ) as Record<string, unknown>
-    const fields = new Set<string>()
+    const fields = new Set<ScheduleField>()
     steps.slice(index + 1).forEach(({ id }) => {
-      const stepFields = getStepFields(id, parentType, type) as string[]
+      const stepFields = getStepFields(id, parentType, type)
       stepFields.forEach((field) => fields.add(field))
       STEP_DEPENDENT_FIELDS[id]?.forEach((field) => fields.add(field))
     })
@@ -369,9 +371,14 @@ export function ScheduleForm({
     fields.delete('parent_type')
     fields.forEach((field) => {
       if (!(field in defaults)) return
-      looseForm.setValue(field, structuredClone(defaults[field]))
+      // `defaults` is this same type's default record, so the value fits
+      // `field` — TS just can't pair them up across a dynamic key.
+      form.setValue(
+        field,
+        structuredClone(defaults[field]) as PathValue<Schedule, ScheduleField>
+      )
     })
-    looseForm.clearErrors([...fields])
+    form.clearErrors([...fields])
     setMaxStep(index)
   }
 
@@ -388,14 +395,14 @@ export function ScheduleForm({
 
   const handleNext = async () => {
     if (currentStepId === 'assign-to' && regularType === 'fixed') {
-      const assignments = (looseForm.getValues('shift_assignments') ?? []) as {
+      const assignments = (form.getValues('shift_assignments') ?? []) as {
         employee_ids: string[]
         team_ids: string[]
       }[]
       if (
         !assignments.some((a) => a.employee_ids.length || a.team_ids.length)
       ) {
-        looseForm.setError('shift_assignments', {
+        form.setError('shift_assignments', {
           type: 'manual',
           message: 'Assign at least one team or employee to a shift',
         })
@@ -404,9 +411,9 @@ export function ScheduleForm({
     }
 
     if (currentStepId === 'assign-to' && regularType === 'rotate') {
-      const crewIds = looseForm.getValues('crew_ids') as string[] | undefined
+      const crewIds = form.getValues('crew_ids') as string[] | undefined
       if (!crewIds?.length) {
-        looseForm.setError('crew_ids', {
+        form.setError('crew_ids', {
           type: 'manual',
           message: 'Select at least one team or employee',
         })
@@ -560,7 +567,7 @@ export function ScheduleForm({
 
                 {parentType === 'daily' && (
                   <EmployeeMultiSelect
-                    control={looseControl}
+                    control={form.control}
                     disabled={disabled}
                   />
                 )}
@@ -643,7 +650,7 @@ export function ScheduleForm({
               )}
 
             {!disabled && currentStepId === 'summary' && (
-              <ScheduleSummary control={looseControl} />
+              <ScheduleSummary control={form.control} />
             )}
 
             {!disabled && (

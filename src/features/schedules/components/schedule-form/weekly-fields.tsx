@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { ToggleButton } from '@/components/toggle-button'
 import { MONTHS } from '../../data/data'
-import { type DayOfWeek } from '../../data/schema'
+import { type DayOfWeek, type Schedule } from '../../data/schema'
 import { getDaysOfMonth } from '../../utils'
 import { TimeRangeFields } from './time-range-fields'
 
@@ -25,8 +25,7 @@ type WeeklyFieldsProps = {
 }
 
 export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, setValue } = useFormContext<any>()
+  const { control, setValue } = useFormContext<Schedule>()
   const year = useWatch({ control, name: 'year' })
   const month = useWatch({ control, name: 'month' })
   const week = useWatch({ control, name: 'week' })
@@ -65,16 +64,14 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
 
     const rangeWeekdays = new Set<string>(newRangeDays.map((d) => d.weekday))
     const removeIndices = fields
-      .map((f, i) => ({ day: (f as unknown as { day: string }).day, i }))
+      .map((f, i) => ({ day: f.day, i }))
       .filter(({ day }) => !rangeWeekdays.has(day))
       .map(({ i }) => i)
     if (removeIndices.length) remove(removeIndices)
   }
 
   const toggleDay = (day: DayOfWeek, checked: boolean) => {
-    const index = fields.findIndex(
-      (f) => (f as unknown as { day: string }).day === day
-    )
+    const index = fields.findIndex((f) => f.day === day)
     if (checked && index === -1) {
       append({ day, times: [{ from_time: '09:00', to_time: '17:00' }] })
     } else if (!checked && index > -1) {
@@ -202,9 +199,7 @@ export function WeeklyFields({ disabled }: WeeklyFieldsProps) {
               <FormLabel>Days</FormLabel>
               <div className='grid gap-3 sm:grid-cols-2'>
                 {selectedRangeDays.map((d) => {
-                  const index = fields.findIndex(
-                    (f) => (f as unknown as { day: string }).day === d.weekday
-                  )
+                  const index = fields.findIndex((f) => f.day === d.weekday)
                   const checked = index > -1
 
                   return (

@@ -1,4 +1,4 @@
-import { type Control, useWatch } from 'react-hook-form'
+import { type Control, type FieldValues, useWatch } from 'react-hook-form'
 import {
   FormControl,
   FormField,
@@ -76,9 +76,8 @@ export function RecurrenceWeekdayChips({
   )
 }
 
-type RecurrenceFrequencyFieldsProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  control: Control<any>
+type RecurrenceFrequencyFieldsProps<T extends FieldValues> = {
+  control: Control<T>
   // Field path prefix, so `shifts` and `schedules` can share this despite different field names.
   name: string
   frequencyOptions: RecurrenceOption[]
@@ -90,15 +89,18 @@ type RecurrenceFrequencyFieldsProps = {
   monthlyFields?: React.ReactNode
 }
 
-export function RecurrenceFrequencyFields({
-  control,
+export function RecurrenceFrequencyFields<T extends FieldValues>({
+  control: typedControl,
   name,
   frequencyOptions,
   weekdayOptions,
   weeklySingleDay,
   disabled,
   monthlyFields,
-}: RecurrenceFrequencyFieldsProps) {
+}: RecurrenceFrequencyFieldsProps<T>) {
+  // Paths are built from `name` at runtime, so they can't be checked
+  // against `T` — callers stay typed, the inside works on plain paths.
+  const control = typedControl as unknown as Control<FieldValues>
   const frequency = useWatch({ control, name: `${name}.frequency` }) as
     | string
     | undefined

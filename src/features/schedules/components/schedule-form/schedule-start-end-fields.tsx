@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/form'
 import { DateField } from '@/components/date-field'
 import { EndFrequencyFields } from '@/components/end-frequency-fields'
+import { type Schedule } from '../../data/schema'
 
 type ScheduleStartEndFieldsProps = {
   disabled?: boolean
@@ -17,8 +18,7 @@ type ScheduleStartEndFieldsProps = {
 export function ScheduleStartEndFields({
   disabled,
 }: ScheduleStartEndFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control } = useFormContext<any>()
+  const { control } = useFormContext<Schedule>()
 
   return (
     <div className='space-y-6'>
@@ -44,7 +44,6 @@ export function ScheduleStartEndFields({
         control={control}
         name='end_settings'
         disabled={disabled}
-        DateField={DateField}
       />
     </div>
   )

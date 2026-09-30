@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
 import { OCCURRENCE_FREQUENCY_OPTIONS } from '../../data/data'
-import { DEFAULT_OCCURRENCE } from '../../data/schema'
+import { DEFAULT_OCCURRENCE, type Schedule } from '../../data/schema'
 import { PerShiftRecurrenceFields } from './per-shift-recurrence-fields'
 
 type OccurrenceFieldsProps = {
@@ -24,8 +24,7 @@ const EXCEPTIONS = [
 // selected shift repeats on its own rule. End settings live in "Start & End",
 // so they aren't repeated here.
 export function OccurrenceFields({ disabled }: OccurrenceFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control } = useFormContext<any>()
+  const { control } = useFormContext<Schedule>()
   const shiftIds =
     (useWatch({ control, name: 'shift_ids' }) as string[] | undefined) ?? []
 

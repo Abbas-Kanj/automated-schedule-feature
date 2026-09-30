@@ -1,10 +1,9 @@
 import { useFormContext, useWatch } from 'react-hook-form'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
-import { type RotatePatternEntry } from '../../data/schema'
+import { type RotatePatternEntry, type Schedule } from '../../data/schema'
 
 export function DirectionPreview() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control } = useFormContext<any>()
+  const { control } = useFormContext<Schedule>()
   const shifts = useShiftsStore((s) => s.shifts)
   const pattern =
     (useWatch({ control, name: 'pattern' }) as

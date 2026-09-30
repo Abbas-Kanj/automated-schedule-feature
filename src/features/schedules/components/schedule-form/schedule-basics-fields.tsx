@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { type RegularType } from '../../data/schema'
+import { type RegularType, type Schedule } from '../../data/schema'
 import { ScheduleTypeSelector } from './schedule-type-selector'
 
 type ScheduleBasicsFieldsProps = {
@@ -25,8 +25,7 @@ export function ScheduleBasicsFields({
   disabled,
   onTypeChange,
 }: ScheduleBasicsFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control } = useFormContext<any>()
+  const { control } = useFormContext<Schedule>()
 
   return (
     <div className='space-y-4'>

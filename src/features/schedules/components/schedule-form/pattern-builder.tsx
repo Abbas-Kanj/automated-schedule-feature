@@ -43,7 +43,11 @@ import {
   ROTATION_PRESET_GROUPS,
   getRotationPreset,
 } from '../../data/rotation-presets'
-import { type RotatePatternEntry, type ShiftRepeat } from '../../data/schema'
+import {
+  type RotatePatternEntry,
+  type ShiftRepeat,
+  type Schedule,
+} from '../../data/schema'
 import { DirectionPreview } from './direction-preview'
 import { PerShiftRecurrenceFields } from './per-shift-recurrence-fields'
 
@@ -52,8 +56,7 @@ type PatternBuilderProps = {
 }
 
 export function PatternBuilder({ disabled }: PatternBuilderProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, getValues, setValue } = useFormContext<any>()
+  const { control, getValues, setValue } = useFormContext<Schedule>()
   const shifts = useShiftsStore((s) => s.shifts)
   const shiftIds =
     (useWatch({ control, name: 'shift_ids' }) as string[] | undefined) ?? []
@@ -307,7 +310,8 @@ export function PatternBuilder({ disabled }: PatternBuilderProps) {
                   const isMonthly = cycleLength?.unit === 'monthly'
                   const multiplier =
                     CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS[
-                      (cycleLength?.unit ?? 'weekly') as keyof typeof CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS
+                      (cycleLength?.unit ??
+                        'weekly') as keyof typeof CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS
                     ] ?? 7
                   const count = field.value
                     ? Math.round(field.value / multiplier)
@@ -417,8 +421,7 @@ type DropTarget = { index: number; side: 'before' | 'after' }
 // State lives in the grid, not the card, since a drag started on one card
 // updates a sibling's drop-line indicator.
 function usePatternReorder() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { getValues, setValue } = useFormContext<any>()
+  const { getValues, setValue } = useFormContext<Schedule>()
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
 
@@ -602,8 +605,7 @@ function PatternDayCard({
   isCustomShifts,
   reorder,
 }: PatternDayCardProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, setValue } = useFormContext<any>()
+  const { control, setValue } = useFormContext<Schedule>()
   const shifts = useShiftsStore((s) => s.shifts)
   const isOff = useWatch({ control, name: `pattern.${index}.is_off` })
   const shiftId = useWatch({ control, name: `pattern.${index}.shift_id` }) as

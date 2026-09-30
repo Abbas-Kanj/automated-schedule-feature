@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ToggleButton } from '@/components/toggle-button'
 import { MONTHS } from '../../data/data'
+import { type Schedule } from '../../data/schema'
 import { getDaysInMonthArray } from '../../utils'
 import { TimeRangeFields } from './time-range-fields'
 
@@ -26,8 +27,7 @@ type MonthlyFieldsProps = {
 }
 
 export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control } = useFormContext<any>()
+  const { control } = useFormContext<Schedule>()
   const year = useWatch({ control, name: 'year' })
   const {
     fields: monthFields,
@@ -39,9 +39,7 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
   })
 
   const toggleMonth = (month: number, checked: boolean) => {
-    const index = monthFields.findIndex(
-      (f) => (f as unknown as { month: number }).month === month
-    )
+    const index = monthFields.findIndex((f) => f.month === month)
     if (checked && index === -1) {
       append({ month, days: [] })
     } else if (!checked && index > -1) {
@@ -79,9 +77,7 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
             <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
               {MONTHS.map((month) => {
                 const monthNum = Number(month.value)
-                const checked = monthFields.some(
-                  (f) => (f as unknown as { month: number }).month === monthNum
-                )
+                const checked = monthFields.some((f) => f.month === monthNum)
                 return (
                   <Label
                     key={month.value}
@@ -112,7 +108,7 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
           key={monthField.id}
           control={control}
           monthIndex={monthIndex}
-          month={(monthField as unknown as { month: number }).month}
+          month={monthField.month}
           year={year}
           disabled={disabled}
         />
@@ -122,8 +118,7 @@ export function MonthlyFields({ disabled }: MonthlyFieldsProps) {
 }
 
 type MonthDaysCardProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  control: Control<any>
+  control: Control<Schedule>
   monthIndex: number
   month: number
   year: number
@@ -145,9 +140,7 @@ function MonthDaysCard({
   const monthLabel = MONTHS.find((m) => Number(m.value) === month)?.label
 
   const toggleDay = (day: number, checked: boolean) => {
-    const index = fields.findIndex(
-      (f) => (f as unknown as { day: number }).day === day
-    )
+    const index = fields.findIndex((f) => f.day === day)
     if (checked && index === -1) {
       append({ day, times: [{ from_time: '09:00', to_time: '17:00' }] })
     } else if (!checked && index > -1) {
@@ -163,9 +156,7 @@ function MonthDaysCard({
       <CardContent className='space-y-4 px-4'>
         <div className='grid grid-cols-7 gap-1.5'>
           {days.map((day) => {
-            const checked = fields.some(
-              (f) => (f as unknown as { day: number }).day === day
-            )
+            const checked = fields.some((f) => f.day === day)
             return (
               <ToggleButton
                 key={day}
@@ -182,7 +173,7 @@ function MonthDaysCard({
         {fields.map((dayField, dayIndex) => (
           <div key={dayField.id} className='space-y-1'>
             <p className='text-xs font-medium text-muted-foreground'>
-              Day {(dayField as unknown as { day: number }).day}
+              Day {dayField.day}
             </p>
             <TimeRangeFields
               control={control}

@@ -24,6 +24,7 @@ import { ShiftSwatch } from '@/features/shifts/components/shift-swatch'
 import { SHIFT_ICON_COMPONENTS } from '@/features/shifts/data/data'
 import { type Shift } from '@/features/shifts/data/schema'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
+import { type Schedule } from '../../data/schema'
 
 type ShiftPickerFieldProps = {
   disabled?: boolean
@@ -37,8 +38,7 @@ export function ShiftPickerField({
   onDialogOpenChange,
   minSelection = 1,
 }: ShiftPickerFieldProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, setValue } = useFormContext<any>()
+  const { control, setValue } = useFormContext<Schedule>()
   const shifts = useShiftsStore((s) => s.shifts)
   const formatTime = useTimeFormat()
 

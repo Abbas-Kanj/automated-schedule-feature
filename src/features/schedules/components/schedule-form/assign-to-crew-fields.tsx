@@ -11,7 +11,7 @@ import { ToggleButton } from '@/components/toggle-button'
 import { useEmployeesStore } from '@/features/employees/stores/employees-store'
 import { getEmployeeFullName } from '@/features/employees/utils'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
-import { type CrewKind } from '../../data/schema'
+import { type CrewKind, type Schedule } from '../../data/schema'
 
 type Option = { value: string; label: string }
 
@@ -22,8 +22,7 @@ type AssignToCrewFieldsProps = {
 // Rotate only: who this rotation's roster is drawn from. The rotating Work
 // schedule's "Assign crews" places exactly these crews on days and shifts.
 export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, setValue, clearErrors } = useFormContext<any>()
+  const { control, setValue, clearErrors } = useFormContext<Schedule>()
   const crewKind = (useWatch({ control, name: 'crew_kind' }) ??
     'team') as CrewKind
 

@@ -13,6 +13,7 @@ import {
   type CrewKind,
   type ShiftAssignment,
   type ShiftOccurrence,
+  type Schedule,
 } from '../../data/schema'
 import {
   crewsOnMultipleShifts,
@@ -32,8 +33,7 @@ type FixedAssignToFieldsProps = {
 // occurrence's business, so this is one picker per shift, not per day. A crew
 // may be on several shifts — that's warned about, not blocked.
 export function FixedAssignToFields({ disabled }: FixedAssignToFieldsProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { control, setValue, clearErrors } = useFormContext<any>()
+  const { control, setValue, clearErrors } = useFormContext<Schedule>()
   const crewKind = (useWatch({ control, name: 'crew_kind' }) ??
     'team') as CrewKind
   const shiftIds =

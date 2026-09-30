@@ -1,5 +1,10 @@
 import { useEffect } from 'react'
-import { type Control, useFieldArray, useWatch } from 'react-hook-form'
+import {
+  type Control,
+  type FieldValues,
+  useFieldArray,
+  useWatch,
+} from 'react-hook-form'
 import {
   FormControl,
   FormField,
@@ -22,9 +27,8 @@ import {
 
 const DEFAULT_DAY_POSITION_RULE = { position: 2, weekday: 'mon' } as const
 
-type RepeatMonthlyFieldsProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  control: Control<any>
+type RepeatMonthlyFieldsProps<T extends FieldValues> = {
+  control: Control<T>
   // Field path prefix, so shifts' Repeat tab and schedules' rotate "Custom
   // alternate" rows can share this despite different field names.
   name: string
@@ -33,13 +37,16 @@ type RepeatMonthlyFieldsProps = {
   disabled?: boolean
 }
 
-export function RepeatMonthlyFields({
-  control,
+export function RepeatMonthlyFields<T extends FieldValues>({
+  control: typedControl,
   name,
   monthlyModeOptions,
   weekdayOptions,
   disabled,
-}: RepeatMonthlyFieldsProps) {
+}: RepeatMonthlyFieldsProps<T>) {
+  // Paths are built from `name` at runtime, so they can't be checked
+  // against `T` — callers stay typed, the inside works on plain paths.
+  const control = typedControl as unknown as Control<FieldValues>
   const monthlyMode = useWatch({ control, name: `${name}.monthly_mode` }) as
     | string
     | undefined

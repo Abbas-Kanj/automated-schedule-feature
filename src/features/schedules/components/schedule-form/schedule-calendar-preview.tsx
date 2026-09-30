@@ -21,8 +21,7 @@ import {
 const WEEKDAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 type ScheduleCalendarPreviewProps = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  values: any
+  values: CalendarScheduleInput
 }
 
 // Maps a schedule onto real calendar dates, one cycle at a time, with
