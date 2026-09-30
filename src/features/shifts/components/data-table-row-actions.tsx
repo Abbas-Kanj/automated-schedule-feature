@@ -1,4 +1,5 @@
 import { DotsHorizontalIcon } from '@radix-ui/react-icons'
+import { useNavigate } from '@tanstack/react-router'
 import { type Row } from '@tanstack/react-table'
 import { Copy, Pencil, Shield, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -24,6 +25,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const shift = row.original
   const { setOpen, setCurrentRow } = useShifts()
   const cloneShift = useShiftsStore((s) => s.cloneShift)
+  const navigate = useNavigate()
 
   return (
     <DropdownMenu modal={false}>
@@ -38,10 +40,12 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-40'>
         <DropdownMenuItem
-          onClick={() => {
-            setCurrentRow(shift)
-            setOpen('edit')
-          }}
+          onClick={() =>
+            navigate({
+              to: '/shifts/$shiftId/edit',
+              params: { shiftId: shift.id },
+            })
+          }
         >
           Edit
           <DropdownMenuShortcut>

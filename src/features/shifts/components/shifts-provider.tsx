@@ -2,8 +2,9 @@ import React, { useState } from 'react'
 import useDialogState from '@/hooks/use-dialog-state'
 import { type Shift } from '../data/schema'
 
-// Creating a shift navigates to its own page rather than opening a dialog.
-export type ShiftsDialogType = 'edit' | 'delete' | 'policy'
+// Creating and editing a shift navigate to their own pages rather than
+// opening a dialog.
+export type ShiftsDialogType = 'delete' | 'policy'
 
 type ShiftsContextType = {
   open: ShiftsDialogType | null

@@ -41,6 +41,7 @@ import { Route as AuthenticatedWorkScheduleFixedIndexRouteImport } from './route
 import { Route as AuthenticatedShiftsNewIndexRouteImport } from './routes/_authenticated/shifts/new/index'
 import { Route as AuthenticatedSchedulesNewIndexRouteImport } from './routes/_authenticated/schedules/new/index'
 import { Route as AuthenticatedSchedulesScheduleIdIndexRouteImport } from './routes/_authenticated/schedules/$scheduleId/index'
+import { Route as AuthenticatedShiftsShiftIdEditIndexRouteImport } from './routes/_authenticated/shifts/$shiftId/edit/index'
 import { Route as AuthenticatedSchedulesScheduleIdEditIndexRouteImport } from './routes/_authenticated/schedules/$scheduleId/edit/index'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -222,6 +223,12 @@ const AuthenticatedSchedulesScheduleIdIndexRoute =
     path: '/schedules/$scheduleId/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedShiftsShiftIdEditIndexRoute =
+  AuthenticatedShiftsShiftIdEditIndexRouteImport.update({
+    id: '/shifts/$shiftId/edit/',
+    path: '/shifts/$shiftId/edit/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSchedulesScheduleIdEditIndexRoute =
   AuthenticatedSchedulesScheduleIdEditIndexRouteImport.update({
     id: '/schedules/$scheduleId/edit/',
@@ -262,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/work-schedule/fixed/': typeof AuthenticatedWorkScheduleFixedIndexRoute
   '/work-schedule/rotating/': typeof AuthenticatedWorkScheduleRotatingIndexRoute
   '/schedules/$scheduleId/edit/': typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
+  '/shifts/$shiftId/edit/': typeof AuthenticatedShiftsShiftIdEditIndexRoute
 }
 export interface FileRoutesByTo {
   '/employees': typeof AuthenticatedEmployeesRouteRoute
@@ -295,6 +303,7 @@ export interface FileRoutesByTo {
   '/work-schedule/fixed': typeof AuthenticatedWorkScheduleFixedIndexRoute
   '/work-schedule/rotating': typeof AuthenticatedWorkScheduleRotatingIndexRoute
   '/schedules/$scheduleId/edit': typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
+  '/shifts/$shiftId/edit': typeof AuthenticatedShiftsShiftIdEditIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -331,6 +340,7 @@ export interface FileRoutesById {
   '/_authenticated/work-schedule/fixed/': typeof AuthenticatedWorkScheduleFixedIndexRoute
   '/_authenticated/work-schedule/rotating/': typeof AuthenticatedWorkScheduleRotatingIndexRoute
   '/_authenticated/schedules/$scheduleId/edit/': typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
+  '/_authenticated/shifts/$shiftId/edit/': typeof AuthenticatedShiftsShiftIdEditIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -367,6 +377,7 @@ export interface FileRouteTypes {
     | '/work-schedule/fixed/'
     | '/work-schedule/rotating/'
     | '/schedules/$scheduleId/edit/'
+    | '/shifts/$shiftId/edit/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/employees'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/work-schedule/fixed'
     | '/work-schedule/rotating'
     | '/schedules/$scheduleId/edit'
+    | '/shifts/$shiftId/edit'
   id:
     | '__root__'
     | '/_authenticated'
@@ -435,6 +447,7 @@ export interface FileRouteTypes {
     | '/_authenticated/work-schedule/fixed/'
     | '/_authenticated/work-schedule/rotating/'
     | '/_authenticated/schedules/$scheduleId/edit/'
+    | '/_authenticated/shifts/$shiftId/edit/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -676,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSchedulesScheduleIdIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/shifts/$shiftId/edit/': {
+      id: '/_authenticated/shifts/$shiftId/edit/'
+      path: '/shifts/$shiftId/edit'
+      fullPath: '/shifts/$shiftId/edit/'
+      preLoaderRoute: typeof AuthenticatedShiftsShiftIdEditIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/schedules/$scheduleId/edit/': {
       id: '/_authenticated/schedules/$scheduleId/edit/'
       path: '/schedules/$scheduleId/edit'
@@ -728,6 +748,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedWorkScheduleFixedIndexRoute: typeof AuthenticatedWorkScheduleFixedIndexRoute
   AuthenticatedWorkScheduleRotatingIndexRoute: typeof AuthenticatedWorkScheduleRotatingIndexRoute
   AuthenticatedSchedulesScheduleIdEditIndexRoute: typeof AuthenticatedSchedulesScheduleIdEditIndexRoute
+  AuthenticatedShiftsShiftIdEditIndexRoute: typeof AuthenticatedShiftsShiftIdEditIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -754,6 +775,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedWorkScheduleRotatingIndexRoute,
   AuthenticatedSchedulesScheduleIdEditIndexRoute:
     AuthenticatedSchedulesScheduleIdEditIndexRoute,
+  AuthenticatedShiftsShiftIdEditIndexRoute:
+    AuthenticatedShiftsShiftIdEditIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

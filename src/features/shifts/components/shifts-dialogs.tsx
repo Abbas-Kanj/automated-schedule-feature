@@ -1,7 +1,6 @@
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { useShiftsStore } from '../stores/shifts-store'
-import { ShiftFormDialog } from './shift-form-dialog'
 import { ShiftPolicyDrawer } from './shift-policy-drawer'
 import { useShifts } from './shifts-provider'
 
@@ -13,18 +12,6 @@ export function ShiftsDialogs() {
     <>
       {currentRow && (
         <>
-          <ShiftFormDialog
-            key={`shift-edit-${currentRow.id}`}
-            open={open === 'edit'}
-            onOpenChange={() => {
-              setOpen('edit')
-              setTimeout(() => {
-                setCurrentRow(null)
-              }, 500)
-            }}
-            currentRow={currentRow}
-          />
-
           <ConfirmDialog
             key='shift-delete'
             destructive
