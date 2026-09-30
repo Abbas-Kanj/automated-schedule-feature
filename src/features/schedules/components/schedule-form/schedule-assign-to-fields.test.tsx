@@ -6,6 +6,7 @@ import { userEvent } from 'vitest/browser'
 import { isRotateSchedule } from '@/features/schedule-rotation/utils'
 import { sampleSchedules } from '../../data/schedules.fixtures'
 import { type RotateDayCoverage } from '../../data/schema'
+import { crewSelectionFromDayCoverage } from '../../rotation-crews'
 import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 
 const seed = sampleSchedules.find((s) => s.id === 'sched-rotation')!
@@ -51,11 +52,16 @@ function CoverageState() {
 }
 
 function Harness({ values = rotation }: { values?: typeof rotation }) {
+  // The wizard recovers the pool from a saved roster the same way on load.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const form = useForm<any>({ defaultValues: values })
+  const form = useForm<any>({
+    defaultValues: values.crew_ids?.length
+      ? values
+      : { ...values, ...crewSelectionFromDayCoverage(values.day_coverage) },
+  })
   return (
     <FormProvider {...form}>
-      <ScheduleAssignToFields schedule={values} />
+      <ScheduleAssignToFields />
       <CoverageState />
     </FormProvider>
   )

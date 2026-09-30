@@ -19,8 +19,8 @@ type AssignToCrewFieldsProps = {
   disabled?: boolean
 }
 
-// Rotate only: who this rotation's roster is drawn from. The rotating Work
-// schedule's "Assign crews" places exactly these crews on days and shifts.
+// Rotate only: who this rotation's roster is drawn from. The placement below
+// it on the same step puts exactly these crews on days and shifts.
 export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
   const { control, setValue, clearErrors } = useFormContext<Schedule>()
   const crewKind = (useWatch({ control, name: 'crew_kind' }) ??

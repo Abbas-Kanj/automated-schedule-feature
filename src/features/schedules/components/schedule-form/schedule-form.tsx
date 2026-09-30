@@ -42,12 +42,12 @@ import {
   crewSelectionFromDayCoverage,
   pruneRosterToCrews,
 } from '../../rotation-crews'
-import { AssignToCrewFields } from './assign-to-crew-fields'
 import { EmployeeMultiSelect } from './employee-multi-select'
 import { FixedAssignToFields } from './fixed-assign-to-fields'
 import { MonthlyFields } from './monthly-fields'
 import { OccurrenceFields } from './occurrence-fields'
 import { PatternBuilder } from './pattern-builder'
+import { ScheduleAssignToFields } from './schedule-assign-to-fields'
 import { ScheduleBasicsFields } from './schedule-basics-fields'
 import { ScheduleStartEndFields } from './schedule-start-end-fields'
 import { ScheduleSummary } from './schedule-summary'
@@ -67,15 +67,15 @@ function getSteps(
     ]
   }
 
-  // Rotate only picks who is on the rotation here; placing those crews on
-  // days happens on the rotating Work schedule's "Assign crews".
+  // Rotate picks its crews and places them on days and shifts in "Assign to",
+  // which reads in real dates — so the dates come first.
   if (regularType === 'rotate') {
     return [
       { id: 'basics', label: 'Basics' },
       { id: 'shifts', label: 'Shifts' },
       { id: 'pattern', label: 'Pattern' },
-      { id: 'assign-to', label: 'Assign to' },
       { id: 'end-settings', label: 'Start & End' },
+      { id: 'assign-to', label: 'Assign to' },
       { id: 'summary', label: 'Summary' },
     ]
   }
@@ -308,8 +308,10 @@ export function ScheduleForm({
   const currentStepId = steps[step]?.id
   const isLastStep = step === steps.length - 1
 
-  // Leaving rotate's "Assign to" drops anybody no longer picked from a saved
-  // roster, so "Assign crews" never shows crews that are not on the schedule.
+  // Leaving rotate's "Assign to" takes a picked-but-unapplied suggestion (see
+  // `commitPendingSuggestion`), then drops anybody no longer picked from the
+  // roster, so it never holds crews that are not on the schedule.
+  const commitAssignment = useRef<(() => void) | null>(null)
   const pruneRosterToSelection = () => {
     const values = form.getValues()
     if (values.type !== 'rotate') return
@@ -386,6 +388,7 @@ export function ScheduleForm({
     const target = Math.min(Math.max(index, 0), steps.length - 1)
     if (target === step) return
     if (currentStepId === 'assign-to' && regularType === 'rotate') {
+      commitAssignment.current?.()
       pruneRosterToSelection()
     }
     resetLaterStepsIfEdited()
@@ -419,6 +422,7 @@ export function ScheduleForm({
         })
         return
       }
+      commitAssignment.current?.()
       pruneRosterToSelection()
     }
 
@@ -635,7 +639,10 @@ export function ScheduleForm({
             {(disabled || currentStepId === 'assign-to') &&
               parentType === 'regular' &&
               regularType === 'rotate' && (
-                <AssignToCrewFields disabled={disabled} />
+                <ScheduleAssignToFields
+                  disabled={disabled}
+                  commitRef={commitAssignment}
+                />
               )}
 
             {(disabled || currentStepId === 'assign-to') &&

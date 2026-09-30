@@ -886,6 +886,13 @@ a genuine missing-import that `tsc -b` caught.
     are generic in the caller's form type instead. `.gitattributes` now
     forces LF. Build clean, 500/500 tests. **Not browser-verified.**
     The old "week-count divides by a hardcoded `6`" item was already fixed.
+14. **Rotate crew placement is back in the wizard (2026-09-30)**, branch
+    `feat/rotate-assign-in-wizard`, not merged. The "Assign crews" dialog on
+    the rotating Work schedule is **deleted**; rotate steps are now Pattern →
+    Start & End → Assign to. Any older note here pointing at "Assign crews"
+    or `/schedule-rotation/assign` is stale. 496/496 tests, build + eslint
+    clean, **not browser-verified**.
+    → `.claude/handoff/schedule-wizard-assign-steps.md`
 13. **Two lockfiles** — both `package-lock.json` and `pnpm-lock.yaml` are
     checked in. Pick one. (`@radix-ui/react-accordion` is now unused but
     was left in `package.json` rather than touching both lockfiles.)

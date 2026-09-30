@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
+import { isRotateSchedule } from '@/features/schedule-rotation/utils'
+import { sampleSchedules } from '../../data/schedules.fixtures'
 import { type Schedule } from '../../data/schema'
 import { ScheduleForm } from './schedule-form'
 
@@ -170,5 +172,120 @@ describe('ScheduleForm — going back', () => {
     await expect
       .element(screen.getByTestId('multi-shift-warning'))
       .toHaveTextContent('1 team is assigned to more than one shift.')
+  }, 45_000)
+})
+
+const rotationSeed = sampleSchedules.find((s) => s.id === 'sched-rotation')!
+if (!isRotateSchedule(rotationSeed)) {
+  throw new Error('Seed is not a rotate schedule')
+}
+const rotation = rotationSeed
+
+// The seeded rotation is staffed by individual employees, so the pool opens
+// in Employees mode — switching it to Teams also clears the pool.
+async function pickTeams(screen: Screen, names: string[]) {
+  await userEvent.click(screen.getByRole('button', { name: 'Teams' }))
+  const pool = screen.getByRole('combobox').first()
+  for (const name of names) {
+    await userEvent.click(pool)
+    await userEvent.fill(pool, name)
+    await userEvent.keyboard('{Enter}')
+  }
+  // The menu stays open over the buttons below otherwise, and swallows clicks.
+  await userEvent.keyboard('{Escape}')
+}
+
+// Everyone the submitted coverage matrix names, once each, sorted.
+function submittedCrewKeys(onSubmit: ReturnType<typeof vi.fn>): string[] {
+  const saved = onSubmit.mock.calls[0][0] as Extract<
+    Schedule,
+    { type: 'rotate' }
+  >
+  const keys = new Set<string>()
+  saved.day_coverage.forEach((cell) => {
+    cell.team_ids.forEach((id) => keys.add(`team:${id}`))
+    cell.employee_ids.forEach((id) => keys.add(`employee:${id}`))
+  })
+  return [...keys].sort()
+}
+
+// Basics → Shifts → Pattern → Start & End → Assign to.
+const TO_ROTATE_ASSIGN = 4
+
+describe('ScheduleForm — rotate assignment', () => {
+  it('orders rotate steps with Start & End before Assign to', async () => {
+    const screen = await render(
+      <ScheduleForm defaultValues={rotation} onSubmit={vi.fn()} />
+    )
+    const labels = await screen
+      .getByRole('navigation')
+      .getByRole('button')
+      .all()
+    const text = await Promise.all(labels.map((l) => l.element().textContent))
+    expect(text.map((t) => t?.replace(/^\d/, ''))).toEqual([
+      'Basics',
+      'Shifts',
+      'Pattern',
+      'Start & End',
+      'Assign to',
+      'Summary',
+    ])
+  })
+
+  it('keeps a suggested assignment through to submit', async () => {
+    const onSubmit = vi.fn()
+    const screen = await render(
+      <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
+    )
+
+    await next(screen, TO_ROTATE_ASSIGN)
+    await pickTeams(screen, ['Team A', 'Team B'])
+    await userEvent.click(
+      screen.getByRole('button', { name: /suggest assignment/i })
+    )
+    await next(screen, 1)
+    await userEvent.click(screen.getByRole('button', { name: 'Save schedule' }))
+
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    // Both teams placed — and the employees the seed had assigned cleared,
+    // not left behind to double-book the cycle.
+    expect(submittedCrewKeys(onSubmit)).toEqual(['team:team-a', 'team:team-b'])
+  }, 45_000)
+
+  it('applies a pending suggestion on Next when the button was never pressed', async () => {
+    const onSubmit = vi.fn()
+    const screen = await render(
+      <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
+    )
+
+    await next(screen, TO_ROTATE_ASSIGN)
+    await pickTeams(screen, ['Team A', 'Team B'])
+    await next(screen, 1)
+    await userEvent.click(screen.getByRole('button', { name: 'Save schedule' }))
+
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(submittedCrewKeys(onSubmit)).toEqual(['team:team-a', 'team:team-b'])
+  }, 45_000)
+
+  it('leaves a hand-placed roster alone while Assign manually is on', async () => {
+    const onSubmit = vi.fn()
+    const screen = await render(
+      <ScheduleForm defaultValues={rotation} onSubmit={onSubmit} />
+    )
+
+    await next(screen, TO_ROTATE_ASSIGN)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Assign manually' })
+    )
+    await next(screen, 1)
+    await userEvent.click(screen.getByRole('button', { name: 'Save schedule' }))
+
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(submittedCrewKeys(onSubmit)).toEqual([
+      'employee:emp-a',
+      'employee:emp-b',
+      'employee:emp-c',
+      'employee:emp-d',
+    ])
   }, 45_000)
 })

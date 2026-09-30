@@ -31,7 +31,6 @@ import { useSchedulesStore } from '@/features/schedules/stores/schedules-store'
 import { useShiftsStore } from '@/features/shifts/stores/shifts-store'
 import { type Team } from '@/features/teams/data/schema'
 import { useTeamsStore } from '@/features/teams/stores/teams-store'
-import { AssignCrewsDialog } from './components/assign-crews-dialog'
 import { EmptyState } from './components/empty-state'
 import { RotationTimelineGrid } from './components/rotation-timeline'
 import { ScheduleRotationTable } from './components/schedule-rotation-table'
@@ -100,7 +99,6 @@ export function ScheduleRotation() {
   const [employeeSpan, setEmployeeSpan] = useState<TimelineSpan>(() =>
     rotateSchedules[0] ? getDefaultSpan(rotateSchedules[0]) : 'month'
   )
-  const [assignOpen, setAssignOpen] = useState(false)
 
   const schedule =
     rotateSchedules.find((s) => s.id === scheduleId) ?? rotateSchedules[0]
@@ -218,15 +216,6 @@ export function ScheduleRotation() {
                 ))}
               </SelectContent>
             </Select>
-
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => setAssignOpen(true)}
-            >
-              <Users className='me-1 size-4' />
-              Assign crews
-            </Button>
           </div>
         </div>
 
@@ -271,7 +260,7 @@ export function ScheduleRotation() {
               <EmptyState
                 icon={<Users className='size-8' />}
                 title='No employees on this rotation'
-                description='Use “Assign crews” above to put employees or teams on each position of the cycle.'
+                description='Edit this schedule and use its “Assign to” step to put teams or employees on each shift of the cycle.'
               />
             ) : (
               <>
@@ -333,16 +322,6 @@ export function ScheduleRotation() {
           </div>
         )}
       </Main>
-
-      {/* Mounted only while open so the picker re-seeds its default without
-          an effect. */}
-      {assignOpen && (
-        <AssignCrewsDialog
-          open={assignOpen}
-          onOpenChange={setAssignOpen}
-          scheduleId={schedule?.id}
-        />
-      )}
     </>
   )
 }

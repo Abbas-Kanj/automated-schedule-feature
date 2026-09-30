@@ -388,9 +388,8 @@ export function ScheduleSummary({ control }: ScheduleSummaryProps) {
             {values.type === 'rotate' && !values.day_coverage?.length && (
               // Without a placed roster there's only the template to walk.
               <p className='text-xs text-muted-foreground'>
-                The pattern on real dates. Crews are placed on each shift from
-                Work schedule → Assign crews; once they are, this shows who
-                works what.
+                The pattern on real dates. Crews are placed on each shift on the
+                Assign to step; once they are, this shows who works what.
               </p>
             )}
             <ScheduleCalendarPreview values={values} />

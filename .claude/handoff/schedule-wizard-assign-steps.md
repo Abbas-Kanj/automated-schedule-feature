@@ -3,13 +3,15 @@
 Where crew assignment lives, per schedule type, and how the wizard moves
 between steps.
 
-**State (2026-09-16): UNCOMMITTED.** Working tree holds the whole rework
-below (31 files, incl. 5 new, 1 deleted). Last commit on `main` is `52271e2`.
-Browser-verified this session (see Verification).
+**State (2026-09-30):** the 09-16 rework is committed. On branch
+`feat/rotate-assign-in-wizard`, **rotate crew placement moved back into the
+wizard** and the "Assign crews" dialog on the rotating Work schedule screen
+was **deleted** (user's call). See "2026-09-30 move" below; the Dialog
+section further down is history.
 
 ## Current step lists (`schedule-form.tsx#getSteps`)
 
-- **Rotate:** Basics → Shifts → Pattern → **Assign to** → Start & End → Summary
+- **Rotate:** Basics → Shifts → Pattern → **Start & End** → **Assign to** → Summary
 - **Fixed:** Basics → Shifts → **Occurrence** → **Start & End** → **Assign to** → Summary
 - **Flexible:** unchanged — Basics → Shifts → Start & End → Summary
 
@@ -25,8 +27,9 @@ The `work` step ("Work rotation" / "Work fixed") **no longer exists** (removed
   chosen **once for the schedule**. The same crew **may** be on several shifts —
   warned (amber count + per-card note), never blocked. Next blocks only when
   nobody is assigned at all. (2026-09-16)
-- **Rotate placement happens only in the "Assign crews" dialog** on the
-  rotating Work schedule screen; the wizard's Assign to picks the pool only.
+- ~~Rotate placement happens only in the "Assign crews" dialog~~ —
+  **reversed 2026-09-30**: rotate's wizard "Assign to" step picks the pool
+  *and* places it (Suggest / Assign manually / coverage panel). No dialog.
 - **Going back clears every later step — create mode only.** Editing keeps
   saved data. (2026-09-16)
 - **Dialog requires Start & End before Suggest/manual/tables**, and its tables
@@ -34,6 +37,23 @@ The `work` step ("Work rotation" / "Work fixed") **no longer exists** (removed
   the rotating screen's Employees table replaces the crew table. (2026-09-16)
 - **Summary calendar shows crews per shift.** (2026-09-16)
 - Monthly stays selectable in Occurrence (2026-09-15).
+
+## 2026-09-30 move (rotate placement → wizard)
+
+- `schedule-assign-to-fields.tsx` is now wizard-only: the pool is the form's
+  `crew_kind`/`crew_ids` (rendered by `AssignToCrewFields` at the top of the
+  step), no local pool state, no `schedule`/`startEnd` props — the live record
+  comes from `getValues()`.
+- Start & End moved **before** Assign to for rotate, because placement is read
+  in real dates. The step's own date gate stays as a safety net.
+- `schedule-form.tsx` holds `commitAssignment` (the `commitRef`) and calls it
+  on Next *and* on tab navigation out of rotate's Assign to, before
+  `pruneRosterToSelection` — so a picked-but-unapplied pool is placed, and
+  manual mode is left alone.
+- `assign-crews-dialog.tsx` + its test deleted; its three Save tests are now
+  wizard tests in `schedule-form.test.tsx` ("rotate assignment").
+- The rotating screen's empty state points at the schedule's Assign to step.
+- **Not browser-verified.**
 
 ## How it's built
 
