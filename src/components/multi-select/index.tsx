@@ -1,15 +1,17 @@
 import clsx from 'clsx'
-import Select, { MenuPosition } from 'react-select'
+import Select, { type MenuPosition } from 'react-select'
 import makeAnimated from 'react-select/animated'
 import CreatableSelect from 'react-select/creatable'
-import { COMPACT_HEIGHT_STYLES, Variant, VARIANT_STYLES } from './styles'
+import { COMPACT_HEIGHT_STYLES, type Variant, VARIANT_STYLES } from './styles'
 
-type SelectComponentProps = {
-  options: any[]
-  value?: any
-  defaultValue?: any
-  onChange?: (value: any) => void
-  isMulti?: boolean
+// Anything with a label — the default `formatOptionLabel` and the A-Z
+// filter both read it. A `type: 'button'` option renders as a link-style row.
+export type SelectOption = { label: string; type?: string }
+
+type CommonProps<T extends SelectOption> = {
+  options: readonly T[]
+  // Pre-fills the search text, not the selection.
+  defaultValue?: string
   isDisabled?: boolean
   isLoading?: boolean
   createAble?: boolean
@@ -21,7 +23,7 @@ type SelectComponentProps = {
   onClick?: React.MouseEventHandler
   className?: string
   required?: boolean
-  formatOptionLabel?: (option: any) => React.ReactNode
+  formatOptionLabel?: (option: T) => React.ReactNode
   variant?: Variant
   compactHeight?: boolean
   onCreateOption?: (inputValue: string) => void | Promise<void>
@@ -30,9 +32,27 @@ type SelectComponentProps = {
   autoFocus?: boolean
 }
 
+// `isMulti` decides the shape of `value` and `onChange`, so the two modes
+// are separate prop sets rather than one loose `any`.
+type MultiProps<T extends SelectOption> = CommonProps<T> & {
+  isMulti: true
+  value?: readonly T[]
+  onChange?: (value: T[]) => void
+}
+
+type SingleProps<T extends SelectOption> = CommonProps<T> & {
+  isMulti?: false
+  value?: T | null
+  onChange?: (value: T | null) => void
+}
+
+export type MultiSelectProps<T extends SelectOption> =
+  | MultiProps<T>
+  | SingleProps<T>
+
 const animatedComponents = makeAnimated()
 
-export const MultiSelect = ({
+export function MultiSelect<T extends SelectOption>({
   options,
   value,
   onChange,
@@ -57,8 +77,12 @@ export const MultiSelect = ({
   menuListClassName,
   autoFocus,
   ...props
-}: SelectComponentProps) => {
-  const Comp = createAble ? CreatableSelect : Select
+}: MultiSelectProps<T>) {
+  // react-select's own generics can't follow the isMulti union above, so the
+  // boundary is typed once here; callers get the precise types.
+  const Comp = (
+    createAble ? CreatableSelect : Select
+  ) as typeof CreatableSelect<T, boolean>
   const s = VARIANT_STYLES[variant]
 
   return (
@@ -81,9 +105,9 @@ export const MultiSelect = ({
         defaultValue={value}
         options={options}
         noOptionsMessage={() => 'No data found !!'}
-        onChange={onChange}
+        onChange={onChange as (value: unknown) => void}
         onCreateOption={onCreateOption}
-        formatOptionLabel={formatOptionLabel ?? ((option: any) => option.label)}
+        formatOptionLabel={formatOptionLabel ?? ((option) => option.label)}
         menuPortalTarget={menuPortalTarget}
         menuPosition={menuPosition}
         styles={{
@@ -126,7 +150,7 @@ export const MultiSelect = ({
           groupHeading: () => s?.groupHeading,
           noOptionsMessage: () => s?.noOptionsMessage,
 
-          option: ({ data, isDisabled }: { data: any; isDisabled: boolean }) =>
+          option: ({ data, isDisabled }) =>
             clsx(
               s.option,
               data?.type === 'button' &&

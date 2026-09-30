@@ -1,40 +1,36 @@
-import { type ComponentProps, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ToggleButton } from '@/components/toggle-button'
-import { MultiSelect } from './index'
+import { MultiSelect, type MultiSelectProps, type SelectOption } from './index'
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
-type MultiSelectProps = ComponentProps<typeof MultiSelect>
+type FilterableMultiSelectProps<T extends SelectOption> =
+  MultiSelectProps<T> & {
+    // Reports the active letter (null = All) for a future server-side query.
+    onLetterChange?: (letter: string | null) => void
+    className?: string
+  }
 
-type FilterableMultiSelectProps = MultiSelectProps & {
-  // Reports the active letter (null = All) for a future server-side query.
-  onLetterChange?: (letter: string | null) => void
-  className?: string
-}
-
-function firstLetter(option: { label?: unknown }): string {
-  return String(option?.label ?? '')
-    .trim()
-    .charAt(0)
-    .toUpperCase()
+function firstLetter(option: SelectOption): string {
+  return option.label.trim().charAt(0).toUpperCase()
 }
 
 // An A-Z strip over `MultiSelect` that narrows `options` only — react-select
 // takes `value` separately, so an already-picked chip survives a letter that
 // excludes it.
-export function FilterableMultiSelect({
+export function FilterableMultiSelect<T extends SelectOption>({
   options,
   onLetterChange,
   className,
   isDisabled,
   ...props
-}: FilterableMultiSelectProps) {
+}: FilterableMultiSelectProps<T>) {
   const [letter, setLetter] = useState<string | null>(null)
 
   const available = useMemo(() => {
     const set = new Set<string>()
-    for (const option of options ?? []) set.add(firstLetter(option))
+    for (const option of options) set.add(firstLetter(option))
     return set
   }, [options])
 
@@ -42,7 +38,7 @@ export function FilterableMultiSelect({
     () =>
       letter === null
         ? options
-        : (options ?? []).filter((option) => firstLetter(option) === letter),
+        : options.filter((option) => firstLetter(option) === letter),
     [options, letter]
   )
 
