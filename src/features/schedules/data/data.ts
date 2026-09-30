@@ -25,6 +25,7 @@ import {
   type CYCLE_LENGTH_UNITS,
   type CYCLE_TYPES,
   type OCCURRENCE_FREQUENCIES,
+  type ParentScheduleType,
   type RECURRENCE_END_TYPES,
   type REGULAR_TYPES,
   type ShiftRepeatFrequency,
@@ -50,6 +51,11 @@ export const MONTHS = [
   { value: '11', label: 'November' },
   { value: '12', label: 'December' },
 ]
+
+export const PARENT_TYPE_OPTIONS = [
+  { value: 'regular', label: 'Regular' },
+  { value: 'daily', label: 'Daily' },
+] satisfies { value: ParentScheduleType; label: string }[]
 
 export const SCHEDULE_TYPES = [
   { value: 'weekly', label: 'Weekly' },

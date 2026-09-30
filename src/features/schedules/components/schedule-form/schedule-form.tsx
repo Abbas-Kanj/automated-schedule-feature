@@ -23,14 +23,16 @@ import {
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { MultiSelect } from '@/components/multi-select'
 import {
   type VerticalTabsStep,
   VerticalTabs,
 } from '@/components/ui/vertical-tabs'
-import { SCHEDULE_TYPES } from '../../data/data'
+import { PARENT_TYPE_OPTIONS, SCHEDULE_TYPES } from '../../data/data'
 import {
   type DailySchedule,
   DEFAULT_OCCURRENCE_EXCEPTIONS,
+  type ParentScheduleType,
   type RegularType,
   type Schedule,
   type ScheduleType,
@@ -53,9 +55,6 @@ import { ShiftPickerField } from './shift-picker-field'
 import { WeeklyFields } from './weekly-fields'
 import { WeeklyOneFields } from './weekly-one-fields'
 
-// `parent_type: 'daily'` isn't offered when creating/editing a schedule — the
-// 'daily' branches below exist only so pre-existing daily schedules still
-// render correctly on view/edit.
 function getSteps(
   parentType: string,
   regularType?: RegularType
@@ -432,6 +431,22 @@ export function ScheduleForm({
 
   const handleBack = () => goToStep(step - 1)
 
+  const handleParentTypeChange = (value: ParentScheduleType) => {
+    if (value === parentType) return
+    const current = form.getValues()
+    form.reset({
+      id: current.id,
+      name: current.name,
+      description: current.description,
+      ...(value === 'daily'
+        ? getTypeDefaults('weekly')
+        : getRegularTypeDefaults('fixed')),
+    } as Schedule)
+    setStep(0)
+    setMaxStep(0)
+    setIsShiftDialogOpen(false)
+  }
+
   const handleTypeChange = (value: string) => {
     if (value === type) return
     const current = form.getValues()
@@ -499,6 +514,21 @@ export function ScheduleForm({
           <div className='min-w-0 flex-1 space-y-6'>
             {(disabled || currentStepId === 'basics') && (
               <>
+                <FormItem>
+                  <FormLabel>Category</FormLabel>
+                  <MultiSelect
+                    options={PARENT_TYPE_OPTIONS}
+                    value={
+                      PARENT_TYPE_OPTIONS.find((o) => o.value === parentType) ??
+                      null
+                    }
+                    onChange={(opt: { value: ParentScheduleType } | null) =>
+                      opt && handleParentTypeChange(opt.value)
+                    }
+                    isDisabled={disabled}
+                    isClearable={false}
+                  />
+                </FormItem>
                 <FormField
                   control={form.control}
                   name='name'
