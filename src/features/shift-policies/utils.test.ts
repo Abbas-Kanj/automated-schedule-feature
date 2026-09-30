@@ -180,7 +180,10 @@ describe('break time rules', () => {
   })
 
   it('describes each break type', () => {
-    const base: BreakTimeRule = buildDefaultBreakTimeRule('r1')
+    const base: BreakTimeRule = {
+      ...buildDefaultBreakTimeRule('r1'),
+      pay_type: 'unpaid',
+    }
     expect(describeRule({ ...base, duration_minutes: 90 }, identity)).toBe(
       'Unpaid · Fixed · 1h 30m'
     )

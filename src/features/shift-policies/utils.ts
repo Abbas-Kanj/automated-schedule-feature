@@ -82,13 +82,13 @@ export function buildDefaultMissedPunchRule(id: string): MissedPunchRule {
   }
 }
 
-// Starts as a 30-minute unpaid fixed break — the common case.
+// Starts as a 30-minute paid fixed break.
 export function buildDefaultBreakTimeRule(id: string): BreakTimeRule {
   return {
     id,
     policy_type: 'break_time',
     name: '',
-    pay_type: 'unpaid',
+    pay_type: 'paid',
     ...buildBreakTypeFields('fixed'),
   }
 }
