@@ -79,7 +79,7 @@ function SummaryRow({
   )
 }
 
-// The three end-settings shapes never coexist, so one line covers all of them.
+// One line covers all end-settings shapes.
 function formatEndSettings(
   endSettings: EndSettings | undefined
 ): string | undefined {

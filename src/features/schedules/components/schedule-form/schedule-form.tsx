@@ -131,7 +131,7 @@ function getTypeDefaults(type: ScheduleType) {
 }
 
 // `end_occurrences` gets a default too, so the "End after" input isn't empty
-// the moment it's switched to.
+// when switched to.
 const DEFAULT_END_SETTINGS = {
   end_type: 'never' as const,
   end_occurrences: 1,
@@ -217,8 +217,7 @@ type ScheduleFormProps = {
   disabled?: boolean
   submitLabel?: string
   // Creating only: editing a step clears every later step, so what's ahead is
-  // always rebuilt from what's behind. Navigating alone never discards
-  // anything. Editing an existing schedule keeps saved data either way.
+  // rebuilt from what's behind. Editing an existing schedule keeps saved data.
   resetLaterStepsOnChange?: boolean
 }
 
@@ -235,8 +234,7 @@ function getStepFields(
     return ['name', 'description', 'type']
   }
   if (stepId === 'shifts') {
-    // Shared by fixed/flexible/rotate — the discriminated union's shared
-    // superRefine enforces rotate's own ">=2 shifts" rule on this same field.
+    // Shared by fixed/flexible/rotate.
     return ['shift_ids']
   }
   if (stepId === 'end-settings') {
@@ -248,8 +246,8 @@ function getStepFields(
   if (stepId === 'occurrence') {
     return ['shift_occurrences', 'occurrence_exceptions']
   }
-  // At least one crew is required too, but checked in `handleNext` rather
-  // than the schema, so schedules saved without a pick still load.
+  // At least one crew is required too, checked in `handleNext` rather than the
+  // schema.
   if (stepId === 'assign-to') {
     return type === 'fixed'
       ? ['crew_kind', 'shift_assignments']
@@ -327,14 +325,11 @@ export function ScheduleForm({
 
   // What the step currently on screen held when the user arrived on it, so
   // leaving can tell an actual edit from plain navigation. `null` means no
-  // baseline has been taken yet, which counts as "nothing was edited" —
-  // never as "everything changed".
+  // baseline has been taken yet.
   const stepSnapshot = useRef<string | null>(null)
 
-  // Only the step's *own* fields. `STEP_DEPENDENT_FIELDS` are consequences of
-  // a step rather than things edited on it — `pruneRosterToSelection` rewrites
-  // `day_coverage` on the way out of "Assign to", which would otherwise read
-  // as the user having changed something every single time.
+  // Only the step's own fields; `STEP_DEPENDENT_FIELDS` are consequences of a
+  // step rather than things edited on it.
   const snapshotOf = (index: number): string => {
     const id = steps[index]?.id
     if (!id) return ''
@@ -345,11 +340,8 @@ export function ScheduleForm({
   const leavingStepChanged = (): boolean =>
     stepSnapshot.current !== null && snapshotOf(step) !== stepSnapshot.current
 
-  // Later steps are rebuilt from what is behind them, so they have to go when
-  // what is behind them moves — but *only* then. Resetting on the navigation
-  // itself meant stepping back to re-read an earlier step silently discarded
-  // every answer after it, with the loss invisible until the user walked
-  // forward again.
+  // Later steps are rebuilt from what is behind them, so they are reset when
+  // what is behind them changes — not on navigation alone.
   const resetLaterStepsIfEdited = () => {
     if (resetLaterStepsOnChange && leavingStepChanged()) resetStepsAfter(step)
   }
@@ -482,8 +474,7 @@ export function ScheduleForm({
     setStep(0)
     setMaxStep(0)
     setIsShiftDialogOpen(false)
-    // The form underneath the baseline is gone, so a stale one would read as
-    // an edit on the next navigation.
+    // The baseline's form is gone, so it is cleared.
     stepSnapshot.current = null
   }
 

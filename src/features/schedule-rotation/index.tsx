@@ -91,8 +91,7 @@ export function ScheduleRotation() {
   const [scheduleId, setScheduleId] = useState<string>(
     () => rotateSchedules[0]?.id ?? ''
   )
-  // Separate state per view (grid vs. table) so comparing a month of bands
-  // against this week's roster doesn't force both onto the same span.
+  // Separate state per view (grid vs. table).
   const [span, setSpan] = useState<TimelineSpan>(() =>
     rotateSchedules[0] ? getDefaultSpan(rotateSchedules[0]) : 'month'
   )
@@ -143,7 +142,6 @@ export function ScheduleRotation() {
   const employeeStepType: RotationPeriodType =
     employeeSpan === 'week' ? 'weekly' : 'monthly'
 
-  // Plain function, not useMemo — the React Compiler rejects manual memoization.
   const workDaysByEmployee = buildWorkDays(schedule, teams)
 
   const employeeRows = (() => {

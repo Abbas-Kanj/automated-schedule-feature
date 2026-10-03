@@ -58,11 +58,9 @@ type ScheduleAssignToFieldsProps = {
 }
 
 // Who covers each selected shift on each day of the cycle. The pattern is a
-// template, not the answer — suggestion transposes copies of that journey
-// across crews so every shift is staffed every day. What's stored is the
-// resolved `day_coverage` matrix, not the offsets, because the manual grid
-// edits single cells freely; hand-assignment is the escape hatch for rosters
-// the search can't express.
+// template: suggestion transposes copies of that journey across crews so every
+// shift is staffed every day. Hand-assignment edits single cells of the stored
+// `day_coverage` matrix.
 export function ScheduleAssignToFields({
   disabled,
   commitRef,
@@ -71,7 +69,6 @@ export function ScheduleAssignToFields({
   const patternRaw = useWatch({ control, name: 'pattern' }) as
     | RotatePatternEntry[]
     | undefined
-  // Memoised so a fresh `[]` doesn't re-run the coverage analysis every render.
   const pattern = useMemo(() => patternRaw ?? [], [patternRaw])
   const coverageRaw = useWatch({ control, name: 'day_coverage' }) as
     | RotateDayCoverage[]
@@ -147,9 +144,8 @@ export function ScheduleAssignToFields({
     [dayCoverage, teams, employeeLabels]
   )
 
-  // Nothing is placed until the dates are settled: every table below is read
-  // in real dates, and a suggestion made against the wrong start would put
-  // crews on the wrong weekdays.
+  // Nothing is placed until the dates are settled; every table below is read in
+  // real dates.
   const datesReady =
     dateStringSchema.safeParse(startDateValue).success &&
     endSettingsSchema.safeParse(endSettings).success
@@ -179,7 +175,6 @@ export function ScheduleAssignToFields({
     dayDates[day] ? format(dayDates[day], 'EEE d MMM') : `Day ${day + 1}`
   )
 
-  // Not keyed on the pool itself, which wouldn't change the answer.
   const requirement = useMemo(
     () => crewRequirement(patternToSlots(pattern), orderedShiftIds),
     [pattern, orderedShiftIds]
@@ -191,8 +186,6 @@ export function ScheduleAssignToFields({
         startDate,
         shiftLabels,
         shiftHours,
-        // Only when exact — else the panel could tell someone who just
-        // pressed Suggest that there are enough crews when there aren't.
         minimumCrews: requirement.exact ? requirement.minimumCrews : undefined,
       }),
     [
@@ -250,8 +243,8 @@ export function ScheduleAssignToFields({
     )
 
     const storedPlacements = crewPlacementsToStored(placements)
-    // Both halves of the roster are written together so they can't drift
-    // apart; the matrix is regenerated, never patched.
+    // Both halves of the roster are written together; the matrix is regenerated,
+    // never patched.
     setValue('crew_placements', storedPlacements, { shouldDirty: true })
     setValue(
       'day_coverage',
@@ -271,11 +264,9 @@ export function ScheduleAssignToFields({
     poolCrewKeys.length === placedCrewKeys.size &&
     poolCrewKeys.every((key) => placedCrewKeys.has(key))
 
-  // Makes "Next" accept what's showing: a no-op on the ordinary path, but
-  // catches leaving with the suggestion half-taken (pool picked but never
-  // applied, or changed after). Manual mode is left alone — re-running the
-  // search over hand-placed crew would throw away exactly what the toggle
-  // exists to allow.
+  // Makes "Next" accept what's showing: catches leaving with the suggestion
+  // half-taken (pool picked but never applied, or changed after). Manual mode is
+  // left alone.
   function commitPendingSuggestion() {
     if (
       manualMode ||
@@ -287,8 +278,6 @@ export function ScheduleAssignToFields({
     applySuggestion()
   }
 
-  // No dependency list on purpose — the callback closes over the pool and the
-  // matrix, so the form has to be handed a fresh one after every render.
   useEffect(() => {
     if (!commitRef) return
     commitRef.current = commitPendingSuggestion
@@ -447,10 +436,7 @@ type CrewRequirementNoteProps = {
 
 // How many crews the pattern needs for full coverage. Under the minimum is a
 // fact about the pattern, not a mistake, so this never blocks or uses the
-// destructive colour. The naive crew-days/cells division often undercounts
-// by one, since two crews on duty together can land on the same shift and
-// leave another empty — worth naming, since that's fixable by editing the
-// pattern, not just by hiring.
+// destructive colour.
 function CrewRequirementNote({
   requirement,
   cycleLength,
@@ -464,8 +450,6 @@ function CrewRequirementNote({
 
   const unit = crewKind === 'team' ? 'team' : 'employee'
   const short = minimumCrews - selectedCount
-  // Only a demonstrated requirement licenses the green line — promising full
-  // coverage and then showing a red 0 is what this guards against.
   const enough = requirement.exact && short <= 0
 
   return (
@@ -534,8 +518,7 @@ type ManualDayCardProps = {
 }
 
 // One cycle day: every selected shift gets its own picker, so a hole is a
-// visibly empty field. Cells are edited freely — a pick here moves nowhere
-// else, which is the point of storing the matrix rather than crew offsets.
+// visibly empty field. Cells are edited freely.
 function ManualDayCard({
   day,
   label,
@@ -548,9 +531,8 @@ function ManualDayCard({
   const { getValues, setValue } = useFormContext<Schedule>()
   const shifts = useShiftsStore((s) => s.shifts)
 
-  // Written through `setValue` rather than a `FormField` per cell: the stored
-  // array is sparse, so a cell has no stable index to register a controller
-  // against — clearing one would renumber every field name after it.
+  // Written through `setValue` rather than a `FormField` per cell, since the
+  // stored array is sparse.
   const setCell = (shiftId: string, ids: string[]) => {
     const current =
       (getValues('day_coverage') as RotateDayCoverage[] | undefined) ?? []
@@ -576,8 +558,7 @@ function ManualDayCard({
 
     setValue(
       'day_coverage',
-      // Drop cells nobody is on, so an emptied picker leaves no trace and
-      // "no cell" and "empty cell" keep meaning the same thing.
+      // Drops cells nobody is on.
       next.filter((cell) => cell.employee_ids.length || cell.team_ids.length),
       { shouldDirty: true }
     )
@@ -604,9 +585,7 @@ function ManualDayCard({
                 <ShiftSwatch shift={shift} />
                 {shift?.name ?? 'Unknown shift'}
               </span>
-              {/* Keyed on crew kind: without it, flipping Teams/Employees
-                  while the grid is open leaves the picker holding the other
-                  kind's ids and writes them to the wrong field. */}
+              {/* Keyed on crew kind so the picker resets when it flips. */}
               <MultiSelect
                 key={crewKind}
                 options={crewOptions}

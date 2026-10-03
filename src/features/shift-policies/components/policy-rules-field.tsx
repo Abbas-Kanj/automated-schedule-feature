@@ -57,9 +57,8 @@ export function PolicyRulesField() {
     name: 'rules',
   })
 
-  // Open with something to fill in rather than an empty panel plus an
-  // "Add at least one rule" error. Guarded on length so clearing every rule
-  // by hand stays cleared.
+  // Opens with a blank rule; guarded on length so clearing every rule by hand
+  // stays cleared.
   const [editingIndex, setEditingIndex] = useState<number | null>(() =>
     form.getValues('rules').length === 0 ? 0 : null
   )
@@ -211,8 +210,7 @@ type PolicyRuleRowProps = {
   onDone: () => void
 }
 
-// Watches only its own slice of the array so typing in one rule doesn't
-// re-render the others.
+// Watches only its own slice of the array.
 function PolicyRuleRow({
   index,
   onTypeChange,
@@ -222,8 +220,7 @@ function PolicyRuleRow({
   const form = useFormContext<ShiftPolicyFormValues>()
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
 
-  // Collapse only once this rule actually validates, so a half-filled row
-  // can't be folded away into a summary that hides its errors.
+  // Collapses only once this rule validates.
   const save = async () => {
     const valid = await form.trigger(`rules.${index}`)
     if (valid) onDone()
@@ -266,9 +263,8 @@ function PolicyRuleRow({
             <Select
               value={field.value}
               onValueChange={(value) => {
-                // Radix's hidden select bounces an empty value back on a
-                // programmatic write; a real pick is never empty. See
-                // `radix-select-bubble-select-wipes-programmatic-value`.
+                // Ignores the empty value Radix's hidden select bounces back on a
+                // programmatic write.
                 if (!value) return
                 onTypeChange(value as PolicyType)
               }}

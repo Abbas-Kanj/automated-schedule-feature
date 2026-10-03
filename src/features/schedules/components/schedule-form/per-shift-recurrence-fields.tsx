@@ -68,10 +68,7 @@ export function PerShiftRecurrenceFields({
         <CardTitle className='text-base font-semibold'>{title}</CardTitle>
       </CardHeader>
       <CardContent className='space-y-4 px-4'>
-        {/* Rows come from the field array, not `shiftIds`: a row mounted
-            before the effect above writes its rule would hand the Radix
-            Select an undefined value, and it keeps showing the placeholder
-            once the real one arrives. */}
+        {/* Rows come from the field array, not `shiftIds`. */}
         {fields.map(({ id, shift_id: shiftId }, index) => {
           const shift = shifts.find((s) => s.id === shiftId)
           const Icon = shift ? SHIFT_ICON_COMPONENTS[shift.icon] : undefined
@@ -103,8 +100,7 @@ export function PerShiftRecurrenceFields({
             </div>
           )
         })}
-        {/* Row-count errors ("every selected shift needs a rule") land on the
-            array itself, not on any one row. */}
+        {/* Row-count errors land on the array itself, not on any one row. */}
         <ArrayError name={name} />
       </CardContent>
     </Card>

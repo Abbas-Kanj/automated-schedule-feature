@@ -64,7 +64,7 @@ const shiftStatusSchema = z.enum(SHIFT_STATUSES)
 export const SHIFT_TIME_SLOT_TYPES = ['regular', 'overtime'] as const
 const shiftTimeSlotTypeSchema = z.enum(SHIFT_TIME_SLOT_TYPES)
 
-// Mirrors schedules' recurrence shape, kept as its own copy since shifts is standalone.
+// Mirrors schedules' recurrence shape.
 export const REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 const repeatFrequencySchema = z.enum(REPEAT_FREQUENCIES)
 
@@ -98,8 +98,7 @@ export const DAYS_OF_WEEK = [
 ] as const
 const dayOfWeekSchema = z.enum(DAYS_OF_WEEK)
 
-// One time range; may cross midnight (22:00 -> 06:00) instead of failing
-// the "end after start" check below.
+// One time range; may cross midnight (22:00 -> 06:00).
 const timeRangeEntrySchema = z.object({
   from_time: timeStringSchema,
   to_time: timeStringSchema,
@@ -107,10 +106,8 @@ const timeRangeEntrySchema = z.object({
 })
 
 // Unwraps a range onto a continuous timeline (adding a day once it crosses
-// midnight) so two ranges can be compared with plain start/end math. Only
-// the clock actually wrapping matters, not the `overnight` flag itself — a
-// range flagged overnight that already ends after it starts doesn't span
-// an extra day.
+// midnight) so two ranges can be compared with plain start/end math. Only the
+// clock actually wrapping matters, not the `overnight` flag.
 function getTimeRangeSpan(entry: { from_time: string; to_time: string }) {
   const start = toMinutes(entry.from_time)
   let end = toMinutes(entry.to_time)
