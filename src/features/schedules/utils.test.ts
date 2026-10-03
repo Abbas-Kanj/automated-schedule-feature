@@ -548,8 +548,7 @@ describe('formatTimes', () => {
 })
 
 describe('describeStartDay', () => {
-  // "Week 2" is the phrase the real-world rotation write-ups use, so a cycle
-  // that is a whole number of weeks says it out loud.
+  // A cycle that is a whole number of weeks names the week.
   it('names the week on a whole-week cycle', () => {
     expect(describeStartDay(7, 28)).toBe('Day 8 · week 2')
     expect(describeStartDay(0, 28)).toBe('Day 1 · week 1')

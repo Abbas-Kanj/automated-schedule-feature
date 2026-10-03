@@ -45,8 +45,7 @@ const DEFAULT_TIME: TimeRangeEntry = {
   overnight: false,
 }
 
-// Duration defaults to this range's own span rather than being left blank —
-// it's editable, not required.
+// Duration defaults to this range's own span; editable, not required.
 const DEFAULT_BREAK: BreakEntry = {
   break_type: 'paid',
   from_time: '12:00',
@@ -58,8 +57,7 @@ const DEFAULT_BREAK: BreakEntry = {
 
 // Keeps its own text buffer so a partial edit (e.g. "1:") isn't clobbered by
 // the formatted "H:MM" value on every keystroke; only a fully-parsed value
-// reaches the form. Re-syncs during render (not an effect) per React's
-// "reset state when a prop changes" guidance.
+// reaches the form.
 function BreakDurationInput({
   value,
   onChange,
@@ -99,8 +97,7 @@ export function ShiftTimesTab() {
   const days = useWatch({ control: form.control, name: 'days' }) ?? []
   const breaks = useWatch({ control: form.control, name: 'breaks' }) ?? []
   const category = useWatch({ control: form.control, name: 'category' })
-  // Only surface "select at least one day" after a submit attempt, not on
-  // a blank slate.
+  // Only surfaces "select at least one day" after a submit attempt.
   const isSubmitted = form.formState.isSubmitted
   // Which break row is expanded for editing; new breaks open straight into it.
   const [editingBreakIndex, setEditingBreakIndex] = useState<number | null>(
@@ -265,8 +262,8 @@ export function ShiftTimesTab() {
       breaks.map((entry, i) => {
         if (i !== index) return entry
         const next = { ...entry, ...patch }
-        // A duration entered for the old range can outlive a narrower new
-        // one — drop it rather than silently saving an out-of-range value.
+        // A duration entered for the old range is dropped if it falls outside a
+        // narrower new one.
         if ('from_time' in patch || 'to_time' in patch) {
           const span = getBreakSpanMinutes(next.from_time, next.to_time)
           if (next.duration_minutes && next.duration_minutes > span) {
@@ -289,8 +286,7 @@ export function ShiftTimesTab() {
   const masterValid = master.overnight || master.to_time > master.from_time
   const masterDuration = calculateShiftHours(master.from_time, master.to_time)
 
-  // Mirrors the schema's `superRefine` break checks, for live feedback
-  // without waiting on a submit/validate cycle.
+  // Mirrors the schema's `superRefine` break checks, for live feedback.
   const getBreakEntryError = (b: BreakEntry): string | null => {
     if (!b.break_type) return 'Select a break type.'
     if (!(b.to_time > b.from_time)) return 'End time must be after start time.'
@@ -318,11 +314,7 @@ export function ShiftTimesTab() {
                 onValueChange={(value) => switchMode(value as ShiftHoursMode)}
                 className='gap-2'
               >
-                {/* Radix's hidden native radio input re-dispatches a
-                    synthetic bubbling click on every `mode` change,
-                    which would re-trigger this onClick and flip `mode`
-                    back forever. `isTrusted` filters that out — see
-                    `radix-radio-group-bubble-input-reopens-dialog`. */}
+                {/* Ignores the synthetic click Radix's hidden radio input re-dispatches (`isTrusted` filter). */}
                 <Label
                   onClick={(event) => {
                     if (event.nativeEvent.isTrusted && mode !== 'same') {
@@ -530,8 +522,7 @@ export function ShiftTimesTab() {
         </p>
       )}
 
-      {/* Not derived from the day ranges above — a shift can count a "full
-          day" as something other than its own scheduled span. */}
+      {/* Not derived from the day ranges above. */}
       <div className='space-y-2'>
         <Label className='text-base font-semibold'>Day duration</Label>
         <div className='space-y-2'>
@@ -578,9 +569,6 @@ export function ShiftTimesTab() {
           ))}
         </div>
       </div>
-
-      {/* `start_date` stays on the schema though not shown here — the
-          schedule's date decides when work happens, not the shift's. */}
 
       <FormField
         control={form.control}

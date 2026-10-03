@@ -100,8 +100,7 @@ export const VARIANT_STYLES: Record<string, SelectStyleSet> = {
 } as const
 export type Variant = keyof typeof VARIANT_STYLES
 
-// Minimum heights only: a fixed height clips a multi-select's chips once they
-// wrap past the first row, so the third pick in a narrow card vanished.
+// Minimum heights only, so chips can wrap past the first row without clipping.
 export const COMPACT_HEIGHT_STYLES = {
   control: (base: object) => ({ ...base, minHeight: '24px' }),
   valueContainer: (base: object) => ({

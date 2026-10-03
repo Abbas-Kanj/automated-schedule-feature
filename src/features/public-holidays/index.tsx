@@ -85,8 +85,7 @@ function PublicHolidaysContent() {
         </div>
 
         {isYearOpen ? (
-          // Remounting on year change resets pagination, sorting and any
-          // row selection carried over from the year before.
+          // Remounting on year change resets pagination, sorting and row selection.
           <PublicHolidaysTable key={selectedYear} data={yearHolidays} />
         ) : (
           <div className='flex flex-1 flex-col items-center justify-center gap-2 rounded-md border border-dashed p-10 text-center'>

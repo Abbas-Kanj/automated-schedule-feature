@@ -21,8 +21,7 @@ import {
   placementShifts,
 } from './rotation-suggestion'
 
-// Only the fields the reconstruction needs, so this doesn't drag the whole
-// team schema across feature lines.
+// Only the fields the reconstruction needs.
 export type RotationCrewTeam = {
   id: string
   name: string
@@ -39,8 +38,7 @@ export function patternToSlots(
   }))
 }
 
-// A shift with no enabled day sorts last rather than first, so an
-// unconfigured shift does not silently become the head of the rotation.
+// A shift with no enabled day sorts last.
 function shiftStartMinutes(shift: Shift): number {
   const starts = shift.days
     .filter((day) => day.enabled)
@@ -49,9 +47,7 @@ function shiftStartMinutes(shift: Shift): number {
 }
 
 // Clock order, earliest first, so `shiftStep` 1 means "the next shift of the
-// day". Ties break on name for stability across renders/reloads. Ids with no
-// matching shift are kept, at the end — dropping them would silently shrink
-// the rotation.
+// day". Ties break on name. Ids with no matching shift are kept, at the end.
 export function orderShiftIdsByStart(
   shiftIds: string[],
   shifts: Shift[]
@@ -69,10 +65,7 @@ export function orderShiftIdsByStart(
 }
 
 // A shift finishing at or before it starts runs past midnight, so its end is
-// pushed into the next day — this is what makes night-ending-06:00 into
-// morning-starting-06:00 come out as zero rest rather than a negative day.
-// Shifts with no enabled day are left out rather than defaulted: inventing
-// hours for one would invent a rest violation with them.
+// pushed into the next day. Shifts with no enabled day are left out.
 export function shiftHoursById(shifts: Shift[]): Map<string, ShiftHours> {
   const hours = new Map<string, ShiftHours>()
   shifts.forEach((shift) => {
@@ -88,8 +81,7 @@ export function shiftHoursById(shifts: Shift[]): Map<string, ShiftHours> {
   return hours
 }
 
-// A team or employee the stores no longer know about is dropped: it cannot be
-// labelled or counted, and leaving it in would report phantom coverage.
+// A team or employee the stores no longer know about is dropped.
 export function crewsFromDayCoverage(
   cells: RotateDayCoverage[],
   teams: RotationCrewTeam[],
@@ -140,11 +132,8 @@ export function crewsFromDayCoverage(
   return [...crews.values()]
 }
 
-// Sparse — only cells somebody landed on are written, so "no cell" and "empty
-// cell" stay the same thing everywhere. Takes the *stored* placement shape
-// rather than the search's own because both callers hold that shape: the
-// suggestion after `crewPlacementsToStored`, and the step's "starts on day N"
-// editor, which has no search result behind it.
+// Sparse — only cells somebody landed on are written. Takes the stored
+// placement shape.
 export function cellsFromCrewPlacements(
   slots: SuggestionSlot[],
   placements: RotateCrewPlacement[],
@@ -198,9 +187,8 @@ export function cellsFromPlacements(
   )
 }
 
-// Only the crew's key survives — the label and headcount are looked up from
-// the stores on the way back out, so a renamed team does not leave a stale
-// name in the record.
+// Only the crew's key survives; the label and headcount are looked up from the
+// stores on the way back out.
 export function crewPlacementsToStored(
   placements: CrewPlacement[]
 ): RotateCrewPlacement[] {
@@ -225,11 +213,9 @@ function normalizeCells(cells: RotateDayCoverage[]): string {
   )
 }
 
-// Re-derived by regenerating and comparing, never tracked as a flag: a flag
-// has to be cleared on every path that touches a cell, and the one path that
-// forgets makes the record lie. False means a cell was hand-edited (or the
-// pool changed under them); callers must show the matrix as-is and not
-// re-apply the offsets, which would undo the edit.
+// Re-derived by regenerating and comparing, never tracked as a flag. False
+// means a cell was hand-edited (or the pool changed); callers must show the
+// matrix as-is and not re-apply the offsets.
 export function dayCoverageMatchesPlacements(
   slots: SuggestionSlot[],
   placements: RotateCrewPlacement[],
@@ -275,8 +261,7 @@ export function crewSelectionFromDayCoverage(cells: RotateDayCoverage[]): {
 }
 
 // Drops everybody the "Assign to" step no longer names — the other crew kind
-// entirely, and any unpicked crew of this one — so the work step never shows
-// a roster built from people who are not on the schedule anymore.
+// entirely, and any unpicked crew of this one.
 export function pruneRosterToCrews(
   cells: RotateDayCoverage[],
   placements: RotateCrewPlacement[],

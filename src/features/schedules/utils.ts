@@ -58,8 +58,7 @@ export function getScheduleCrewNames(
   return names
 }
 
-// "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line, since
-// the three end-settings shapes never coexist.
+// "Never ends" / "After 4 occurrence(s)" / "On 2026-09-01" as one line.
 export function formatEndSettings(
   endSettings: EndSettings | undefined
 ): string | undefined {
@@ -129,8 +128,8 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
-// The schedule's own shifts, resolved and in its own order. Ids with no shift
-// behind them are dropped — a since-deleted shift contributes no hours.
+// The schedule's own shifts, resolved and in its own order; ids with no shift
+// behind them are dropped.
 function resolveShifts(shiftIds: string[], shifts: Shift[]): Shift[] {
   const byId = new Map(shifts.map((shift) => [shift.id, shift]))
   return shiftIds.flatMap((id) => {
@@ -145,9 +144,8 @@ function enabledDayHours(shift: Shift): number {
     .reduce((sum, day) => sum + calculateHours(day.times), 0)
 }
 
-// Shared "09:00–17:00, 18:00–20:00" formatter for a list of time ranges.
-// `formatTime` is the caller's bound `useTimeFormat()` formatter — 12h/24h is a
-// display preference, not something this pure function decides.
+// Formats a list of time ranges as "09:00–17:00, 18:00–20:00". `formatTime` is
+// the caller's bound `useTimeFormat()` formatter.
 export function formatTimes(
   times: { from_time: string; to_time: string }[] | undefined,
   formatTime: (time: string) => string
@@ -261,9 +259,8 @@ export type ScheduleCalendarCycle = {
   canGoToNextCycle: boolean
 }
 
-// Loose shape on purpose: the Summary step reads these off the live, possibly
-// still-incomplete form values via `useWatch` rather than a validated
-// `Schedule`, so every field stays optional.
+// Loose shape: every field is optional, since the Summary step reads live,
+// possibly incomplete form values.
 export type CalendarScheduleInput = {
   type?: 'fixed' | 'flexible' | 'rotate'
   start_date?: string
@@ -313,8 +310,7 @@ function shiftTimesOn(
   return range ? [range] : []
 }
 
-// 7 days for a card whose shift has a matching `weekly` repeat entry, else 1
-// — keeps `pattern_shifts` mode on one-card-one-day with no special case.
+// 7 days for a card whose shift has a matching `weekly` repeat entry, else 1.
 function getCardDayCount(
   entry: { shift_id?: string; is_off: boolean },
   shiftRepeatByShiftId: Map<string, { frequency: string }>
@@ -480,7 +476,7 @@ export function getScheduleCalendarCycle(
     .map((id) => shifts.find((s) => s.id === id))
     .filter((s): s is Shift => s !== undefined)
 
-  // Once per call, not per date: the same expanded sequence repeats every cycle.
+  // Expanded once per call; the same sequence repeats every cycle.
   const expandedDays =
     schedule.type === 'rotate'
       ? expandRotatePatternDays(pattern, schedule.shift_repeat ?? [], startDate)
@@ -528,8 +524,7 @@ export function getScheduleCalendarCycle(
         const shift = expanded?.shiftId
           ? shifts.find((s) => s.id === expanded.shiftId)
           : undefined
-        // Re-derived rather than trusting `expanded.isOff`: a card pointing at
-        // a since-deleted shift must still read as off.
+        // A card pointing at a since-deleted shift reads as off.
         const isOff = !expanded || expanded.isOff || !shift
         const weekdayCode = format(date, 'EEE').toLowerCase() as ShiftDayOfWeek
         const perWeekdayTimes = expanded?.fromWeeklyCard
@@ -619,8 +614,7 @@ export function getScheduleCalendarCycle(
   }
 }
 
-// "Week 2" is the phrase real-world write-ups use for a crew's start day, so
-// it's said out loud rather than left as day-number arithmetic.
+// Formats a crew's start day, adding the week number for whole-week cycles.
 export function describeStartDay(day: number, cycleLength: number): string {
   if (cycleLength > 7 && cycleLength % 7 === 0) {
     return `Day ${day + 1} · week ${Math.floor(day / 7) + 1}`

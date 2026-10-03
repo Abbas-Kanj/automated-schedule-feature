@@ -6,9 +6,7 @@ import { getEmployeeFullName } from '@/features/employees/utils'
 import { type Team } from '../data/schema'
 import { DataTableRowActions } from './data-table-row-actions'
 
-// Drops any id that no longer matches a seeded employee. Coexists with this
-// file's non-component `teamsColumns` export, which fast refresh doesn't
-// support — acceptable for a column-def module.
+// Drops any id that no longer matches a seeded employee.
 // eslint-disable-next-line react-refresh/only-export-components
 function MembersCell({ employeeIds }: { employeeIds: string[] }) {
   const employees = useEmployeesStore((s) => s.employees)

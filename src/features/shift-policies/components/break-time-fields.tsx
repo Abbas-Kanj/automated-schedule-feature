@@ -33,8 +33,7 @@ type BreakTimeRuleFieldsProps = {
   index: number
 }
 
-// Empty input reads as undefined, so the required check can report it
-// instead of it silently becoming 0.
+// Empty input reads as undefined.
 function toNumberOrUndefined(value: string, asNumber: number) {
   return value === '' ? undefined : asNumber
 }
@@ -44,8 +43,7 @@ export function BreakTimeRuleFields({ index }: BreakTimeRuleFieldsProps) {
   const rule = useWatch({ control: form.control, name: `rules.${index}` })
   if (!rule || rule.policy_type !== 'break_time') return null
 
-  // Resets every other type's fields, so a stale value can't linger and
-  // fail validation or be saved alongside the new type.
+  // Resets every other type's fields.
   const changeBreakType = (next: BreakType) => {
     const fields = buildBreakTypeFields(next)
     for (const [key, value] of Object.entries(fields)) {
@@ -226,8 +224,7 @@ export function BreakTimeRuleFields({ index }: BreakTimeRuleFieldsProps) {
   )
 }
 
-// Stored as total minutes; the unit only changes how it's typed in, so
-// switching unit keeps the same duration.
+// Stored as total minutes; the unit only changes how it's typed in.
 function FixedDurationFields({ index }: { index: number }) {
   const form = useFormContext<ShiftPolicyFormValues>()
   const rule = useWatch({ control: form.control, name: `rules.${index}` })

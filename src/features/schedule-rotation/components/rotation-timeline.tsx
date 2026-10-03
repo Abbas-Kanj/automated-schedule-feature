@@ -14,8 +14,7 @@ type RotationTimelineProps = {
   timeline: RotationTimeline
 }
 
-// Shared with the header row's blocks — one constant keeps a date aligned
-// above the dot it belongs to instead of restating the width per row.
+// Shared with the header row's blocks.
 const DAY_COLUMN = { week: 'w-12', month: 'w-6' } as const
 const DOT_SIZE = { week: 'size-5', month: 'size-3' } as const
 
@@ -46,8 +45,7 @@ function ShiftDot({
           'rounded-full',
           DOT_SIZE[span],
           dotClassName(position),
-          // A ring, not a different fill — the fill already means "which
-          // shift".
+          // A ring, not a different fill.
           day.isToday &&
             'ring-2 ring-foreground/60 ring-offset-2 ring-offset-background'
         )}
@@ -56,7 +54,7 @@ function ShiftDot({
   )
 }
 
-// Shown first: a grid of bare colored circles is unreadable without this.
+// Legend for the shift colours.
 function TimelineLegend({ legend }: { legend: RotationPosition[] }) {
   const formatTime = useTimeFormat()
 
@@ -133,8 +131,7 @@ function CrewRow({
 }
 
 export function RotationTimelineGrid({ timeline }: RotationTimelineProps) {
-  // Recomputed rather than stored, so a short final block (cycle length not a
-  // multiple of seven) can't drift out of step with its header.
+  // Recomputed rather than stored.
   const blockOffsets: number[] = []
   timeline.blocks.reduce((offset, block) => {
     blockOffsets.push(offset)

@@ -82,8 +82,7 @@ export function AssignToCrewFields({ disabled }: AssignToCrewFieldsProps) {
           </span>
         </div>
 
-        {/* Keyed on the kind so the picker remounts rather than holding the
-            other kind's ids for a frame. */}
+        {/* Keyed on the kind so the picker remounts. */}
         <FormField
           key={crewKind}
           control={control}

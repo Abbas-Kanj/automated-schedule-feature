@@ -14,15 +14,13 @@ import { ShiftBadge } from './shift-badge'
 
 type ScheduleRotationTableProps = {
   rows: RotationRow[]
-  // Spelled out by the caller: this reads one specific day, so a period word
-  // like "this week" would misdescribe a daily-advancing rotation.
+  // Spelled out by the caller, since this reads one specific day.
   assignedHeading: string
   cycleLength: number
 }
 
 // `startDay` is only set while the stored start days still describe the
-// stored matrix (see `buildRotation`) — a hand-finished rotation shows just
-// the crew name rather than claiming a stagger the grid no longer has.
+// stored matrix (see `buildRotation`).
 function CrewNote({
   row,
   cycleLength,

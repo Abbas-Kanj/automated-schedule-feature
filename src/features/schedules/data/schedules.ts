@@ -12,20 +12,15 @@ import {
   type Schedule,
 } from './schema'
 
-// Seeded demo schedules — seven records chosen to span the model rather than
-// to look busy: both `regular` arms that carry crews (fixed / rotate), both
-// `cycle_type` arms, all three occurrence frequencies, all three end types,
-// and crews drawn both as teams and as individual employees at four different
-// crew counts.
-//
-// Every seed starts on a **Monday** so week-shaped patterns put their rest
-// cards on the weekend; a mid-week start walks them off it.
+// Seeded demo schedules — seven records spanning the model: both `regular` arms
+// that carry crews (fixed / rotate), both `cycle_type` arms, all three
+// occurrence frequencies, all three end types, and crews drawn both as teams
+// and as individual employees at four different crew counts. Every seed starts
+// on a **Monday**.
 const START_DATE = '2026-08-31'
 
 // Turns a preset's card list (indexes into `shiftIds`, `null` = rest) into the
-// stored pattern — the same conversion the Pattern step's preset picker does,
-// so a seed and a hand-built schedule cannot describe the same named system
-// differently.
+// stored pattern, as the Pattern step's preset picker does.
 function presetPattern(
   presetId: string,
   shiftIds: string[]
@@ -39,11 +34,8 @@ function presetPattern(
   }))
 }
 
-// `day_coverage` is the source of truth the app reads, but writing 28x3 cells
-// by hand invites a typo no test would catch. Deriving them from the
-// placements instead keeps the seeds satisfying
-// `dayCoverageMatchesPlacements`, so the "Crew start days" read-back renders
-// as generated rather than as "set by hand".
+// Derives `day_coverage` from the placements, so the seeds satisfy
+// `dayCoverageMatchesPlacements`.
 function rosterFrom(
   pattern: RotatePatternEntry[],
   shiftIds: string[],

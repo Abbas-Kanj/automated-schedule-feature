@@ -36,8 +36,7 @@ export const SHIFT_SOFT_BADGE_CLASSES: Record<ShiftBadgeColor, string> = {
 
 export const OFF_BADGE_CLASS = 'bg-muted text-muted-foreground dark:bg-muted/50'
 
-// Derived from the shift form's own swatches, not redefined, so a dot is
-// always the same color the shift wears everywhere else.
+// Derived from the shift form's own swatches.
 export const SHIFT_DOT_CLASSES = Object.fromEntries(
   SHIFT_BADGE_COLOR_OPTIONS.map((option) => [
     option.value,
@@ -45,6 +44,5 @@ export const SHIFT_DOT_CLASSES = Object.fromEntries(
   ])
 ) as Record<ShiftBadgeColor, string>
 
-// An empty ring, not a grey disc — rest should recede rather than compete
-// visually with the shift colors.
+// An empty ring, not a grey disc.
 export const OFF_DOT_CLASS = 'border-2 border-muted-foreground/35'

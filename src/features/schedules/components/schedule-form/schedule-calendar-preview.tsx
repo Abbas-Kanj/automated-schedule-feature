@@ -25,8 +25,7 @@ type ScheduleCalendarPreviewProps = {
 }
 
 // Maps a schedule onto real calendar dates, one cycle at a time, with
-// "next/previous cycle" paging instead of rendering the whole — possibly
-// unbounded — schedule at once.
+// next/previous cycle paging.
 export function ScheduleCalendarPreview({
   values,
 }: ScheduleCalendarPreviewProps) {

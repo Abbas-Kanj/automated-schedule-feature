@@ -19,8 +19,6 @@ type DataTableRowActionsProps = {
   row: Row<Shift>
 }
 
-// `row.original` is already a validated `Shift` — the store parses on load
-// (see `shifts-store.ts`), so this doesn't re-run the schema per render.
 export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const shift = row.original
   const { setOpen, setCurrentRow } = useShifts()
@@ -74,8 +72,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
             <Shield size={16} />
           </DropdownMenuShortcut>
         </DropdownMenuItem>
-        {/* Not wired up yet — no assignment flow exists — kept visible so
-            the action is discoverable ahead of that. */}
+        {/* Not wired up yet — kept visible so the action is discoverable. */}
         <DropdownMenuItem disabled>
           Assign users
           <DropdownMenuShortcut>

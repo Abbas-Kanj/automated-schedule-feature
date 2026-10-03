@@ -1,7 +1,7 @@
 import { type PublicHoliday } from './data/schema'
 
-// Ids are a human-readable code (HOL-2026-07), not a uuid — scanning the
-// year's existing ids keeps a new one collision-free after deletes.
+// Ids are a human-readable code (HOL-2026-07); the year's existing ids are
+// scanned to generate the next.
 export function nextHolidayId(holidays: PublicHoliday[], year: number): string {
   const prefix = `HOL-${year}-`
   const highest = holidays

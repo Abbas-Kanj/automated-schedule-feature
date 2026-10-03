@@ -34,8 +34,6 @@ function getRuleWindow(rules: PolicyRule[]) {
   }
 }
 
-// Coexists with this file's non-component `policiesColumns` export, which
-// fast refresh doesn't support — acceptable for a column-def module.
 // eslint-disable-next-line react-refresh/only-export-components
 function WindowCell({ rules }: { rules: PolicyRule[] }) {
   const formatTime = useTimeFormat()

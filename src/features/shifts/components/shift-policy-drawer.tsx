@@ -21,9 +21,8 @@ export function ShiftPolicyDrawer({
   onOpenChange,
 }: ShiftPolicyDrawerProps) {
   const updateShift = useShiftsStore((s) => s.updateShift)
-  // `shift` is a snapshot that never re-renders once the store updates, so
-  // re-read the live row by id; fall back to the snapshot only for the
-  // brief window between delete and this drawer unmounting.
+  // `shift` is a snapshot, so the live row is re-read by id; the snapshot is
+  // only a fallback between delete and unmount.
   const liveShift =
     useShiftsStore((s) => s.shifts.find((row) => row.id === shift?.id)) ?? shift
 

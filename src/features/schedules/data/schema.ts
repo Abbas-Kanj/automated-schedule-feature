@@ -12,10 +12,7 @@ export const DAYS_OF_WEEK = [
 
 const daySchema = z.enum(DAYS_OF_WEEK)
 
-// Shape *and* reality: the regex alone accepts `2026-02-31`, which then
-// silently becomes March 3rd wherever the string is turned into a Date, and
-// `2026-13-45`, which becomes an Invalid Date. Round-tripped through UTC
-// because local parsing shifts the day in negative offsets.
+// Checks the format and that the date exists, by round-tripping through UTC.
 export const dateStringSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Required')
@@ -236,9 +233,7 @@ const rotatePatternEntrySchema = z.object({
 })
 
 // The rotation roster as an explicit (cycle day × shift) → crews matrix.
-// Storing the resolved matrix (not an offset per crew) decouples pattern from
-// coverage and lets the manual grid edit one cell without dragging a crew's
-// whole journey. Sparse: an absent cell means unstaffed, warned not errored.
+// Sparse: an absent cell means unstaffed, warned not errored.
 const rotateDayCoverageSchema = z.object({
   day: z.number().int().min(0), // 0-based, indexes the pattern card
   shift_id: z.string().min(1),
@@ -253,8 +248,7 @@ const rotateDayCoverageSchema = z.object({
 export const SHIFT_REPEAT_FREQUENCIES = ['daily', 'weekly', 'monthly'] as const
 
 // Mirrors `shifts`' own "Repeat" tab (minus end-frequency, since the
-// pattern's length already bounds it). Own copy, not an import — `shifts` is
-// a standalone feature.
+// pattern's length already bounds it).
 export const SHIFT_REPEAT_WEEKDAYS = [
   'mon',
   'tue',
@@ -297,11 +291,9 @@ const shiftRepeatSchema = z.object({
     .optional(),
 })
 
-// How the roster was *generated*, stored next to the matrix it produced.
-// `day_coverage` stays the source of truth (free cell editing can put a crew
-// somewhere no offset pair would); this only answers "Team B starts week 2".
-// Not tracked by a staleness flag — re-derived via `dayCoverageMatchesPlacements`
-// by regenerating and comparing, so a hand edit can't leave a stale flag behind.
+// How the roster was generated, stored next to the matrix it produced.
+// `day_coverage` stays the source of truth; this only answers "Team B starts
+// week 2". Staleness is re-derived via `dayCoverageMatchesPlacements`.
 const rotateCrewPlacementSchema = z.object({
   crew: z.string().min(1), // `team:<id>` / `employee:<id>`, matches the pool key
   day_offset: z.number().int().min(0), // cycle card this crew stands on at day 0
@@ -320,9 +312,9 @@ const rotateFieldsSchema = z.object({
 
 // --- rotate: who the roster is drawn from ---
 //
-// Optional so older saved schedules still load — the form recovers the pick
-// from `day_coverage` (see `crewSelectionFromDayCoverage`). Fixed keeps only
-// `crew_kind`; its crews live on `shift_assignments`.
+// Optional; the form recovers the pick from `day_coverage` (see
+// `crewSelectionFromDayCoverage`). Fixed keeps only `crew_kind`; its crews
+// live on `shift_assignments`.
 export const CREW_KINDS = ['team', 'employee'] as const
 
 const crewSelectionSchema = z.object({
@@ -442,9 +434,7 @@ const occurrenceExceptionsSchema = z.object({
 
 // --- fixed: who works each shift ---
 //
-// Per shift rather than per day: which days a shift runs is its occurrence's
-// business. The same crew may be on several shifts — the step warns, it
-// doesn't forbid.
+// Per shift rather than per day. The same crew may be on several shifts.
 const shiftAssignmentSchema = z.object({
   shift_id: z.string().min(1),
   employee_ids: z.array(z.string()).default([]),
@@ -492,9 +482,8 @@ const regularScheduleSchema = z
     regularRotateSchema,
   ])
   .superRefine((val, ctx) => {
-    // `endSettingsSchema` can only see its own object, so the one rule that
-    // needs both dates lives here. ISO strings compare chronologically, so
-    // no parsing is needed.
+    // Checks the end date against the start date; ISO strings compare
+    // chronologically.
     if (
       val.end_settings.end_type === 'on_date' &&
       val.end_settings.end_date &&
@@ -591,8 +580,7 @@ const regularScheduleSchema = z
         }
       })
 
-      // Well-formed only — an unstaffed shift is a warning, never a
-      // validation error; fixability depends on crew count, not data shape.
+      // Well-formed only — an unstaffed shift is a warning, never a validation error.
       const seenCells = new Set<string>()
       val.day_coverage.forEach((cell, i) => {
         if (!val.shift_ids.includes(cell.shift_id)) {
@@ -622,8 +610,7 @@ const regularScheduleSchema = z
         seenCells.add(key)
       })
 
-      // Well-formed only, same as `day_coverage` — a stale placement is not
-      // an error, the step reports the mismatch in place.
+      // Well-formed only, same as `day_coverage`.
       const seenCrews = new Set<string>()
       val.crew_placements.forEach((placement, i) => {
         if (placement.day_offset >= val.pattern.length) {
@@ -697,8 +684,7 @@ const commonScheduleSchema = z.object({
   id: z.string(),
   name: z.string().min(1, 'Name is required'),
   description: z.string(),
-  // Step 1's template picker. Wiring templates to pre-fill a schedule is a
-  // follow-up; for now this only records the pick.
+  // Step 1's template picker; only records the pick.
   template_id: z.string().optional(),
 })
 

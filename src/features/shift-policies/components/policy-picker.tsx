@@ -81,9 +81,8 @@ export function PolicyPicker({ value, onChange, disabled }: PolicyPickerProps) {
     )
   }
 
-  // Click-away and Escape close the dropdown. A plain blur would fire
-  // before the click on a result lands, so the listener is on the document
-  // and scoped to the wrapper instead.
+  // Click-away and Escape close the dropdown; the listener is on the document,
+  // scoped to the wrapper.
   useEffect(() => {
     if (!searchOpen) return
     const close = () => {
@@ -268,8 +267,7 @@ export function PolicyPicker({ value, onChange, disabled }: PolicyPickerProps) {
       <PolicyFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        // A policy created from here is attached straight away — that's the
-        // reason to create one mid-flow.
+        // A policy created from here is attached straight away.
         onSaved={(policy) => toggle(policy.id, true)}
       />
       {editing && (

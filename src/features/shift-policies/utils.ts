@@ -94,8 +94,7 @@ export function buildDefaultBreakTimeRule(id: string): BreakTimeRule {
 }
 
 // The fields one break type uses, defaulted, with every other type's fields
-// cleared — so switching type can't leave a stale value behind to fail
-// validation or get saved.
+// cleared.
 export function buildBreakTypeFields(
   break_type: BreakType
 ): Pick<
@@ -163,8 +162,7 @@ export function retypeRule(rule: PolicyRule, next: PolicyType): PolicyRule {
   return { ...buildDefaultRule(rule.id, next), name: rule.name }
 }
 
-// `formatTime` comes from the caller's `useTimeFormat`, so the window
-// follows the user's 12/24-hour display preference.
+// `formatTime` comes from the caller's `useTimeFormat`.
 export function describeRule(
   rule: PolicyRule,
   formatTime: (time: string) => string

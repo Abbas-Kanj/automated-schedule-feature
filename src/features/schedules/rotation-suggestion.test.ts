@@ -67,8 +67,7 @@ function place(
 
 describe('crewRequirement', () => {
   // Each case is pinned against `suggestRotationCoverage` (what the search can
-  // actually place) rather than against a counting argument, which gets these
-  // wrong.
+  // actually place).
   function coversWith(
     slots: SuggestionSlot[],
     shifts: string[],
@@ -91,8 +90,7 @@ describe('crewRequirement', () => {
     expect(crewRequirement(slots, shifts)).toEqual({
       workDaysPerCrew: 5,
       cellsPerCycle: 14,
-      // The division a person does in their head, kept so the UI can account
-      // for the difference instead of printing both numbers side by side.
+      // The division a person does in their head.
       crewDayBound: 3,
       minimumCrews: 4,
       exact: true,
@@ -236,9 +234,8 @@ describe('suggestRotationCoverage', () => {
     expect(codes(result.warnings)).not.toContain('uncovered-shift')
   })
 
-  // master_49 can't reach a spread of 1 — 210 crew-days over 49 days is a
-  // mean of 4.29, not the search's fault. Listed as an exception rather than
-  // loosening the rule for every preset.
+  // master_49 can't reach a spread of 1 — 210 crew-days over 49 days is a mean
+  // of 4.29. Listed as an exception.
   const FLATNESS_EXCEPTIONS: Record<string, number> = { master_49: 2 }
 
   it('keeps coverage flat on every preset at its suggested crew count', () => {

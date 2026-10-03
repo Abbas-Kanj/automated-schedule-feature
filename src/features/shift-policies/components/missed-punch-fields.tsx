@@ -196,8 +196,7 @@ export function MissedPunchRuleFields({ index }: MissedPunchRuleFieldsProps) {
         </div>
       </div>
 
-      {/* A missed punch is always booked as a deduction — shown, not
-          chosen, so the rule reads the same as a window rule. */}
+      {/* A missed punch is always booked as a deduction — shown, not chosen. */}
       <div className='space-y-2'>
         <Label className='text-xs'>Attendance type</Label>
         <Select value={rule.attendance_type} disabled>
@@ -236,10 +235,7 @@ export function MissedPunchRuleFields({ index }: MissedPunchRuleFieldsProps) {
                         <RadioGroupItem value={option.value} />
                         {option.label}
                       </Label>
-                      {/* Only "Hours" takes a number — a half/full day is
-                          however long the shift says it is. Kept outside the
-                          Label so clicking into it doesn't read as a click
-                          on the radio. */}
+                      {/* Only "Hours" takes a number; a half/full day uses the shift's own duration. */}
                       {option.value === 'hours' && (
                         <FormField
                           control={form.control}

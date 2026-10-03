@@ -22,8 +22,7 @@ type CommandNavLink = {
   trail: string[]
 }
 
-// Flattens to leaves recursively — the nav is nested arbitrarily deep, and
-// walking only one level left grandchildren rendering as branches with no url.
+// Flattens the nav to its leaves recursively.
 function flattenNavItems(
   items: NavItem[],
   trail: string[] = []

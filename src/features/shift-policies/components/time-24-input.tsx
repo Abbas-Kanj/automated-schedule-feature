@@ -27,9 +27,8 @@ function normalize(raw: string): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-// Stands in for `<input type="time">`, whose AM/PM segment depends on the
-// browser's locale and can't be forced off (`lang` on the input doesn't
-// work) — a masked text field is the only way to guarantee 24-hour "HH:mm".
+// Stands in for `<input type="time">`: a masked text field that guarantees
+// 24-hour "HH:mm".
 export function Time24Input({
   value,
   onChange,

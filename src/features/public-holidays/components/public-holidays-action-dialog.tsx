@@ -45,8 +45,7 @@ const formSchema = z.object({
 type HolidayForm = z.infer<typeof formSchema>
 
 // The calendar works in local Date objects but the form field holds
-// "yyyy-MM-dd" strings, so a date is only ever compared as text — no
-// timezone drift.
+// "yyyy-MM-dd" strings, so dates are compared as text.
 const toDateInputValue = (date: Date) => format(date, 'yyyy-MM-dd')
 const fromDateInputValue = (value: string) => new Date(`${value}T00:00:00`)
 
@@ -109,8 +108,7 @@ export function PublicHolidaysActionDialog({
 
   const onSubmit = (values: HolidayForm) => {
     const holiday: PublicHoliday = {
-      // Editing keeps the record's id; a new one continues the year's
-      // sequence, so two holidays can never collide on it.
+      // Editing keeps the record's id; a new one continues the year's sequence.
       id: currentRow?.id ?? nextHolidayId(holidays, holidayYear),
       name: values.name,
       year: holidayYear,

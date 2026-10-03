@@ -186,8 +186,8 @@ export const DAY_LABELS: Record<(typeof DAYS_OF_WEEK)[number], string> = {
 // "Local" radio option in the timezone field.
 export const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-// The project's `lib` target (ES2020) predates `Intl.supportedValuesOf`'s
-// type declaration — cast narrowly instead of widening `lib` for one API.
+// Cast narrowly: the `lib` target predates `Intl.supportedValuesOf`'s type
+// declaration.
 const supportedValuesOf = (
   Intl as unknown as { supportedValuesOf?: (key: 'timeZone') => string[] }
 ).supportedValuesOf

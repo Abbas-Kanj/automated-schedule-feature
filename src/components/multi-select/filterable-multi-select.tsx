@@ -70,8 +70,6 @@ export function FilterableMultiSelect<T extends SelectOption>({
             key={candidate}
             size='sm'
             selected={letter === candidate}
-            // A letter nobody's name starts with is dead weight to click, so
-            // the strip doubles as a readout of what the directory holds.
             disabled={isDisabled || !available.has(candidate)}
             onClick={() => pick(candidate)}
             className='h-6 w-6 p-0 font-mono text-xs'

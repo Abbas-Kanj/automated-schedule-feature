@@ -27,8 +27,7 @@ export type CrewPlacement = {
   shiftStep: number
 }
 
-// An array per day, not one id: free cell editing can put a crew on two
-// shifts the same day, which should be named as a mistake, not dropped.
+// An array per day, so a hand edit can double-book a crew.
 export type CoverageCrew = {
   key: string
   label: string
@@ -86,9 +85,7 @@ export type AnalysisOptions = {
   // reads as fixable or structural. Without it, falls back to a looser
   // crew-day count.
   minimumCrews?: number
-  // Without this the quick-turnaround check is skipped — list position isn't
-  // enough, since Night -> Morning steps one place *forward* through a list
-  // ordered by start time.
+  // Without this the quick-turnaround check is skipped.
   shiftHours?: Map<string, ShiftHours>
   // Defaults to the EU Working Time Directive's 11.
   minRestHours?: number
@@ -106,7 +103,7 @@ const DEFAULT_WEEKEND_DAYS = [0, 6]
 const DEFAULT_MIN_REST_HOURS = 11
 
 // Above this many candidates the exhaustive pass is skipped for a seeded local
-// search. Sized so real rosters stay exhaustive (DuPont: 2,925 candidates).
+// search.
 const EXHAUSTIVE_LIMIT = 100_000
 
 const MAX_LOCAL_ROUNDS = 60
@@ -115,10 +112,7 @@ const MAX_LOCAL_ROUNDS = 60
 // spaced one a human would have picked.
 const EVEN_SPACING_TIEBREAK = 1e-4
 
-// An order of magnitude above the spacing tie-break and far below anything the
-// coverage score can reach: rest only decides between rosters that are
-// otherwise equally covered, never buys a flatter rota at the cost of an
-// unstaffed shift.
+// Weight of the rest tie-break; it only decides between otherwise equally covered rosters.
 const QUICK_TURNAROUND_TIEBREAK = 1e-3
 
 type PlacementContext = {
@@ -131,8 +125,7 @@ function floorMod(value: number, modulus: number): number {
 }
 
 // The card decides *whether* a crew works, its own step decides *what*. An
-// unknown shift id (a since-deleted shift) passes through unrotated, so it
-// stays visibly wrong instead of silently becoming a different shift.
+// An unknown shift id passes through unrotated.
 function shiftForCard(
   slot: SuggestionSlot,
   shiftStep: number,
@@ -162,10 +155,8 @@ export function placementShifts(
 
 // --- crew requirement -------------------------------------------------------
 
-// Deliberately not crew-days over cells, nor the step-distribution bound —
-// neither can see day alignment. Found by placing: start at the counting
-// bound and run the real search for one more crew at a time, so the number
-// means "the smallest pool Suggest can fully cover with".
+// Starts at the counting bound and runs the real search for one more crew
+// at a time; the result is the smallest pool Suggest can fully cover with.
 export type CrewRequirement = {
   workDaysPerCrew: number
   cellsPerCycle: number
@@ -220,13 +211,10 @@ function someSplitCovers(
 }
 
 // Above this many selected shifts the composition search is skipped for the
-// plain division — nobody rotates through nine shifts, and a loose starting
-// point only costs an extra probe.
+// plain division.
 const REQUIREMENT_EXACT_SHIFT_LIMIT = 8
 
-// The starting point is a real lower bound and the answer is normally it or
-// one above, so this is slack rather than search width — each probe is a
-// full search.
+// Extra crews probed beyond the lower bound; each probe is a full search.
 const REQUIREMENT_PROBE_LIMIT = 4
 
 // Interchangeable stand-ins: the search only cares how many crews there are.
@@ -260,7 +248,6 @@ function cardsByShiftCount(
 }
 
 // Cells divided by the days one crew works — a true lower bound, and the
-// number a person arrives at on their own.
 export function crewDayLowerBound(
   slots: SuggestionSlot[],
   orderedShiftIds: string[]
@@ -289,8 +276,6 @@ function coverageLowerBound(
   const crewDayBound = crewDayLowerBound(slots, orderedShiftIds)
   if (shiftCount > REQUIREMENT_EXACT_SHIFT_LIMIT) return crewDayBound
 
-  // Giving every shift its own crew group always satisfies the counting
-  // constraints, so the scan is guaranteed to stop at or before this.
   const ceiling =
     Math.ceil(cycleLength / Math.max(...cardsByShift)) * shiftCount
 
@@ -351,8 +336,7 @@ export function placementsToCoverageCrews(
     return {
       key: placement.crew.key,
       label: placement.crew.label,
-      // At least one body even before its team is populated, so an empty
-      // team does not read as free coverage.
+      // At least one body even before its team is populated.
       headcount: Math.max(placement.crew.employeeIds.length, 1),
       byDay,
     }
@@ -405,13 +389,9 @@ export type QuickTurnaround = {
   restMinutes: number
 }
 
-// Measured in hours, not list positions: Night -> Morning looks like a step
-// *forward* through a list ordered by start time while being the textbook
-// quick turnaround, so only the clock can tell them apart.
-//
-// Wraps the end of the cycle. Where a hand edit put a crew on two shifts the
-// same day, the tightest reading is used (latest finish into earliest start)
-// so a double booking cannot hide a turnaround.
+// Measured in hours, not list positions. Wraps the end of the cycle; where a
+// crew is on two shifts the same day, the tightest reading is used (latest
+// finish into earliest start).
 export function findQuickTurnarounds(
   crews: CoverageCrew[],
   cycleLength: number,
@@ -464,12 +444,8 @@ export function findQuickTurnarounds(
 
 // --- scoring ----------------------------------------------------------------
 
-// An unstaffed shift is priced above everything else the score can reach,
-// rather than left to compete with a lumpy roster. Holes nobody can fill stay
-// harmless: when there aren't enough crew-days, every candidate pays the same
-// number of these, so a constant added to all of them can't change the winner.
-// The size is a real bound (the largest total the rest of the score can
-// reach), not a magic number.
+// Penalty for an unstaffed shift, sized above anything else the score can
+// reach (the largest total of the rest of the score).
 function uncoveredCellPenalty(
   cycleLength: number,
   crewCount: number,
@@ -482,8 +458,7 @@ function uncoveredCellPenalty(
 }
 
 // Lower is better: unstaffed cells first, then flat per-cell crew counts,
-// then flat crews-on-duty. The spacing tie-break lives in the search instead,
-// the only half holding offsets to space out.
+// then flat crews-on-duty.
 function scoreCoverage(
   coverage: CoverageDay[],
   orderedShiftIds: string[],
@@ -546,11 +521,9 @@ type PlacementScorer = (
   shiftSteps: number[]
 ) => number
 
-// The search scores the same handful of journeys tens of thousands of times,
-// so every journey the pattern admits is resolved once up front — including
-// quick turnarounds, a per-crew property independent of who else is placed.
-// Scoring a candidate is then a walk over `crewCount` rows of a typed array
-// rather than rebuilding a matrix of maps.
+// Resolves every journey the pattern admits once up front, including quick
+// turnarounds, so scoring a candidate is a walk over `crewCount` rows of a
+// typed array.
 function createScorer(
   slots: SuggestionSlot[],
   orderedShiftIds: string[],
@@ -672,13 +645,8 @@ function combinationCount(n: number, k: number): number {
 
 type Placement = { dayOffsets: number[]; shiftSteps: number[] }
 
-// Each move type earns its keep: moving a crew's day explores rest staggers,
-// moving its shift step explores which shift it fills, swapping two crews'
-// placements only matters once crews differ in size.
-//
-// Duplicate day offsets are deliberately allowed — two crews on the same rest
-// rhythm working different shifts is the correct answer for an office 5-2
-// with a morning and a night shift.
+// Moves: shift a crew's day offset, shift its shift step, or swap two crews'
+// placements. Duplicate day offsets are allowed.
 function localImprove(
   crewCount: number,
   cycleLength: number,
@@ -690,9 +658,7 @@ function localImprove(
   const shiftSteps = [...seed.shiftSteps]
   let bestCost = score(crewCount, dayOffsets, shiftSteps)
 
-  // Mutate in place and roll back on a miss — cloning two arrays per trial
-  // dominated everything else across a full climb's hundreds of thousands of
-  // candidates.
+  // Mutates in place and rolls back on a miss.
   const keeps = (slot: number[], index: number, previous: number): boolean => {
     const cost = score(crewCount, dayOffsets, shiftSteps)
     if (cost < bestCost - 1e-9) {
@@ -759,9 +725,7 @@ function localImprove(
 }
 
 // Places crews one at a time, each into the (day, shift step) that best
-// completes what is already down. Rescues cases where the hand-written seeds
-// mislead — a DuPont pattern already spelling out its own day/night
-// alternation wants every shift step at 0.
+// completes what is already down.
 function greedyPlacement(
   crewCount: number,
   cycleLength: number,
@@ -799,7 +763,7 @@ function greedyPlacement(
 
 // Exhaustive over day offsets against one fixed set of shift steps, crew 0
 // pinned to offset 0. Walks the combinations in place rather than
-// materialising each one — this body runs up to `EXHAUSTIVE_LIMIT` times.
+// materialising each one.
 function bestDayOffsetsFor(
   crewCount: number,
   cycleLength: number,
@@ -850,10 +814,7 @@ function choosePlacement(
   const score = createScorer(slots, orderedShiftIds, context)
   const evenDays = evenSpacedOffsets(cycleLength, crewCount)
 
-  // Both shift-step seeds are needed: all-zero wins when the pattern already
-  // spells out its own alternation (DDNNOO, DuPont), round-robin wins when it
-  // names one shift repeatedly and crews must fan out. Seeding only one
-  // leaves the climb stuck in the other's basin — don't simplify this away.
+  // Seeds with both all-zero and round-robin shift steps.
   const stepSeeds: number[][] = [new Array<number>(crewCount).fill(0)]
   if (shiftCount > 1) {
     stepSeeds.push(Array.from({ length: crewCount }, (_, k) => k % shiftCount))
@@ -865,12 +826,9 @@ function choosePlacement(
   }))
   starts.push(greedyPlacement(crewCount, cycleLength, shiftCount, score))
 
-  // Two free symmetries justify pinning crew 0 to day offset 0: rotating every
-  // day offset by the same amount rotates the coverage array without changing
-  // it, and rotating every shift step cyclically permutes which shift is
-  // which — every score term is a symmetric sum over shifts, invariant under
-  // both. The budget below is the *total* candidates scored, so a second
-  // shift-step seed halves how long a cycle stays exhaustive.
+  // Crew 0 is pinned to day offset 0 (rotating every day offset, or cyclically
+  // permuting shift steps, leaves the score unchanged). The budget below is the
+  // total candidates scored across both shift-step seeds.
   const candidates = combinationCount(cycleLength - 1, crewCount - 1)
   if (
     crewCount <= cycleLength &&
@@ -889,9 +847,7 @@ function choosePlacement(
     })
   }
 
-  // Always polish, from every start: the exhaustive pass only searches day
-  // offsets against one fixed set of shift steps and hands crews to it in
-  // pick order, which is not the best pairing once crews differ.
+  // Always polish, from every start.
   let best: Placement | undefined
   let bestCost = Number.POSITIVE_INFINITY
   starts.forEach((start) => {
@@ -914,8 +870,7 @@ function choosePlacement(
 
 // --- warnings ---------------------------------------------------------------
 
-// Rest is reported in hours because that is the unit working-time rules are
-// written in. Half hours survive; anything finer is false precision.
+// Rest is reported in hours, rounded to the half hour.
 function formatHours(minutes: number): string {
   const rounded = Math.round((minutes / 60) * 2) / 2
   const value = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)
@@ -1046,15 +1001,12 @@ function buildWarnings(
     0
   )
 
-  // `crewRequirement` places crews to find out; the crew-day fallback only
-  // counts them, which understates.
+  // Uses `crewRequirement` when available, else a crew-day count.
   const recommendedCrews =
     options.minimumCrews ??
     (maxWorkDays ? Math.ceil((cycleLength * shiftCount) / maxWorkDays) : 0)
   // Would a different assignment of *these* crews close the hole? Below the
-  // requirement nothing can, so this is the pattern and crew count talking,
-  // not a mistake — getting it wrong tells someone who just pressed Suggest
-  // to press it again.
+  // requirement nothing can, so this is the pattern and crew count talking.
   const fillable =
     options.minimumCrews != null
       ? crewCount >= options.minimumCrews
@@ -1103,8 +1055,7 @@ function buildWarnings(
     })
   }
 
-  // Only reachable by hand — the search never produces it — but free cell
-  // editing makes it one click away.
+  // Only reachable by hand edits.
   const doubleBooked = crews.filter((crew) =>
     [...crew.byDay.values()].some((shiftIds) => shiftIds.length > 1)
   )
@@ -1145,8 +1096,7 @@ function buildWarnings(
     )
 
     if (turnarounds.length > 0) {
-      // One line, not one per occurrence: a rotation that breaks the rule
-      // usually breaks it the same way for every crew.
+      // One line for the whole rotation, not one per occurrence.
       const worst = turnarounds.reduce((tightest, entry) =>
         entry.restMinutes < tightest.restMinutes ? entry : tightest
       )
@@ -1191,8 +1141,7 @@ export function analyzeDayCoverage(
 }
 
 // Deterministic: the same slots, crews and shift order always produce the
-// same placements, so re-running never shuffles a roster the user has looked
-// at.
+// same placements.
 export function suggestRotationCoverage(
   slots: SuggestionSlot[],
   crews: SuggestionCrew[],
@@ -1203,8 +1152,6 @@ export function suggestRotationCoverage(
     slots,
     crews,
     orderedShiftIds,
-    // `crewRequirement` probes through here and deliberately passes nothing —
-    // what a pattern *needs* is a fact about coverage, not about comfort.
     options.shiftHours
       ? {
           shiftHours: options.shiftHours,

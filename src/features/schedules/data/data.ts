@@ -166,10 +166,7 @@ export const CYCLE_TYPE_OPTIONS = [
   description: string
 }[]
 
-// "Monthly" stays greyed out, not removed — nothing downstream honours real
-// calendar months yet (see `CYCLE_LENGTH_UNIT_DAY_MULTIPLIERS`). Same reasoning
-// for every other `disabled: true` monthly option here and in
-// `shifts/data/data.ts`; existing monthly data still renders.
+// "Monthly" is shown greyed out; existing monthly data still renders.
 export const CYCLE_LENGTH_UNIT_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly', disabled: true },

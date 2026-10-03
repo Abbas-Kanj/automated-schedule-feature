@@ -38,16 +38,14 @@ export function isRotateSchedule(
   return schedule.parent_type === 'regular' && schedule.type === 'rotate'
 }
 
-// Each advances the rotation by exactly one pattern position. `daily` makes a
-// day-based pattern mean what it says — a 2-2-3 roster is fourteen *days*, so
-// cards advance one per day; read weekly, the same cards would be a
-// fourteen-*week* cycle. `weekly` (Monday-first) and `monthly` treat a card as
-// a whole week or month on one shift.
+// Each advances the rotation by exactly one pattern position: `daily` one card
+// per day, `weekly` (Monday-first) a whole week per card, `monthly` a whole
+// month per card.
 export type RotationPeriodType = 'daily' | 'weekly' | 'monthly'
 
 // One resolved day of the cycle — a pattern card (template) or an employee's
-// actual cell. `isOff` is re-derived rather than trusted, so a day pointing at
-// a since-deleted shift still reads as off.
+// actual cell. `isOff` is re-derived, so a day pointing at a since-deleted
+// shift reads as off.
 export type RotationPosition = {
   index: number
   shift?: Shift
@@ -62,8 +60,7 @@ export type RotationRow = {
   employee: Employee
   employeeId: string
   fullName: string
-  // First cycle day this employee works — a sort key, not a stagger (the
-  // roster is stored per (day, shift), not as an offset).
+  // First cycle day this employee works — a sort key.
   offset: number
   // The crew this employee rotates with, and the cycle day it starts on — the
   // "Team B starts on week 2" half. `startDay` is only set while the stored
@@ -127,10 +124,8 @@ export function getRotationPositions(
     )
 }
 
-// Reads only the schedule's own `day_coverage` matrix — a shift's own "Assign
+// Reads only the schedule's own `day_coverage` matrix; a shift's own "Assign
 // to" picks say who may work it in general, not who covers this rotation.
-// Fixed schedules store the same shape under occurrence slot keys, so they go
-// through here too.
 export function getRotationRoster<
   S extends Pick<RotateSchedule, 'day_coverage'>,
 >(
@@ -204,9 +199,8 @@ export function getRotationRoster<
     )
 }
 
-// A fact about the schedule, not something to ask the user: a `pattern` card
-// is normally one day, so the cycle steps daily. The exception is a
-// `custom_shifts` card whose shift repeats weekly (see
+// A `pattern` card is normally one day, so the cycle steps daily. The exception
+// is a `custom_shifts` card whose shift repeats weekly (see
 // `expandRotatePatternDays` in `schedules/utils.ts`) — then a card spans a
 // real week, detected by the cycle being longer in days than it has cards.
 export function getAdvanceType(schedule: RotateSchedule): RotationPeriodType {
@@ -219,10 +213,8 @@ export function getAdvanceType(schedule: RotateSchedule): RotationPeriodType {
   return cycleDays === schedule.pattern.length ? 'daily' : 'weekly'
 }
 
-// The span a schedule's own cycle is written in: a monthly cycle read weekly
-// never closes on screen, a weekly one read monthly buries the stepping
-// bands. Custom-day cycles go by length. A starting point only — tabs stay
-// clickable after.
+// The span a schedule's own cycle is written in. Custom-day cycles go by
+// length. A starting point only — tabs stay clickable after.
 export function getDefaultSpan(schedule: RotateSchedule): 'week' | 'month' {
   if (schedule.cycle_length.unit === 'monthly') return 'month'
   if (schedule.cycle_length.unit === 'weekly') return 'week'
@@ -283,13 +275,9 @@ const DAYS_PER_ADVANCE: Record<RotationPeriodType, number> = {
 }
 
 // The first real date on or after `start_date` that each cycle day falls on,
-// index-aligned with the cycle. Walked through `getPeriodIndex` rather than
-// computed, so it can never disagree with how the screens map dates to days.
-// A slot stays undefined only if the start date is unusable.
-// `cycleDayDates` gives the first calendar date each cycle *day* falls on, so
-// the earliest of the days a crew actually works is the date it first comes on
-// duty. Mirrors the timeline's own forward walk without duplicating the date
-// arithmetic a second time.
+// index-aligned with the cycle, walked through `getPeriodIndex`. A slot stays
+// undefined only if the start date is unusable. The earliest of the days a
+// crew works is the date it first comes on duty.
 function firstWorkedDate(
   byDay: Map<number, string>,
   cycleDates: (Date | undefined)[]
@@ -415,11 +403,7 @@ export function buildRotation(
         crewKey,
         crewLabel,
         startDay,
-        // The crew's first day *on duty*, not the date its cycle position
-        // falls on. `day_offset` says which card the crew stands on at day 0,
-        // so `startDates[day_offset]` answers a different question entirely —
-        // it read "starts Sep 7" for a crew already working on Aug 31, and
-        // disagreed with the timeline's own label on the same screen.
+        // The crew's first day on duty, not the date its cycle position falls on.
         startDate:
           startDay === undefined
             ? undefined

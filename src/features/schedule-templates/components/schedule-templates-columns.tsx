@@ -12,8 +12,7 @@ import {
 import { formatDuration } from '../utils'
 import { DataTableRowActions } from './data-table-row-actions'
 
-// Theme tokens rather than raw palette classes, so both badges follow the
-// app's light/dark themes like every other badge in the table.
+// Theme tokens rather than raw palette classes.
 const STATUS_VARIANTS: Record<
   ScheduleTemplateStatus,
   'default' | 'secondary' | 'outline'
@@ -32,8 +31,6 @@ const PRIORITY_VARIANTS: Record<
   low: 'outline',
 }
 
-// Coexists with this file's non-component `scheduleTemplatesColumns` export,
-// which fast refresh doesn't support.
 // eslint-disable-next-line react-refresh/only-export-components
 function WindowCell({ template }: { template: ScheduleTemplate }) {
   const formatTime = useTimeFormat()

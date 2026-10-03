@@ -9,8 +9,6 @@ import { getShiftTimeRange } from '../utils'
 import { DataTableRowActions } from './data-table-row-actions'
 import { ShiftSwatch } from './shift-swatch'
 
-// Coexists with the file's non-component `shiftsColumns` export, which fast
-// refresh doesn't support — acceptable for a column-def module.
 // eslint-disable-next-line react-refresh/only-export-components
 function TimeCell({ value }: { value: string | null }) {
   const formatTime = useTimeFormat()

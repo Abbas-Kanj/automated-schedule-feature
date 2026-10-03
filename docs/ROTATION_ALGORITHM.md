@@ -15,7 +15,39 @@ so the document fails the build rather than drifting.
 | `src/features/schedules/rotation-crews.ts` | Bridges the algorithm to stored data and owns shift ordering. |
 | `src/features/schedules/data/schema.ts` | What a rotate schedule may be; the cross-field rules. |
 | `src/features/schedules/data/rotation-presets.ts` | The 17 ready-made patterns. |
-| `src/features/schedules/components/schedule-form/schedule-assign-to-fields.tsx` | The "Assign to" step that drives it. |
+| `src/features/schedules/components/schedule-form/schedule-assign-to-fields.tsx` | The crew-pool picker, Suggest button, manual day × shift grid and coverage panel that drive it. |
+| `src/features/schedule-rotation/components/assign-crews-dialog.tsx` | Hosts those fields on `/schedule-rotation` ("Assign crews"). |
+| `src/features/schedule-rotation/utils.ts`, `timeline.ts` | Read the stored roster back as per-employee and per-crew views. |
+
+---
+
+## 0. Where it appears in the app
+
+**Creating a rotate schedule** is a six-step wizard: Basics → Shifts → Pattern →
+**Assign to** (picks the crew pool: Teams *or* Employees, one kind at a time) →
+**Start & End** → Summary. The wizard does not place crews on days; the Summary
+shows a one-line status ("Not yet assigned…" / "N crews assigned…") instead of a
+coverage panel.
+
+**Placing crews** happens on `/schedule-rotation` → **Assign crews**. The dialog
+requires Start & End first (so every table reads in real dates), then offers
+*Suggest assignment* (the search in §4) or *Assign manually* (the day × shift
+grid). Saving writes `day_coverage` and `crew_placements` together. The picker
+defaults to the first unstaffed rotate schedule.
+
+**Reading it back** — `/schedule-rotation` has two views, each with its own
+Week/Month/Daily span tabs seeded from the schedule's own cycle: a crew-by-day
+timeline and an Employees table (who works the day on screen, and each crew's
+first on-duty date). Both read `day_coverage`, so they agree with the grader.
+
+**Fixed schedules** share the same machinery but not the model: each selected
+shift has its own occurrence rule (`shift_occurrences`) and its own crews
+(`shift_assignments`), with no pattern, offsets or search. A crew on several
+shifts is warned about, not blocked. Legacy fixed records migrate on store load
+(`migrateLegacyFixedSchedule`). They are read back on `/work-schedule/fixed`.
+
+Persistence is `localStorage` through `schedules-store.ts`, re-validated
+against `scheduleSchema` on load.
 
 ---
 
@@ -67,8 +99,8 @@ coverage              Morning:  1  1  2  2  2  1  1
 
 ### Why the matrix is what gets stored
 
-The placements above are *not* the stored form. The "Assign to" step's manual
-grid edits **any single cell freely**, and no pair of offsets can express an
+The placements above are *not* the stored form. The manual grid
+edits **any single cell freely**, and no pair of offsets can express an
 arbitrary cell edit. So the resolved matrix is stored and the offsets are kept
 beside it, as a record of how it was generated:
 

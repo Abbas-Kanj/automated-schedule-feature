@@ -13,8 +13,8 @@ export function EmployeesTable({ data }: EmployeesTableProps) {
       columns={employeesColumns}
       data={data}
       searchPlaceholder='Search employees...'
-      // There's no single `name` column to fall back on, so search across the
-      // things someone actually knows an employee by.
+      // Searches across the things someone knows an employee by (no single `name`
+      // column).
       globalFilterFn={(row, _columnId, filterValue) => {
         const needle = String(filterValue).toLowerCase()
         const employee = row.original

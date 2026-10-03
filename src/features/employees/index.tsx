@@ -34,8 +34,8 @@ const DEFAULT_EMPLOYEE: Employee = {
 }
 
 const EmployeesPage = () => {
-  // `?action=edit&employeeId=...` is what turns this into the edit screen, so
-  // the edited record derives from the URL rather than local state.
+  // `?action=edit&employeeId=...` turns this into the edit screen; the edited
+  // record derives from the URL.
   const { action, employeeId } = route.useSearch()
   const editing = (
     action === 'edit'

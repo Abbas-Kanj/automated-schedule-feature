@@ -2,8 +2,7 @@ import { type Team } from './schema'
 
 // A team groups people; it does not by itself decide who works when — the
 // schedule's "Assign to" step picks which crew covers which shift on which
-// cycle day. Ids are stable literals rather than `generateId()` since
-// seeded records need the same identity across reloads.
+// cycle day.
 export const defaultTeams: Team[] = [
   {
     id: 'team-a',

@@ -37,8 +37,7 @@ export function isFixedSchedule(schedule: Schedule): schedule is FixedSchedule {
   return schedule.parent_type === 'regular' && schedule.type === 'fixed'
 }
 
-// A bound rather than "until found" — a rule with no working day at all
-// (weekly, nothing ticked) would otherwise never stop.
+// Upper bound on the search, so a rule with no working day stops.
 const MAX_WALK_DAYS = 366 * 10
 
 // The shifts running on a date, in clock order: each by its own occurrence

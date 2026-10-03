@@ -166,9 +166,7 @@ describe('seeded fixed schedules', () => {
   )
 })
 
-// The point of seven seeds rather than two is breadth: if a future edit
-// collapses them onto the same arm, these fail rather than silently narrowing
-// what a new developer sees on first run.
+// Seven seeds span the model; collapsing them onto the same arm fails these.
 describe('seeds span the model', () => {
   it('covers both rotate cycle types', () => {
     expect(new Set(rotateSeeds.map((s) => s.cycle_type))).toEqual(

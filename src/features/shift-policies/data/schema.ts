@@ -15,8 +15,7 @@ export const POLICY_TYPES = [
 // A rule takes one of three shapes, discriminated on `policy_type`: window
 // types describe a from-to window with a factor; the two "worked when off"
 // types take a flat hours count instead; "missed punch error" counts
-// occurrences over a span of days/months. Each set is its own tuple (rather
-// than filtered from `POLICY_TYPES`) so `z.enum` gets literal types.
+// occurrences over a span of days/months.
 export const WINDOW_POLICY_TYPES = ['tardy', 'departure', 'overtime'] as const
 const windowPolicyTypeSchema = z.enum(WINDOW_POLICY_TYPES)
 
@@ -96,9 +95,8 @@ const missedPunchDeductionUnitSchema = z.enum(MISSED_PUNCH_DEDUCTION_UNITS)
 
 const ruleNameSchema = z.string().min(1, 'Rule name is required').max(60)
 
-// A rule's own from–to span in minutes. 0 for a non-increasing range
-// rather than a negative number — rules don't cross midnight (unlike a
-// shift's time ranges), the range is a window within one day.
+// A rule's own from–to span in minutes; 0 for a non-increasing range. Rules
+// don't cross midnight.
 export function getRuleSpanMinutes(from_time: string, to_time: string): number {
   if (!from_time || !to_time || !(to_time > from_time)) return 0
   return toMinutes(to_time) - toMinutes(from_time)
@@ -115,8 +113,7 @@ export function getRuleResultMinutes(rule: {
 }
 
 // One configurable window inside a policy. `factor` multiplies the window's
-// duration (1 = as-worked, 1.5 = time and a half, ...) — half-step only,
-// which is what the number input's 0.5 step produces.
+// duration (1 = as-worked, 1.5 = time and a half, ...), in half steps.
 const windowRuleSchema = z.object({
   id: z.string(),
   policy_type: windowPolicyTypeSchema,
@@ -212,8 +209,8 @@ const policyRuleSchema = z.discriminatedUnion('policy_type', [
   breakTimeRuleSchema,
 ])
 
-// Cross-field checks live here rather than on the members so both rule
-// shapes stay plain objects — `z.discriminatedUnion` needs them that way.
+// Cross-field checks live here so both rule shapes stay plain objects for
+// `z.discriminatedUnion`.
 const policyFieldsSchema = z
   .object({
     name: z.string().min(1, 'Policy name is required').max(60),

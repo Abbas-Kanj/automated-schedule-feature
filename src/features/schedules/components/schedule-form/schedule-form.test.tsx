@@ -67,10 +67,7 @@ describe('ScheduleForm — going back', () => {
     ])
   })
 
-  // Stepping back to re-read an earlier answer is not an edit. Resetting on
-  // the navigation itself discarded every later answer, and because the step
-  // landed on still showed its own data the loss only surfaced on the way
-  // forward again.
+  // Stepping back to re-read an earlier answer is not an edit.
   it('keeps later steps when creating and nothing is edited', async () => {
     const screen = await render(
       <ScheduleForm

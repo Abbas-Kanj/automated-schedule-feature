@@ -58,8 +58,7 @@ export function EndFrequencyFields<T extends FieldValues>({
               <FormLabel className='cursor-pointer font-normal'>
                 End after
               </FormLabel>
-              {/* Always rendered but disabled, so the field and its default
-                  value aren't hidden until this option is selected. */}
+              {/* Always rendered but disabled. */}
               <FormField
                 control={control}
                 name={`${name}.end_occurrences`}

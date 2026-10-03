@@ -521,8 +521,7 @@ describe('end settings', () => {
   })
 })
 
-// A date that matches the regex but does not exist used to pass, and then
-// became a different day the moment anything turned it into a Date.
+// A date that matches the regex but does not exist is rejected.
 describe('calendar dates', () => {
   it.each(['2026-02-31', '2026-13-01', '2026-00-10', '2026-04-31'])(
     'rejects %s',

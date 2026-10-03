@@ -59,9 +59,7 @@ export function IconPickerField({
             <CommandInput placeholder='Search icons...' />
             <CommandList>
               <CommandEmpty>No icon found.</CommandEmpty>
-              {/* cmdk renders items inside a nested [cmdk-group-items] div,
-                  not the element className lands on — target it directly
-                  or a flex/grid layout here is a no-op. */}
+              {/* cmdk renders items inside a nested [cmdk-group-items] div, so it is targeted directly. */}
               <CommandGroup className='**:[[cmdk-group-items]]:flex **:[[cmdk-group-items]]:flex-wrap **:[[cmdk-group-items]]:gap-1'>
                 {SHIFT_ICON_OPTIONS.map((o) => (
                   <CommandItem

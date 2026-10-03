@@ -32,8 +32,7 @@ import {
   toPosition,
 } from './utils'
 
-// Week is the readable "who's on now" unit; month is long enough for a
-// 28-day cycle to close, where the stepping bands become visible.
+// The span of days the grid shows.
 export type TimelineSpan = 'week' | 'month'
 
 // Grouped in sevens so a row reads as weeks ("days 1-7, days 8-14, ...");
@@ -60,11 +59,9 @@ export type TimelineCrewRow = {
   headcount: number
   // Index-aligned with `days`.
   cells: RotationPosition[]
-  // Derived from the schedule's own start, not the visible range, so
-  // navigating months never changes what it says.
+  // Derived from the schedule's own start, not the visible range.
   startDate: Date
-  // Working days in the visible range, so equity across crews doesn't have to
-  // be counted by eye across 31 columns.
+  // Working days in the visible range.
   daysOn: number
 }
 
@@ -86,8 +83,8 @@ const DAYS_PER_ADVANCE: Record<RotationPeriodType, number> = {
   monthly: 31,
 }
 
-// Walked rather than computed: `getPeriodIndex` is the one place that knows
-// how a date maps onto a cycle day, so duplicating that math here would drift.
+// Walked through `getPeriodIndex`, the one place that maps a date onto a cycle
+// day.
 function crewStartDate(
   schedule: RotateSchedule,
   workedDays: Set<number>,
@@ -132,8 +129,7 @@ export function toBlocks(
     const sameMonth = first.getMonth() === last.getMonth()
     blocks.push({
       key: format(first, 'yyyy-MM-dd'),
-      // "Days N-M" matches how rosters are written within a month; a lone
-      // week is better named by its dates.
+      // Labelled "Days N-M"; a lone week is named by its dates.
       label:
         span === 'month'
           ? `Days ${format(first, 'd')}\u2013${format(last, 'd')}`
@@ -169,8 +165,7 @@ export function buildRotationTimeline(
   )
 
   // Always the whole week/month, including days before the schedule's start
-  // (wrapped through the cycle) — clamping those shrinks a month to one dot
-  // when the schedule starts on the 31st.
+  // (wrapped through the cycle).
   const days: TimelineDay[] = spanDays(viewDate, span).map((date) => ({
     date,
     cycleDay: cycleLength
@@ -201,8 +196,7 @@ export function buildRotationTimeline(
       cycleLength
     )
     const cells = days.map((day) => {
-      // First shift wins on a hand-made double booking, matching how the
-      // employee table resolves it.
+      // First shift wins on a hand-made double booking.
       const shiftId = crew.byDay.get(day.cycleDay)?.[0]
       return toPosition(
         day.cycleDay,
@@ -244,7 +238,6 @@ export function buildRotationTimeline(
   }
 }
 
-// Kept here so the screen and the builder parse the start date the same way.
 export function parseScheduleStart(startDate: string): Date {
   return startOfDay(parse(startDate, 'yyyy-MM-dd', new Date()))
 }

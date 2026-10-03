@@ -504,8 +504,7 @@ describe('cycleDayDates', () => {
 })
 
 // A crew's `day_offset` is the cycle card it stands on at day 0 — not a delay
-// before it starts. Indexing the cycle-day dates by it produced "starts Sep 7"
-// for a crew already on duty on day 0, contradicting the timeline's own label.
+// before it starts.
 describe('buildRotation crew start dates', () => {
   const staggered: RotateSchedule = {
     ...schedule,

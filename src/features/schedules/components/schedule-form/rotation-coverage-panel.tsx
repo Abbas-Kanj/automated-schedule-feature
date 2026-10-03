@@ -15,8 +15,7 @@ type RotationCoveragePanelProps = {
   shifts: Shift[]
   // Column headers (real dates) instead of cycle-day numbers.
   dayLabels?: string[]
-  // Rendered between the coverage grid and the warnings — the per-person
-  // roster, so it reads next to the numbers it explains.
+  // Rendered between the coverage grid and the warnings.
   children?: ReactNode
 }
 
@@ -38,11 +37,9 @@ const WARNING_STYLES: Record<
   info: { icon: Info, className: 'text-muted-foreground' },
 }
 
-// The only place a coverage hole is reported: leaving a shift unstaffed is a
-// warning, not a validation error, so "Next" always advances and this panel
-// carries the message. The grid's shift rows show whether every selected
-// shift is covered every day, driven by live form state so a hand edit
-// updates it immediately.
+// Reports coverage holes: leaving a shift unstaffed is a warning, not a
+// validation error. The grid's shift rows show whether every selected shift is
+// covered every day, driven by live form state.
 export function RotationCoveragePanel({
   analysis,
   orderedShiftIds,
@@ -58,11 +55,8 @@ export function RotationCoveragePanel({
   const minOnDuty = onDutyCounts.length ? Math.min(...onDutyCounts) : 0
   const maxOnDuty = onDutyCounts.length ? Math.max(...onDutyCounts) : 0
 
-  // `info`-severity warnings are hidden except the two kinds that explain
-  // something already on screen: an unstaffed shift (the red 0 above) and
-  // weekday alignment (the start date lives on a different step). The
-  // nobody-in-today line stays hidden — the "On duty" row already shows the
-  // zero. `analysis.warnings` still carries every line for callers/tests.
+  // `info`-severity warnings are hidden except an unstaffed shift and weekday
+  // alignment. `analysis.warnings` still carries every line.
   const shownWarnings = analysis.warnings.filter(
     (warning) =>
       warning.severity !== 'info' || SHOWN_INFO_CODES.has(warning.code)

@@ -171,8 +171,7 @@ export function FixedAssignToFields({ disabled }: FixedAssignToFieldsProps) {
                     </span>
                   )}
                 </div>
-                {/* Keyed on the kind so the picker remounts rather than
-                      holding the other kind's ids for a frame. */}
+                {/* Keyed on the kind so the picker remounts. */}
                 <FilterableMultiSelect
                   key={crewKind}
                   options={options}
